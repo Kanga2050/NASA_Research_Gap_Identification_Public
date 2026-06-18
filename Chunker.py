@@ -85,7 +85,7 @@ if __name__ == "__main__":
         similarity_threshold=0.60
     )
 
-    result = segmenter.process_pdf("document.pdf")
+    result = segmenter.process_pdf("/Users/schauha4/Desktop/Research_Gap_Identification/Pdfs/10.1002_aps3.1197.pdf")
 
     print(f"Sections found: {result['section_count']}")
 
