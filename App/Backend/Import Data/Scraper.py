@@ -16,7 +16,7 @@ def fetch_data(topic, output_filename="scaped.csv", limit = 10000):
         'filter': "has_abstract:true",
         'per_page':200,
         'cursor': '*',
-        'api_key': os.environ.get('OPENALEX_API_KEY')
+        'api_key': "n66C3l0O086hALzQQDEDq4"
     }
 
     columns = [
@@ -98,6 +98,6 @@ def fetch_data(topic, output_filename="scaped.csv", limit = 10000):
 if __name__ == "__main__":
     fetch_data(
         topic = "Space Biology",
-        output_filename = "scraped.csv",
+        output_filename = "App/Backend/CSVs/Space_Biology.csv",
         limit = 100000
     )
