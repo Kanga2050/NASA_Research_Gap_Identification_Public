@@ -1,0 +1,26 @@
+import pandas as pd
+
+def hybrid_search(csv_path: str, keyword_col: str, semantic_col: str, new_column_name: str = "hybrid_score", k: int = 60):
+    print("Running Hybrid Reciprocal Rank Fusion (RRF)...")
+    df = pd.read_csv(csv_path)
+    
+    # Convert absolute scores into dense rankings (1 being the highest match)
+    keyword_rank = df[keyword_col].rank(ascending=False, method='min')
+    semantic_rank = df[semantic_col].rank(ascending=False, method='min')
+    
+    # Apply standard Reciprocal Rank Fusion calculation
+    rrf_score = (1.0 / (k + keyword_rank)) + (1.0 / (k + semantic_rank))
+    
+    # Normalize between 0 and 1 to make numerical thresholds human-intuitive
+    df[new_column_name] = (rrf_score - rrf_score.min()) / (rrf_score.max() - rrf_score.min())
+    
+    df.to_csv(csv_path, index=False)
+    print(f"Success! Hybrid RRF favorability saved to column '{new_column_name}'.")
+
+if __name__ == "__main__":
+    hybrid_search(
+        csv_path="App/Backend/CSVs/Space_Biology.csv",
+        keyword_col="keyword_favorability",
+        semantic_col="semantic_favorability",
+        new_column_name="hybrid_favorability"
+    )
