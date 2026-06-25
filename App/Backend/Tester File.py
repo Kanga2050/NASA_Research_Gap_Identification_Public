@@ -23,6 +23,10 @@ def run_full_pipeline(file_path):
     reduce_embeddings_with_umap(file_path, "abstract_embedding", "2d", n_components=2)
     cluster_with_hdbscan(file_path, "5d", "topic_id", min_cluster_size=32, min_samples=8)
     generate_intertopic_distance_map(file_path, "topic_id", "abstract", "2d")
+
+
+
+    
     keyword_search(file_path, query="my query", text_column="abstract", new_column_name="kw")
     semantic_search(file_path, query="my query", embedding_column="abstract_embedding", new_column_name="sem")
     hybrid_search(file_path, keyword_col="kw", semantic_col="sem", new_column_name="hybrid")

@@ -7,11 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastmcp import FastMCP
 
-# Add local paths
+# Add local paths to path resolution for safety
 sys.path.append(os.path.join(os.getcwd(), 'Annotation_Functions'))
 sys.path.append(os.path.join(os.getcwd(), 'Visualization_Functions'))
 
-# Import your atomic functions
+# Import all modules from your pipeline
 from Annotation_Functions.Embedder import add_embeddings_in_place
 from Annotation_Functions.Dimensionality_Reducer import reduce_embeddings_with_umap
 from Annotation_Functions.Clustering import cluster_with_hdbscan
@@ -21,7 +21,7 @@ from Annotation_Functions.Semantic_Score import semantic_search
 from Annotation_Functions.Hybrid_Score import hybrid_search
 from Distillation_Functions.Numerical_Filtering import numerical_search
 
-# 1. Initialize FastAPI Application
+# 1. Initialize core FastAPI context
 app = FastAPI(title="Deconstructed Pipeline API")
 app.add_middleware(
     CORSMiddleware,
@@ -31,18 +31,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared memory log to trace atomic tasks asynchronously 
-# Structure: { task_id: {"function": "...", "status": "processing/completed/failed", "result": "..."} }
+# Shared memory tracking log for background pipeline jobs
 task_registry: Dict[str, Any] = {}
 
-# 2. Asynchronous Execution Helper
+# 2. Async Engine Executor Thread Helper
 def run_async_step(task_id: str, function_name: str, func, *args, **kwargs):
     """Executes any pipeline step on a background thread and caches execution state."""
     try:
         task_registry[task_id] = {"function": function_name, "status": "processing"}
         print(f"[Engine] Running task {task_id} ({function_name})...")
         
-        # Execute the actual imported function dynamically
+        # Invoke your pipeline module dynamically
         func(*args, **kwargs)
         
         task_registry[task_id]["status"] = "completed"
@@ -51,15 +50,17 @@ def run_async_step(task_id: str, function_name: str, func, *args, **kwargs):
         task_registry[task_id]["status"] = "failed"
         task_registry[task_id]["error"] = str(e)
 
-# --- 3. DUAL WORKFLOW EXPOSURES (HUMAN REST ENDPOINTS & AI MCP TOOLS) ---
 
-# Schema for tracking task state
+# --- 3. GLOBAL STATUS TRACKER ---
 @app.get("/api/task/status/{task_id}")
 def get_task_status(task_id: str):
-    """Exposed to UI and Agents to check up on execution status."""
+    """Exposed endpoint to check up on background thread execution updates."""
     if task_id not in task_registry:
         raise HTTPException(status_code=404, detail="Task ID not registered.")
     return task_registry[task_id]
+
+
+# --- 4. DECONSTRUCTED ROUTE HANDLERS ---
 
 # ----------------- STEP A: EMBEDDING GENERATION -----------------
 class EmbedRequest(BaseModel):
@@ -70,13 +71,14 @@ class EmbedRequest(BaseModel):
 
 @app.post("/api/pipeline/embed")
 def trigger_embed(data: EmbedRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
-    """Generates embeddings inside the specified column path."""
+    """Generates vector embeddings across targeted textual rows."""
     task_id = str(uuid.uuid4())
     bg_tasks.add_task(
         run_async_step, task_id, "add_embeddings_in_place", 
         add_embeddings_in_place, data.file_path, data.text_column, data.embedding_column, data.model
     )
     return {"task_id": task_id, "status": "queued"}
+
 
 # ----------------- STEP B: UMAP REDUCTION -----------------
 class UmapRequest(BaseModel):
@@ -87,13 +89,14 @@ class UmapRequest(BaseModel):
 
 @app.post("/api/pipeline/umap")
 def trigger_umap(data: UmapRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
-    """Applies dimensional reduction to a target coordinate space (e.g. 2d or 5d)."""
+    """Applies dimensional reduction coordinates to a targets coordinate array space."""
     task_id = str(uuid.uuid4())
     bg_tasks.add_task(
         run_async_step, task_id, "reduce_embeddings_with_umap",
         reduce_embeddings_with_umap, data.file_path, data.embedding_column, data.output_column, n_components=data.n_components
     )
     return {"task_id": task_id, "status": "queued"}
+
 
 # ----------------- STEP C: HDBSCAN CLUSTERING -----------------
 class ClusterRequest(BaseModel):
@@ -105,7 +108,7 @@ class ClusterRequest(BaseModel):
 
 @app.post("/api/pipeline/cluster")
 def trigger_cluster(data: ClusterRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
-    """Processes dynamic spatial grouping metrics using HDBSCAN."""
+    """Processes computational geometric classification steps through spatial density mappings."""
     task_id = str(uuid.uuid4())
     bg_tasks.add_task(
         run_async_step, task_id, "cluster_with_hdbscan",
@@ -113,24 +116,116 @@ def trigger_cluster(data: ClusterRequest, bg_tasks: BackgroundTasks) -> Dict[str
     )
     return {"task_id": task_id, "status": "queued"}
 
-# [You can similarly add endpoints for keyword_search, semantic_search, hybrid_search, and numerical_search here following the same blueprint]
 
-# 4. Bind FastMCP automatically directly out of your FastAPI endpoints
+# ----------------- STEP D: INTERTOPIC DISTANCE MAPS -----------------
+class DistanceMapRequest(BaseModel):
+    file_path: str
+    topic_column: str = "topic_id"
+    text_column: str = "abstract"
+    coordinate_column: str = "2d"
+
+@app.post("/api/pipeline/distance-map")
+def trigger_distance_map(data: DistanceMapRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Builds topological representations mapping the contextual vector distances of structural topics."""
+    task_id = str(uuid.uuid4())
+    bg_tasks.add_task(
+        run_async_step, task_id, "generate_intertopic_distance_map",
+        generate_intertopic_distance_map, data.file_path, data.topic_column, data.text_column, data.coordinate_column
+    )
+    return {"task_id": task_id, "status": "queued"}
+
+
+# ----------------- STEP E: KEYWORD SEARCH SEEDING -----------------
+class KeywordSearchRequest(BaseModel):
+    file_path: str
+    query: str
+    text_column: str = "abstract"
+    new_column_name: str = "kw"
+
+@app.post("/api/pipeline/keyword-search")
+def trigger_keyword_search(data: KeywordSearchRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Executes frequency-based lexical matches matching precise string parameter strings."""
+    task_id = str(uuid.uuid4())
+    bg_tasks.add_task(
+        run_async_step, task_id, "keyword_search",
+        keyword_search, data.file_path, data.query, data.text_column, data.new_column_name
+    )
+    return {"task_id": task_id, "status": "queued"}
+
+
+# ----------------- STEP F: SEMANTIC SEARCH METRICS -----------------
+class SemanticSearchRequest(BaseModel):
+    file_path: str
+    query: str
+    embedding_column: str = "abstract_embedding"
+    new_column_name: str = "sem"
+
+@app.post("/api/pipeline/semantic-search")
+def trigger_semantic_search(data: SemanticSearchRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Determines high-dimensional cosine similarity matrix associations across vector spaces."""
+    task_id = str(uuid.uuid4())
+    bg_tasks.add_task(
+        run_async_step, task_id, "semantic_search",
+        semantic_search, data.file_path, data.query, data.embedding_column, data.new_column_name
+    )
+    return {"task_id": task_id, "status": "queued"}
+
+
+# ----------------- STEP G: HYBRID WEIGHTED SEARCH -----------------
+class HybridSearchRequest(BaseModel):
+    file_path: str
+    keyword_col: str = "kw"
+    semantic_col: str = "sem"
+    new_column_name: str = "hybrid"
+
+@app.post("/api/pipeline/hybrid-search")
+def trigger_hybrid_search(data: HybridSearchRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Combines lexical keyword matching scores and dense vector semantic context mappings."""
+    task_id = str(uuid.uuid4())
+    bg_tasks.add_task(
+        run_async_step, task_id, "hybrid_search",
+        hybrid_search, data.file_path, data.keyword_col, data.semantic_col, data.new_column_name
+    )
+    return {"task_id": task_id, "status": "queued"}
+
+
+# ----------------- STEP H: NUMERICAL SCORE DISTILLATION -----------------
+class NumericalSearchRequest(BaseModel):
+    file_path: str
+    output_csv: str = "Filtered_Output.csv"
+    target_score_column: str = "hybrid"
+    threshold: float = 0.70
+
+@app.post("/api/pipeline/numerical-distillation")
+def trigger_numerical_search(data: NumericalSearchRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Performs downstream structural rows pruning using explicit cutoff conditions."""
+    task_id = str(uuid.uuid4())
+    bg_tasks.add_task(
+        run_async_step, task_id, "numerical_search",
+        numerical_search, data.file_path, data.output_csv, data.target_score_column, data.threshold
+    )
+    return {"task_id": task_id, "status": "queued"}
+
+
+# --- 5. UNIFIED ROUTE ROUTER & DEPLOYMENT LAYER ---
+
+# Dynamically extract full MCP compliance schemas by reading all FastAPI app signatures
 mcp = FastMCP.from_fastapi(app)
 
-# Convert the MCP configuration into an HTTP-compatible app layer
+# Wrap the MCP endpoints configuration matrix into an HTTP compatible app layer instance
 mcp_app = mcp.http_app()
 
-# Merge both route schemas into a unified app so /docs remains active
+# Merge both endpoint route collections into a combined FastAPI structure so /docs stays available
 combined_app = FastAPI(
     title="Deconstructed Pipeline API (With MCP Integration)",
+    description="Atomic Data Science execution blocks serving Frontend and AI Agents.",
     routes=[
-        *mcp_app.routes,  # Houses the underlying MCP protocols
-        *app.routes,      # Houses your REST API endpoints & /docs
+        *mcp_app.routes,  # Exposes structural /mcp endpoints to internal AI Client agents
+        *app.routes,      # Exposes /api endpoints to browser frontends & /docs to developers
     ]
 )
 
 if __name__ == "__main__":
     import uvicorn
-    # Use standard uvicorn to run the merged app instead of mcp.run()
+    # Enforces 127.0.0.1 loopback deployment protecting data flow within strict networks
     uvicorn.run(combined_app, host="127.0.0.1", port=8000)
