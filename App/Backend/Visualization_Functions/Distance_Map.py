@@ -1,0 +1,82 @@
+import pandas as pd
+import numpy as np
+import ast
+import plotly.express as px
+import spacy
+from collections import Counter
+
+
+nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+
+
+def get_topic_names(df, topic_column, text_column, top_n=3):
+    topic_names = {}
+    for topic_id in df[topic_column].unique():
+        if topic_id == -1: continue
+        
+        # Aggregate text
+        topic_texts = " ".join(df[df[topic_column] == topic_id][text_column].fillna("").tolist())
+        
+        # Process with spaCy: Lemmatize and filter for Nouns/Adjectives
+        doc = nlp(topic_texts[:100000]) # Limit length for performance
+        words = [
+            token.lemma_.lower() for token in doc 
+            if token.is_alpha and not token.is_stop and token.pos_ in ["NOUN", "ADJ"]
+        ]
+        
+        # Get the most common words
+        common = Counter(words).most_common(top_n)
+        topic_names[topic_id] = ", ".join([word for word, count in common])
+        
+    return topic_names
+
+def generate_intertopic_distance_map(
+    csv_path: str, 
+    topic_column: str, 
+    text_column: str = "abstract",
+    coord_column: str = "2d",
+    output_html: str = "App/Backend/Visualizations/Space_Biology_Topics.html"
+):
+    print(f"Loading data from '{csv_path}'...")
+    df = pd.read_csv(csv_path)
+    
+    # Parse coordinates
+    valid_rows = df[coord_column].dropna().index
+    parsed_coords = df.loc[valid_rows, coord_column].apply(ast.literal_eval)
+    df['x'] = np.nan
+    df['y'] = np.nan
+    df.loc[valid_rows, 'x'] = [coord[0] for coord in parsed_coords]
+    df.loc[valid_rows, 'y'] = [coord[1] for coord in parsed_coords]
+
+    # Calculate stats
+    topics_df = df[df[topic_column] != -1]
+    topic_stats = topics_df.groupby(topic_column).agg(
+        x=('x', 'mean'), y=('y', 'mean'), size=('x', 'count')
+    ).reset_index()
+
+    # Generate Labels
+    print("Generating keyword labels for topics...")
+    labels = get_topic_names(topics_df, topic_column, text_column)
+    topic_stats['Topic_Label'] = topic_stats[topic_column].map(labels)
+
+    # Plot
+    fig = px.scatter(
+        topic_stats, x='x', y='y', size='size',
+        color='Topic_Label', hover_name='Topic_Label',
+        title='Intertopic Distance Map',
+        size_max=60
+    )
+
+    fig.update_traces(marker=dict(sizemode='area', sizemin=5, opacity=0.8, line=dict(width=1, color='Black')))
+    fig.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), plot_bgcolor='white')
+
+    fig.write_html(output_html)
+    print(f"Success! Map saved to {output_html}")
+
+if __name__ == "__main__":
+    generate_intertopic_distance_map(
+        csv_path="App/Backend/CSVs/Space_Biology.csv",
+        topic_column="topic_id",
+        text_column="abstract",
+        coord_column="2d"
+    )
