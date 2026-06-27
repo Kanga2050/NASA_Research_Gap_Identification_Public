@@ -283,7 +283,7 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
         for col in df.columns:
             if df[col].dtype == object: # usually strings
                 df[col] = df[col].astype(str).apply(
-                    lambda x: x[:200] + "... [truncated]" if len(x) > 200 else x
+                    lambda x: x[:30] + "... [truncated]" if len(x) > 30 else x
                 )
 
         return df.to_markdown(index=False)

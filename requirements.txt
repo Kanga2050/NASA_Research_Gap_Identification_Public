@@ -13,3 +13,4 @@ sentence-transformers
 spacy
 umap-learn
 uvicorn
+tabulate
