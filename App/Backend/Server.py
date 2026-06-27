@@ -207,25 +207,22 @@ def trigger_numerical_search(data: NumericalSearchRequest, bg_tasks: BackgroundT
     return {"task_id": task_id, "status": "queued"}
 
 
-# --- 5. UNIFIED ROUTE ROUTER & DEPLOYMENT LAYER ---
-
-# Dynamically extract full MCP compliance schemas by reading all FastAPI app signatures
 mcp = FastMCP.from_fastapi(app)
 
-# Wrap the MCP endpoints configuration matrix into an HTTP compatible app layer instance
 mcp_app = mcp.http_app()
 
-# Merge both endpoint route collections into a combined FastAPI structure so /docs stays available
+
 combined_app = FastAPI(
     title="Deconstructed Pipeline API (With MCP Integration)",
     description="Atomic Data Science execution blocks serving Frontend and AI Agents.",
+    lifespan=mcp_app.lifespan,  # <--- THIS IS THE MAGIC LINE FIXING THE 500 ERROR
     routes=[
-        *mcp_app.routes,  # Exposes structural /mcp endpoints to internal AI Client agents
-        *app.routes,      # Exposes /api endpoints to browser frontends & /docs to developers
+        *mcp_app.routes,
+        *app.routes,
     ]
 )
 
 if __name__ == "__main__":
     import uvicorn
-    # Enforces 127.0.0.1 loopback deployment protecting data flow within strict networks
+    # Run the new combined_app
     uvicorn.run(combined_app, host="127.0.0.1", port=8000)
