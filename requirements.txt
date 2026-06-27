@@ -1,0 +1,15 @@
+cloudscraper
+fastapi
+fastmcp
+PyMuPDF
+hdbscan
+numpy
+pandas
+plotly
+pydantic
+requests
+scikit-learn
+sentence-transformers
+spacy
+umap-learn
+uvicorn
