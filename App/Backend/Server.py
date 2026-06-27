@@ -1,6 +1,7 @@
 import sys
 import os
 import uuid
+import pandas
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -208,6 +209,92 @@ def trigger_numerical_search(data: NumericalSearchRequest, bg_tasks: BackgroundT
 
 
 mcp = FastMCP.from_fastapi(app)
+
+DATA_DIR = "./App/Backend/CSVs"
+
+@mcp.resource("csv://catalog")
+def get_csv_catalog() -> str:
+    """
+    Returns a list of all CSVs in the data folder, their exact column names, 
+    and their approximate size in rows and megabytes.
+    """
+    catalog_info = ["# CSV Data Catalog\n"]
+    
+    if not os.path.exists(DATA_DIR):
+        return f"Error: Data directory '{DATA_DIR}' not found."
+
+    for file in os.listdir(DATA_DIR):
+        if file.endswith(".csv"):
+            path = os.path.join(DATA_DIR, file)
+            size_mb = os.path.getsize(path) / (1024 * 1024)
+            
+            # Read only the header to extract column labels (zero memory cost)
+            try:
+                df_header = pandas.read_csv(path, nrows=0)
+                columns = list(df_header.columns)
+                
+                # Fast row count (generator expression avoids loading file into RAM)
+                with open(path, 'rb') as f:
+                    row_count = sum(1 for _ in f) - 1 # Subtract 1 for header
+                
+                catalog_info.append(f"### {file}")
+                catalog_info.append(f"- **Size:** {size_mb:.2f} MB ({row_count} rows)")
+                catalog_info.append(f"- **Columns:** {', '.join(columns)}\n")
+            except Exception as e:
+                catalog_info.append(f"### {file}\n- **Error reading file:** {str(e)}\n")
+
+    return "\n".join(catalog_info)
+
+
+@mcp.resource("csv://{filename}/segment/{start_row}/{num_rows}/{columns}")
+def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) -> str:
+    """
+    Retrieves a specific segment of a CSV.
+    - filename: The name of the csv file (e.g., 'data.csv')
+    - start_row: The index of the first row to read (0-indexed)
+    - num_rows: How many rows to return
+    - columns: Comma-separated list of columns, or 'all' for all columns
+    """
+    path = os.path.join(DATA_DIR, filename)
+    
+    if not os.path.exists(path):
+        return f"Error: File '{filename}' not found."
+
+    # Parse requested columns
+    usecols = None # Pandas uses None to mean "all columns"
+    if columns.lower() != "all":
+        usecols = [col.strip() for col in columns.split(",")]
+
+    try:
+        # skiprows=range(1, start_row + 1) safely skips past rows we don't want,
+        # while implicitly keeping row 0 (the header row).
+        # usecols ensures pandas DOES NOT even parse the columns we don't request.
+        df = pandas.read_csv(
+            path,
+            skiprows=range(1, start_row + 1),
+            nrows=num_rows,
+            usecols=usecols
+        )
+        
+        if df.empty:
+            return "No data found at this row segment (End of file reached)."
+
+        # Optional: Truncate massively long text fields to protect the LLM context window
+        for col in df.columns:
+            if df[col].dtype == object: # usually strings
+                df[col] = df[col].astype(str).apply(
+                    lambda x: x[:200] + "... [truncated]" if len(x) > 200 else x
+                )
+
+        return df.to_markdown(index=False)
+        
+    except ValueError as e:
+        return f"Column Error: Make sure the columns requested exist. Details: {str(e)}"
+    except Exception as e:
+        return f"Error reading segment: {str(e)}"
+
+
+
 
 mcp_app = mcp.http_app()
 
