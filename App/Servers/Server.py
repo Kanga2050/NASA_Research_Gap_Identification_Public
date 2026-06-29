@@ -7,22 +7,20 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastmcp import FastMCP
-
-# Add local paths to path resolution for safety
-sys.path.append(os.path.join(os.getcwd(), 'Annotation_Functions'))
-sys.path.append(os.path.join(os.getcwd(), 'Visualization_Functions'))
+from typing import Literal
+import asyncio
+from pathlib import Path
 
 # Import all modules from your pipeline
-from Annotation_Functions.Embedder import add_embeddings_in_place
-from Annotation_Functions.Dimensionality_Reducer import reduce_embeddings_with_umap
-from Annotation_Functions.Clustering import cluster_with_hdbscan
-from Visualization_Functions.Distance_Map import generate_intertopic_distance_map
-from Annotation_Functions.Keyword_Score import keyword_search
-from Annotation_Functions.Semantic_Score import semantic_search
-from Annotation_Functions.Hybrid_Score import hybrid_search
-from Distillation_Functions.Numerical_Filtering import numerical_search
+from App.Backend.Annotation_Functions.Embedder import add_embeddings_in_place
+from App.Backend.Annotation_Functions.Dimensionality_Reducer import reduce_embeddings_with_umap
+from App.Backend.Annotation_Functions.Clustering import cluster_with_hdbscan
+from App.Backend.Visualization_Functions.Distance_Map import generate_intertopic_distance_map
+from App.Backend.Annotation_Functions.Keyword_Score import keyword_search
+from App.Backend.Annotation_Functions.Semantic_Score import semantic_search
+from App.Backend.Annotation_Functions.Hybrid_Score import hybrid_search
+from App.Backend.Distillation_Functions.Numerical_Filtering import numerical_search
 
-# 1. Initialize core FastAPI context
 app = FastAPI(title="Deconstructed Pipeline API")
 app.add_middleware(
     CORSMiddleware,
@@ -32,10 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared memory tracking log for background pipeline jobs
 task_registry: Dict[str, Any] = {}
 
-# 2. Async Engine Executor Thread Helper
 def run_async_step(task_id: str, function_name: str, func, *args, **kwargs):
     """Executes any pipeline step on a background thread and caches execution state."""
     try:
@@ -52,7 +48,6 @@ def run_async_step(task_id: str, function_name: str, func, *args, **kwargs):
         task_registry[task_id]["error"] = str(e)
 
 
-# --- 3. GLOBAL STATUS TRACKER ---
 @app.get("/api/task/status/{task_id}")
 def get_task_status(task_id: str):
     """Exposed endpoint to check up on background thread execution updates."""
@@ -61,9 +56,6 @@ def get_task_status(task_id: str):
     return task_registry[task_id]
 
 
-# --- 4. DECONSTRUCTED ROUTE HANDLERS ---
-
-# ----------------- STEP A: EMBEDDING GENERATION -----------------
 class EmbedRequest(BaseModel):
     file_path: str
     text_column: str = "abstract"
@@ -81,7 +73,6 @@ def trigger_embed(data: EmbedRequest, bg_tasks: BackgroundTasks) -> Dict[str, st
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP B: UMAP REDUCTION -----------------
 class UmapRequest(BaseModel):
     file_path: str
     embedding_column: str = "abstract_embedding"
@@ -99,7 +90,6 @@ def trigger_umap(data: UmapRequest, bg_tasks: BackgroundTasks) -> Dict[str, str]
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP C: HDBSCAN CLUSTERING -----------------
 class ClusterRequest(BaseModel):
     file_path: str
     coordinate_column: str = "5d"
@@ -118,7 +108,6 @@ def trigger_cluster(data: ClusterRequest, bg_tasks: BackgroundTasks) -> Dict[str
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP D: INTERTOPIC DISTANCE MAPS -----------------
 class DistanceMapRequest(BaseModel):
     file_path: str
     topic_column: str = "topic_id"
@@ -136,7 +125,6 @@ def trigger_distance_map(data: DistanceMapRequest, bg_tasks: BackgroundTasks) ->
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP E: KEYWORD SEARCH SEEDING -----------------
 class KeywordSearchRequest(BaseModel):
     file_path: str
     query: str
@@ -154,7 +142,6 @@ def trigger_keyword_search(data: KeywordSearchRequest, bg_tasks: BackgroundTasks
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP F: SEMANTIC SEARCH METRICS -----------------
 class SemanticSearchRequest(BaseModel):
     file_path: str
     query: str
@@ -172,7 +159,6 @@ def trigger_semantic_search(data: SemanticSearchRequest, bg_tasks: BackgroundTas
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP G: HYBRID WEIGHTED SEARCH -----------------
 class HybridSearchRequest(BaseModel):
     file_path: str
     keyword_col: str = "kw"
@@ -190,7 +176,6 @@ def trigger_hybrid_search(data: HybridSearchRequest, bg_tasks: BackgroundTasks) 
     return {"task_id": task_id, "status": "queued"}
 
 
-# ----------------- STEP H: NUMERICAL SCORE DISTILLATION -----------------
 class NumericalSearchRequest(BaseModel):
     file_path: str
     output_csv: str = "Filtered_Output.csv"
@@ -208,11 +193,12 @@ def trigger_numerical_search(data: NumericalSearchRequest, bg_tasks: BackgroundT
     return {"task_id": task_id, "status": "queued"}
 
 
-mcp = FastMCP.from_fastapi(app)
+
 
 DATA_DIR = "./App/Backend/CSVs"
+HTML_DIR = "./App/Backend/Visualizations"
 
-@mcp.resource("csv://catalog")
+@app.get("/api/catalog/csv")
 def get_csv_catalog() -> str:
     """
     Returns a list of all CSVs in the data folder, their exact column names, 
@@ -228,14 +214,12 @@ def get_csv_catalog() -> str:
             path = os.path.join(DATA_DIR, file)
             size_mb = os.path.getsize(path) / (1024 * 1024)
             
-            # Read only the header to extract column labels (zero memory cost)
             try:
                 df_header = pandas.read_csv(path, nrows=0)
                 columns = list(df_header.columns)
                 
-                # Fast row count (generator expression avoids loading file into RAM)
                 with open(path, 'rb') as f:
-                    row_count = sum(1 for _ in f) - 1 # Subtract 1 for header
+                    row_count = sum(1 for _ in f) - 1 
                 
                 catalog_info.append(f"### {file}")
                 catalog_info.append(f"- **Size:** {size_mb:.2f} MB ({row_count} rows)")
@@ -245,8 +229,34 @@ def get_csv_catalog() -> str:
 
     return "\n".join(catalog_info)
 
+@app.get("/api/catalog/html")
+def list_html_files() -> str:
+    """Returns a list of all currently generated HTML app files."""
+    catalog_info = ["# HTML Visualizations Catalog\n"]
+    
+    # 1. Explicitly check if the directory exists (mirrors your CSV setup)
+    if not os.path.exists(HTML_DIR):
+        return f"Error: HTML directory '{HTML_DIR}' not found."
 
-@mcp.resource("csv://{filename}/segment/{start_row}/{num_rows}/{columns}")
+    # 2. Use os.listdir instead of glob for consistent behavior
+    files = [f for f in os.listdir(HTML_DIR) if f.endswith(".html")]
+    
+    if not files:
+        return "No HTML apps generated yet."
+        
+    # 3. Add dynamic file data (like size) to ensure the payload changes
+    #    This forces the MCP client to recognize it as fresh data.
+    for file in files:
+        path = os.path.join(HTML_DIR, file)
+        try:
+            size_kb = os.path.getsize(path) / 1024
+            catalog_info.append(f"- **{file}** ({size_kb:.2f} KB)")
+        except Exception as e:
+            catalog_info.append(f"- **{file}** (Error reading file: {str(e)})")
+
+    return "\n".join(catalog_info)
+
+@app.get("/api/data/csv-segment")
 def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) -> str:
     """
     Retrieves a specific segment of a CSV.
@@ -260,15 +270,11 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
     if not os.path.exists(path):
         return f"Error: File '{filename}' not found."
 
-    # Parse requested columns
-    usecols = None # Pandas uses None to mean "all columns"
+    usecols = None # 
     if columns.lower() != "all":
         usecols = [col.strip() for col in columns.split(",")]
 
     try:
-        # skiprows=range(1, start_row + 1) safely skips past rows we don't want,
-        # while implicitly keeping row 0 (the header row).
-        # usecols ensures pandas DOES NOT even parse the columns we don't request.
         df = pandas.read_csv(
             path,
             skiprows=range(1, start_row + 1),
@@ -279,7 +285,6 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
         if df.empty:
             return "No data found at this row segment (End of file reached)."
 
-        # Optional: Truncate massively long text fields to protect the LLM context window
         for col in df.columns:
             if df[col].dtype == object: # usually strings
                 df[col] = df[col].astype(str).apply(
@@ -294,7 +299,7 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
         return f"Error reading segment: {str(e)}"
 
 
-
+mcp = FastMCP.from_fastapi(app)
 
 mcp_app = mcp.http_app()
 
@@ -302,7 +307,7 @@ mcp_app = mcp.http_app()
 combined_app = FastAPI(
     title="Deconstructed Pipeline API (With MCP Integration)",
     description="Atomic Data Science execution blocks serving Frontend and AI Agents.",
-    lifespan=mcp_app.lifespan,  # <--- THIS IS THE MAGIC LINE FIXING THE 500 ERROR
+    lifespan=mcp_app.lifespan, 
     routes=[
         *mcp_app.routes,
         *app.routes,
@@ -311,5 +316,4 @@ combined_app = FastAPI(
 
 if __name__ == "__main__":
     import uvicorn
-    # Run the new combined_app
     uvicorn.run(combined_app, host="127.0.0.1", port=8000)
