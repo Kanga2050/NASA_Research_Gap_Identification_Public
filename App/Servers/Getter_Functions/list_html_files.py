@@ -1,7 +1,9 @@
 import os
 
-def list_html_files(html_dir: str) -> str:
+def list_html_files() -> str:
     """Returns a list of all currently generated HTML app files."""
+
+    html_dir = "./App/Backend/Visualizations"
     catalog_info = ["# HTML Visualizations Catalog\n"]
     
     # 1. Explicitly check if the directory exists

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-def get_csv_segment(data_dir: str, filename: str, start_row: int, num_rows: int, columns: str) -> str:
+def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) -> str:
     """
     Retrieves a specific segment of a CSV.
     - data_dir: The directory containing the target csv file
@@ -10,6 +10,8 @@ def get_csv_segment(data_dir: str, filename: str, start_row: int, num_rows: int,
     - num_rows: How many rows to return
     - columns: Comma-separated list of columns, or 'all' for all columns
     """
+
+    data_dir = "./App/Backend/CSVs"
     path = os.path.join(data_dir, filename)
     
     if not os.path.exists(path):

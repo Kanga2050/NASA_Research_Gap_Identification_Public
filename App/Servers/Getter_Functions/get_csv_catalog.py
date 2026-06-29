@@ -1,11 +1,12 @@
 import os
 import pandas as pd
 
-def get_csv_catalog(data_dir: str) -> str:
+def get_csv_catalog() -> str:
     """
     Returns a list of all CSVs in the data folder, their exact column names, 
     and their approximate size in rows and megabytes.
     """
+    data_dir = "./App/Backend/CSVs"
     catalog_info = ["# CSV Data Catalog\n"]
     
     if not os.path.exists(data_dir):
