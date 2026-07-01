@@ -2,8 +2,8 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 import os
 
-def add_embeddings_in_place(
-    csv_path: str, 
+def embed_text(
+    csv_name: str, 
     text_column: str, 
     new_column_name: str, 
     model_name: str = 'all-MiniLM-L6-v2',
@@ -14,7 +14,7 @@ def add_embeddings_in_place(
     Reads a CSV, generates text embeddings for a specific column, 
     and updates the CSV in-place with the new column.
     """
-    
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     print(f"Loading model '{model_name}'...")
     model = SentenceTransformer(model_name)
     
@@ -63,10 +63,10 @@ def add_embeddings_in_place(
 # ==========================================
 if __name__ == "__main__":
     
-    TARGET_FILE = "App/Backend/CSVs/Space_Biology.csv"
+    TARGET_NAME = "Space_Biology"
     
-    add_embeddings_in_place(
-        csv_path=TARGET_FILE,
+    embed_text(
+        csv_name=TARGET_NAME,
         text_column="abstract",
         new_column_name="abstract_embedding",
         model_name='allenai/specter2_base'

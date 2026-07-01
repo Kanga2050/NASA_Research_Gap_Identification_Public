@@ -1,10 +1,9 @@
 import os
 import pandas as pd
 
-def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) -> str:
+def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str) -> str:
     """
     Retrieves a specific segment of a CSV.
-    - data_dir: The directory containing the target csv file
     - filename: The name of the csv file (e.g., 'data.csv')
     - start_row: The index of the first row to read (0-indexed)
     - num_rows: How many rows to return
@@ -12,10 +11,10 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
     """
 
     data_dir = "./App/Backend/CSVs"
-    path = os.path.join(data_dir, filename)
+    path = f"{data_dir}/{csv_name}.csv"
     
     if not os.path.exists(path):
-        return f"Error: File '{filename}' not found at '{path}'."
+        return f"Error: File '{csv_name}' not found at '{path}'."
 
     usecols = None 
     if columns.lower() != "all":
@@ -47,8 +46,7 @@ def get_csv_segment(filename: str, start_row: int, num_rows: int, columns: str) 
 
 if __name__ == "__main__":
     segment_data = get_csv_segment(
-        data_dir="App/Backend/CSVs",
-        filename="Space_Biology.csv",
+        csv_name="Space_Biology",
         start_row=0,
         num_rows=10,
         columns="all"

@@ -4,8 +4,10 @@ import ast
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def semantic_search(csv_path: str, query: str, embedding_column: str, new_column_name: str = "semantic_score", model_name: str = 'allenai/specter2_base'):
+def semantic_score(csv_name: str, query: str, embedding_column: str, new_column_name: str = "semantic_score", model_name: str = 'allenai/specter2_base'):
     print(f"Running semantic search for: '{query}'...")
+
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     df = pd.read_csv(csv_path)
     
     # Generate an embedding for the single query string
@@ -28,8 +30,10 @@ def semantic_search(csv_path: str, query: str, embedding_column: str, new_column
     print(f"Success! Semantic favorability saved to column '{new_column_name}'.")
 
 if __name__ == "__main__":
-    semantic_search(
-        csv_path="App/Backend/CSVs/Space_Biology.csv",
+
+    TARGET_NAME = "Space_Biology"
+    semantic_score(
+        csv_name=TARGET_NAME,
         query="radiation shielding mars regolith",
         embedding_column="abstract_embedding",
         new_column_name="semantic_favorability"

@@ -28,7 +28,5 @@ def list_html_files() -> str:
     return "\n".join(catalog_info)
 
 if __name__ == "__main__":
-    result = list_html_files(
-        html_dir="App/Frontend/HTML"
-    )
+    result = list_html_files()
     print(result)

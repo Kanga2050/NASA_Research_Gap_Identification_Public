@@ -1,7 +1,9 @@
 import pandas as pd
 
-def hybrid_search(csv_path: str, keyword_col: str, semantic_col: str, new_column_name: str = "hybrid_score", k: int = 60):
+def hybrid_score(csv_name: str, keyword_col: str, semantic_col: str, new_column_name: str = "hybrid_score", k: int = 60):
     print("Running Hybrid Reciprocal Rank Fusion (RRF)...")
+
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     df = pd.read_csv(csv_path)
     
     # Convert absolute scores into dense rankings (1 being the highest match)
@@ -18,8 +20,11 @@ def hybrid_search(csv_path: str, keyword_col: str, semantic_col: str, new_column
     print(f"Success! Hybrid RRF favorability saved to column '{new_column_name}'.")
 
 if __name__ == "__main__":
-    hybrid_search(
-        csv_path="App/Backend/CSVs/Space_Biology.csv",
+
+    TARGET_NAME = "Space_Biology"
+
+    hybrid_score(
+        csv_name=TARGET_NAME,
         keyword_col="keyword_favorability",
         semantic_col="semantic_favorability",
         new_column_name="hybrid_favorability"

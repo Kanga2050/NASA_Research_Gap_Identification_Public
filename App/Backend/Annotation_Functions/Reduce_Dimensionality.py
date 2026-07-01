@@ -4,8 +4,8 @@ import umap
 import ast
 import os
 
-def reduce_embeddings_with_umap(
-    csv_path: str, 
+def reduce_dimensionality(
+    csv_name: str, 
     embedding_column: str, 
     new_column_name: str, 
     n_components: int = 2,
@@ -16,13 +16,14 @@ def reduce_embeddings_with_umap(
     and saves the results to a new column in-place.
     
     Parameters:
-    - csv_path: Path to the CSV file.
+    - csv_name: Name of the CSV file (without path or extension).
     - embedding_column: Name of the column containing stringified embeddings.
     - new_column_name: Name for the new column holding the UMAP coordinates.
     - n_components: The target number of dimensions (2 is standard for 2D plots).
     - metric: Distance metric. 'cosine' is best for text embeddings.
     """
     
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     
@@ -67,12 +68,12 @@ def reduce_embeddings_with_umap(
 # ==========================================
 if __name__ == "__main__":
     
-    TARGET_FILE = "App/Backend/CSVs/Space_Biology.csv"
+    TARGET_NAME = "Space_Biology"
     
-    reduce_embeddings_with_umap(
-        csv_path=TARGET_FILE,
+    reduce_dimensionality(
+        csv_path=TARGET_NAME,
         embedding_column="abstract_embedding",
         new_column_name="5d",
-        n_components=5,      # 5 is perfect for 5D visualization
-        metric='cosine'      # ALWAYS use cosine for text vectors (SentenceTransformers)
+        n_components=5,
+        metric='cosine'
     )

@@ -30,13 +30,15 @@ def get_topic_names(df, topic_column, text_column, top_n=3):
         
     return topic_names
 
-def generate_intertopic_distance_map(
-    csv_path: str, 
+def distance_map(
+    csv_name: str, 
     topic_column: str, 
     text_column: str = "abstract",
     coord_column: str = "2d",
-    output_html: str = "App/Backend/Visualizations/Space_Biology_Topics.html"
+    output_name: str = "Space_Biology_Topics"
 ):
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    output_html = f"App/Backend/Visualizations/{output_name}.html"
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     
@@ -74,9 +76,12 @@ def generate_intertopic_distance_map(
     print(f"Success! Map saved to {output_html}")
 
 if __name__ == "__main__":
-    generate_intertopic_distance_map(
-        csv_path="App/Backend/CSVs/Space_Biology.csv",
+
+    TARGET_NAME = "Space_Biology"
+    distance_map(
+        csv_name=TARGET_NAME,
         topic_column="topic_id",
         text_column="abstract",
-        coord_column="2d"
+        coord_column="2d",
+        output_name="Space_Biology_Topics"
     )

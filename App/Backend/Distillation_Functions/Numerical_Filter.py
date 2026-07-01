@@ -1,6 +1,9 @@
 import pandas as pd
 
-def numerical_search(source_csv: str, output_csv: str, target_score_column: str, threshold: float):
+def numerical_filter(source_csv: str, output_csv: str, target_score_column: str, threshold: float):
+    source_csv = f"App/Backend/CSVs/{source_csv}.csv"
+    output_csv = f"App/Backend/CSVs/{output_csv}.csv"
+
     print(f"Filtering dataset on '{target_score_column}' with a minimum threshold of {threshold}...")
     df = pd.read_csv(source_csv)
     
@@ -17,9 +20,9 @@ def numerical_search(source_csv: str, output_csv: str, target_score_column: str,
     print(f"Search complete! Extracted {len(filtered_df)} target items into a brand new file: '{output_csv}'")
 
 if __name__ == "__main__":
-    numerical_search(
-        source_csv="App/Backend/CSVs/Space_Biology.csv",
-        output_csv="App/Backend/CSVs/Highly_Favorable_Cache.csv",
+    numerical_filter(
+        source_csv="Space_Biology",
+        output_csv="Highly_Favorable_Cache",
         target_score_column="hybrid_favorability",
         threshold=0.75  # Extracts entries matching the top tier of your hybrid search 
     )

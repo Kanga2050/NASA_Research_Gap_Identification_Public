@@ -1,36 +1,34 @@
 import sys
 import os
 
-# Add local folders to path
-sys.path.append(os.path.join(os.getcwd(), 'Annotation_Functions'))
-sys.path.append(os.path.join(os.getcwd(), 'Visualization_Functions'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+target_path = os.path.abspath(os.path.join(current_dir, ".."))
+if target_path not in sys.path:
+    sys.path.append(target_path)
 
-from Annotation_Functions.Embedder import add_embeddings_in_place
-from Annotation_Functions.Dimensionality_Reducer import reduce_embeddings_with_umap
-from Annotation_Functions.Clustering import cluster_with_hdbscan
-from Visualization_Functions.Distance_Map import generate_intertopic_distance_map
-from Annotation_Functions.Keyword_Score import keyword_search
-from Annotation_Functions.Semantic_Score import semantic_search
-from Annotation_Functions.Hybrid_Score import hybrid_search
-from Distillation_Functions.Numerical_Filtering import numerical_search
+from Backend.Annotation_Functions.Embed_Text import embed_text
+from Backend.Annotation_Functions.Reduce_Dimensionality import reduce_dimensionality
+from Backend.Annotation_Functions.Cluster import cluster
+from Backend.Visualization_Functions.Distance_Map import distance_map
+from Backend.Annotation_Functions.Keyword_Score import keyword_score
+from Backend.Annotation_Functions.Semantic_Score import semantic_score
+from Backend.Annotation_Functions.Hybrid_Score import hybrid_score
+from Backend.Distillation_Functions.Numerical_Filter import numerical_filter
 
-def run_full_pipeline(file_path):
+def run_full_pipeline(csv_name):
     print("--- Starting Pipeline ---")
-    #add_embeddings_in_place(file_path, "abstract", "abstract_embedding", 'allenai/specter2_base')
-    #reduce_embeddings_with_umap(file_path, "abstract_embedding", "5d", n_components=5)
-    #reduce_embeddings_with_umap(file_path, "abstract_embedding", "2d", n_components=2)
-    #cluster_with_hdbscan(file_path, "5d", "topic_id", min_cluster_size=32, min_samples=8)
-    #generate_intertopic_distance_map(file_path, "topic_id", "abstract", "2d")
+    #embed_text(csv_name, "abstract", "abstract_embedding", 'allenai/specter2_base')
+    reduce_dimensionality(csv_name, "abstract_embedding", "5d", n_components=5)
+    reduce_dimensionality(csv_name, "abstract_embedding", "2d", n_components=2)
+    cluster(csv_name, "5d", "topic_id", min_cluster_size=32, min_samples=8)
+    distance_map(csv_name, "topic_id", "abstract", "2d")
 
-
-
-    
-    keyword_search(file_path, query="microgravity", text_column="abstract", new_column_name="kw")
-    semantic_search(file_path, query="miccrogravity", embedding_column="abstract_embedding", new_column_name="sem")
-    hybrid_search(file_path, keyword_col="kw", semantic_col="sem", new_column_name="hybrid")
-    numerical_search(file_path, output_csv="Filtered_Output.csv", target_score_column="hybrid", threshold=0.70)
+    keyword_score(csv_name, query="microgravity", text_column="abstract", new_column_name="kw")
+    semantic_score(csv_name, query="miccrogravity", embedding_column="abstract_embedding", new_column_name="sem")
+    hybrid_score(csv_name, keyword_col="kw", semantic_col="sem", new_column_name="hybrid")
+    numerical_filter(csv_name, output_csv="Filtered_Output", target_score_column="hybrid", threshold=0.70)
     print("--- Pipeline Complete ---")
 
 if __name__ == "__main__":
-    TARGET_FILE = "App/Backend/CSVs/Space_Biology.csv"
-    run_full_pipeline(TARGET_FILE)
+    TARGET_NAME = "Space_Biology"
+    run_full_pipeline(TARGET_NAME)

@@ -4,8 +4,8 @@ import hdbscan
 import ast
 import os
 
-def cluster_with_hdbscan(
-    csv_path: str, 
+def cluster(
+    csv_name: str, 
     embedding_column: str, 
     new_column_name: str = None, 
     min_cluster_size: int = 50,
@@ -23,6 +23,7 @@ def cluster_with_hdbscan(
     - min_samples: Controls how conservative the clustering is (higher = more noise).
     """
     
+    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     # If no new column name is provided, default to appending '_topic'
     if new_column_name is None:
         new_column_name = f"{embedding_column}_topic"
@@ -75,12 +76,12 @@ def cluster_with_hdbscan(
 # ==========================================
 if __name__ == "__main__":
     
-    TARGET_FILE = "App/Backend/CSVs/Space_Biology.csv"
+    TARGET_NAME = "Space_Biology"
     
-    cluster_with_hdbscan(
-        csv_path=TARGET_FILE,
-        embedding_column="5d",  # Run this on the reduced UMAP coordinates!
+    cluster(
+        csv_name=TARGET_NAME,
+        embedding_column="5d",  
         new_column_name="topic_id",
         min_cluster_size=32,
-        min_samples=8          # A topic must have at least 15 papers
+        min_samples=8 
     )

@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 import time
 
-def fetch_data(topic, output_filename="scaped.csv", limit = 10000):
+def openalex_scraper(topic, csv_name="scaped", limit = 10000):
     headers = {
         'User-Agent': 'shauryachauhan2050@gmail.com'
     }
@@ -24,6 +24,7 @@ def fetch_data(topic, output_filename="scaped.csv", limit = 10000):
         'authors', 'journal', 'pmcid', 'pubmed_id'
     ]
 
+    output_filename = f"App/Backend/CSVs/{csv_name}.csv"
     pd.DataFrame(columns = columns).to_csv(output_filename, index=False)
     print(f"Initialized clean file: {output_filename}")
     total_collected = 0
@@ -96,8 +97,8 @@ def fetch_data(topic, output_filename="scaped.csv", limit = 10000):
 
 
 if __name__ == "__main__":
-    fetch_data(
+    openalex_scraper(
         topic = "Space Biology",
-        output_filename = "App/Backend/CSVs/Space_Biology.csv",
+        csv_name = "Space_Biology",
         limit = 100000
     )

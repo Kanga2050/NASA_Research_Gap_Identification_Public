@@ -33,7 +33,5 @@ def get_csv_catalog() -> str:
     return "\n".join(catalog_info)
 
 if __name__ == "__main__":
-    result = get_csv_catalog(
-        data_dir="App/Backend/CSVs"
-    )
+    result = get_csv_catalog()
     print(result)
