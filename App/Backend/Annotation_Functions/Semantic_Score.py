@@ -1,13 +1,15 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import ast
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def semantic_score(csv_name: str, query: str, embedding_column: str, new_column_name: str = "semantic_score", model_name: str = 'allenai/specter2_base'):
+def semantic_score(csv_name: str, query: str, embedding_column: str, new_column_name: str = "semantic_score", model_name: str = 'allenai/specter2_base', csv_root: str | Path | None = None):
     print(f"Running semantic search for: '{query}'...")
 
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     df = pd.read_csv(csv_path)
     
     model = SentenceTransformer(model_name)

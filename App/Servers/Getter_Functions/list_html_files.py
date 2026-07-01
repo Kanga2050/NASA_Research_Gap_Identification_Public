@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import os
 
-def list_html_files() -> str:
+from Servers.storage_paths import resolve_html_root
+
+def list_html_files(storage_root: str | Path | None = None) -> str:
     """Returns a list of all currently generated HTML app files."""
 
-    html_dir = "./App/Backend/Visualizations"
+    html_dir = resolve_html_root(storage_root)
     catalog_info = ["# HTML Visualizations Catalog\n"]
     
 

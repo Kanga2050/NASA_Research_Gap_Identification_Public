@@ -3,8 +3,11 @@ import os
 import requests
 import pandas as pd
 import time
+from pathlib import Path
 
-def openalex_scraper(topic, csv_name="scaped", limit = 10000):
+from Servers.storage_paths import resolve_csv_root
+
+def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Path | None = None):
     headers = {
         'User-Agent': 'shauryachauhan2050@gmail.com'
     }
@@ -24,7 +27,7 @@ def openalex_scraper(topic, csv_name="scaped", limit = 10000):
         'authors', 'journal', 'pmcid', 'pubmed_id'
     ]
 
-    output_filename = f"App/Backend/CSVs/{csv_name}.csv"
+    output_filename = resolve_csv_root(csv_root) / f"{csv_name}.csv"
     pd.DataFrame(columns = columns).to_csv(output_filename, index=False)
     print(f"Initialized clean file: {output_filename}")
     total_collected = 0

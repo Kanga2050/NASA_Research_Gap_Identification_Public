@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import umap
@@ -9,7 +11,8 @@ def reduce_dimensionality(
     embedding_column: str, 
     new_column_name: str, 
     n_components: int = 2,
-    metric: str = 'cosine'
+    metric: str = 'cosine',
+    csv_root: str | Path | None = None,
 ):
     """
     Reads a CSV, applies UMAP to reduce the dimensionality of an embedding column,
@@ -23,7 +26,7 @@ def reduce_dimensionality(
     - metric: Distance metric. 'cosine' is best for text embeddings.
     """
     
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     

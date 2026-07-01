@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import os
@@ -8,13 +10,14 @@ def embed_text(
     new_column_name: str, 
     model_name: str = 'all-MiniLM-L6-v2',
     chunk_size: int = 5000, 
-    batch_size: int = 32
+    batch_size: int = 32,
+    csv_root: str | Path | None = None,
 ):
     """
     Reads a CSV, generates text embeddings for a specific column, 
     and updates the CSV in-place with the new column.
     """
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     print(f"Loading model '{model_name}'...")
     model = SentenceTransformer(model_name)
     

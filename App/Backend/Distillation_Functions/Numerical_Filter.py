@@ -1,8 +1,10 @@
+from pathlib import Path
+
 import pandas as pd
 
-def numerical_filter(source_csv: str, output_csv: str, target_score_column: str, threshold: float):
-    source_csv = f"App/Backend/CSVs/{source_csv}.csv"
-    output_csv = f"App/Backend/CSVs/{output_csv}.csv"
+def numerical_filter(source_csv: str, output_csv: str, target_score_column: str, threshold: float, csv_root: str | Path | None = None):
+    source_csv = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
+    output_csv = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
 
     print(f"Filtering dataset on '{target_score_column}' with a minimum threshold of {threshold}...")
     df = pd.read_csv(source_csv)

@@ -1,0 +1,24 @@
+from django.contrib.auth import get_user_model
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from App.Frontend.webapp.storage import user_csv_root, user_html_root, user_task_root
+
+from .models import UserStorageProfile
+
+
+User = get_user_model()
+
+
+@receiver(post_save, sender=User)
+def ensure_user_storage(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    UserStorageProfile.objects.get_or_create(
+        user=instance,
+        defaults={"root_name": f"user_{instance.id}"},
+    )
+    user_csv_root(instance)
+    user_html_root(instance)
+    user_task_root(instance)

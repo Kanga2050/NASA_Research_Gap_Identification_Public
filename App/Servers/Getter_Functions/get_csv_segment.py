@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import os
 import pandas as pd
 
-def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str) -> str:
+from Servers.storage_paths import resolve_csv_root
+
+def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str, storage_root: str | Path | None = None) -> str:
     """
     Retrieves a specific segment of a CSV.
     - filename: The name of the csv file (e.g., 'data.csv')
@@ -9,9 +13,8 @@ def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str) 
     - num_rows: How many rows to return
     - columns: Comma-separated list of columns, or 'all' for all columns
     """
-
-    data_dir = "./App/Backend/CSVs"
-    path = f"{data_dir}/{csv_name}.csv"
+    data_dir = resolve_csv_root(storage_root)
+    path = data_dir / f"{csv_name}.csv"
     
     if not os.path.exists(path):
         return f"Error: File '{csv_name}' not found at '{path}'."

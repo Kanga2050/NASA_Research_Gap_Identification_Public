@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Dashboard</title>
+  </head>
+  <body>
+    <h1>Dashboard</h1>
+    <p>Signed in as {{ request.user.username }}</p>
+    {% if messages %}
+      {% for message in messages %}
+        <p>{{ message }}</p>
+      {% endfor %}
+    {% endif %}
+    {% if request.session.last_api_key %}
+      <p><strong>New API key:</strong> {{ request.session.last_api_key }}</p>
+    {% endif %}
+    <ul>
+      <li>CSV root: {{ csv_root }}</li>
+      <li>HTML root: {{ html_root }}</li>
+      <li>Task root: {{ task_root }}</li>
+    </ul>
+    <h2>Files</h2>
+    <h3>CSV</h3>
+    <ul>
+      {% for file in csv_files %}
+        <li>{{ file }}</li>
+      {% empty %}
+        <li>No CSV files yet.</li>
+      {% endfor %}
+    </ul>
+    <h3>HTML</h3>
+    <ul>
+      {% for file in html_files %}
+        <li>{{ file }}</li>
+      {% empty %}
+        <li>No HTML files yet.</li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="{% url 'issue_api_key' %}">
+      {% csrf_token %}
+      {{ api_key_form.as_p }}
+      <button type="submit">Create API key</button>
+    </form>
+    <h2>Queue a task</h2>
+    <form method="post" action="{% url 'submit_task' %}">
+      {% csrf_token %}
+      {{ task_form.as_p }}
+      <button type="submit">Queue task</button>
+    </form>
+    <h2>Recent tasks</h2>
+    <ul>
+      {% for task in tasks %}
+        <li>{{ task.createdAt }} - {{ task.function_name }} - {{ task.status }} - {{ task.task_id }}</li>
+      {% empty %}
+        <li>No tasks yet.</li>
+      {% endfor %}
+    </ul>
+    <p><a href="{% url 'logout' %}">Sign out</a></p>
+  </body>
+ </html>

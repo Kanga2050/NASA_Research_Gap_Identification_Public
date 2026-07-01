@@ -1,11 +1,13 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def keyword_score(csv_name: str, query: str, text_column: str, new_column_name: str = "keyword_score"):
+def keyword_score(csv_name: str, query: str, text_column: str, new_column_name: str = "keyword_score", csv_root: str | Path | None = None):
 
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     print(f"Running keyword search for: '{query}'...")
     df = pd.read_csv(csv_path)
     

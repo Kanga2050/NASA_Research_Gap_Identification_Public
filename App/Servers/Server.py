@@ -1,11 +1,24 @@
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+app_dir = os.path.abspath(os.path.join(current_dir, ".."))
+project_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
+for path in (project_root, app_dir):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "App.Frontend.webapp.settings")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from api_funcs import app as base_api
-from mcp_funcs import mcp
+from Servers.api_runtime import app as base_api
+from Servers.mcp_runtime import mcp
+from App.Frontend.webapp.asgi import application as django_app
 
-mcp_app = mcp.http_app()
+mcp_app = mcp.http_app(path="/mcp")
 
 combined_app = FastAPI(
     title="Deconstructed Pipeline API (With MCP Integration)",
@@ -24,6 +37,8 @@ combined_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+combined_app.mount("/", django_app)
 
 if __name__ == "__main__":
     uvicorn.run(combined_app, host="127.0.0.1", port=8000)

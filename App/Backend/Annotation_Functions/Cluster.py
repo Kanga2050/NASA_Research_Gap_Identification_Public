@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import hdbscan
@@ -9,7 +11,8 @@ def cluster(
     embedding_column: str, 
     new_column_name: str = None, 
     min_cluster_size: int = 50,
-    min_samples: int = 10
+    min_samples: int = 10,
+    csv_root: str | Path | None = None,
 ):
     """
     Reads a CSV, applies HDBSCAN clustering to a column of embeddings (like UMAP 2D coordinates),
@@ -23,7 +26,7 @@ def cluster(
     - min_samples: Controls how conservative the clustering is (higher = more noise).
     """
     
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     if new_column_name is None:
         new_column_name = f"{embedding_column}_topic"
         

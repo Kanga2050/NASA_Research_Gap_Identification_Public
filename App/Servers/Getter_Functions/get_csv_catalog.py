@@ -1,12 +1,16 @@
+from pathlib import Path
+
 import os
 import pandas as pd
 
-def get_csv_catalog() -> str:
+from Servers.storage_paths import resolve_csv_root
+
+def get_csv_catalog(storage_root: str | Path | None = None) -> str:
     """
     Returns a list of all CSVs in the data folder, their exact column names, 
     and their approximate size in rows and megabytes.
     """
-    data_dir = "./App/Backend/CSVs"
+    data_dir = resolve_csv_root(storage_root)
     catalog_info = ["# CSV Data Catalog\n"]
     
 

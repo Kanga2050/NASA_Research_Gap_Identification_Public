@@ -1,9 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 
-def hybrid_score(csv_name: str, keyword_col: str, semantic_col: str, new_column_name: str = "hybrid_score", k: int = 60):
+def hybrid_score(csv_name: str, keyword_col: str, semantic_col: str, new_column_name: str = "hybrid_score", k: int = 60, csv_root: str | Path | None = None):
     print("Running Hybrid Reciprocal Rank Fusion (RRF)...")
 
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
+    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
     df = pd.read_csv(csv_path)
     
     keyword_rank = df[keyword_col].rank(ascending=False, method='min')

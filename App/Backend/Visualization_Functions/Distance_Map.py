@@ -4,9 +4,16 @@ import ast
 import plotly.express as px
 import spacy
 from collections import Counter
+from pathlib import Path
 
+from Servers.storage_paths import resolve_csv_root, resolve_html_root
 
-nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+try:
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    HAS_POS_TAGS = True
+except OSError:
+    nlp = spacy.blank("en")
+    HAS_POS_TAGS = False
 
 
 def get_topic_names(df, topic_column, text_column, top_n=3):
@@ -17,10 +24,16 @@ def get_topic_names(df, topic_column, text_column, top_n=3):
         topic_texts = " ".join(df[df[topic_column] == topic_id][text_column].fillna("").tolist())
         
         doc = nlp(topic_texts[:100000]) # Limit length for performance
-        words = [
-            token.lemma_.lower() for token in doc 
-            if token.is_alpha and not token.is_stop and token.pos_ in ["NOUN", "ADJ"]
-        ]
+        if HAS_POS_TAGS:
+            words = [
+                (token.lemma_ or token.text).lower() for token in doc
+                if token.is_alpha and not token.is_stop and token.pos_ in ["NOUN", "ADJ"]
+            ]
+        else:
+            words = [
+                (token.lemma_ or token.text).lower() for token in doc
+                if token.is_alpha and not token.is_stop
+            ]
         
         common = Counter(words).most_common(top_n)
         topic_names[topic_id] = ", ".join([word for word, count in common])
@@ -32,10 +45,12 @@ def distance_map(
     topic_column: str, 
     text_column: str = "abstract",
     coord_column: str = "2d",
-    output_name: str = "Space_Biology_Topics"
+    output_name: str = "Space_Biology_Topics",
+    csv_root: str | Path | None = None,
+    html_root: str | Path | None = None,
 ):
-    csv_path = f"App/Backend/CSVs/{csv_name}.csv"
-    output_html = f"App/Backend/Visualizations/{output_name}.html"
+    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
+    output_html = resolve_html_root(html_root) / f"{output_name}.html"
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     
