@@ -6,14 +6,11 @@ def hybrid_score(csv_name: str, keyword_col: str, semantic_col: str, new_column_
     csv_path = f"App/Backend/CSVs/{csv_name}.csv"
     df = pd.read_csv(csv_path)
     
-    # Convert absolute scores into dense rankings (1 being the highest match)
     keyword_rank = df[keyword_col].rank(ascending=False, method='min')
     semantic_rank = df[semantic_col].rank(ascending=False, method='min')
     
-    # Apply standard Reciprocal Rank Fusion calculation
     rrf_score = (1.0 / (k + keyword_rank)) + (1.0 / (k + semantic_rank))
     
-    # Normalize between 0 and 1 to make numerical thresholds human-intuitive
     df[new_column_name] = (rrf_score - rrf_score.min()) / (rrf_score.max() - rrf_score.min())
     
     df.to_csv(csv_path, index=False)

@@ -14,17 +14,14 @@ def get_topic_names(df, topic_column, text_column, top_n=3):
     for topic_id in df[topic_column].unique():
         if topic_id == -1: continue
         
-        # Aggregate text
         topic_texts = " ".join(df[df[topic_column] == topic_id][text_column].fillna("").tolist())
         
-        # Process with spaCy: Lemmatize and filter for Nouns/Adjectives
         doc = nlp(topic_texts[:100000]) # Limit length for performance
         words = [
             token.lemma_.lower() for token in doc 
             if token.is_alpha and not token.is_stop and token.pos_ in ["NOUN", "ADJ"]
         ]
         
-        # Get the most common words
         common = Counter(words).most_common(top_n)
         topic_names[topic_id] = ", ".join([word for word, count in common])
         
@@ -42,7 +39,6 @@ def distance_map(
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     
-    # Parse coordinates
     valid_rows = df[coord_column].dropna().index
     parsed_coords = df.loc[valid_rows, coord_column].apply(ast.literal_eval)
     df['x'] = np.nan
@@ -50,18 +46,15 @@ def distance_map(
     df.loc[valid_rows, 'x'] = [coord[0] for coord in parsed_coords]
     df.loc[valid_rows, 'y'] = [coord[1] for coord in parsed_coords]
 
-    # Calculate stats
     topics_df = df[df[topic_column] != -1]
     topic_stats = topics_df.groupby(topic_column).agg(
         x=('x', 'mean'), y=('y', 'mean'), size=('x', 'count')
     ).reset_index()
 
-    # Generate Labels
     print("Generating keyword labels for topics...")
     labels = get_topic_names(topics_df, topic_column, text_column)
     topic_stats['Topic_Label'] = topic_stats[topic_column].map(labels)
 
-    # Plot
     fig = px.scatter(
         topic_stats, x='x', y='y', size='size',
         color='Topic_Label', hover_name='Topic_Label',

@@ -9,8 +9,6 @@ def get_csv_catalog() -> str:
     data_dir = "./App/Backend/CSVs"
     catalog_info = ["# CSV Data Catalog\n"]
     
-    if not os.path.exists(data_dir):
-        return f"Error: Data directory '{data_dir}' not found."
 
     for file in os.listdir(data_dir):
         if file.endswith(".csv"):

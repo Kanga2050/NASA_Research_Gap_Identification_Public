@@ -3,16 +3,15 @@ import os
 import uuid
 import threading
 from fastmcp import FastMCP
+from fastmcp.apps import AppConfig  
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 target_path = os.path.abspath(os.path.join(current_dir, ".."))
 if target_path not in sys.path:
     sys.path.append(target_path)
 
-# Import the shared state manager and the queue helper
 from task_manager import shared_task_registry, add_task_to_queue, get_iso_time
 
-# Import all modules directly from your pipeline
 from Backend.Annotation_Functions.Embed_Text import embed_text as _embed_text
 from Backend.Annotation_Functions.Reduce_Dimensionality import reduce_dimensionality as _reduce_dimensionality
 from Backend.Annotation_Functions.Cluster import cluster as _cluster
@@ -21,17 +20,14 @@ from Backend.Annotation_Functions.Keyword_Score import keyword_score as _keyword
 from Backend.Annotation_Functions.Semantic_Score import semantic_score as _semantic_score
 from Backend.Annotation_Functions.Hybrid_Score import hybrid_score as _hybrid_score
 from Backend.Distillation_Functions.Numerical_Filter import numerical_filter as _numerical_filter
-
-# Import getter functions
 from Servers.Getter_Functions.List_Html_Files import list_html_files as _list_html_files
 from Servers.Getter_Functions.Get_Csv_Catalog import get_csv_catalog as _get_csv_catalog
 from Servers.Getter_Functions.Get_Csv_Segment import get_csv_segment as _get_csv_segment
 from Backend.Import_Data.OpenAlex_Scraper import openalex_scraper as _openalex_scraper
 
 # Initialize the MCP Server
-mcp = FastMCP("Deconstructed Pipeline")
+mcp = FastMCP("NLP Analysis Platform")
 
-# --- Helper Function for Background Queueing ---
 def queue_mcp_task(func_name: str, func, *args, **kwargs) -> dict:
     """
     Replaces FastAPI's BackgroundTasks by spinning up a lightweight 
@@ -41,7 +37,6 @@ def queue_mcp_task(func_name: str, func, *args, **kwargs) -> dict:
     now = get_iso_time()
     shared_task_registry[task_id] = {"status": "queued", "createdAt": now, "lastUpdatedAt": now}
     
-    # Hand off task insertion to a background thread
     threading.Thread(
         target=add_task_to_queue, 
         args=(task_id, func_name, func, *args), 
@@ -52,7 +47,6 @@ def queue_mcp_task(func_name: str, func, *args, **kwargs) -> dict:
     return {"task_id": task_id, "status": "queued"}
 
 
-# --- Synchronous Getter Tools ---
 
 @mcp.tool()
 def get_task_status(task_id: str):
@@ -77,7 +71,6 @@ def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str):
     return _get_csv_segment(csv_name, start_row, num_rows, columns)
 
 
-# --- Asynchronous Pipeline Tools (Method 2) ---
 
 @mcp.tool(name="embed_text")
 def embed_text(csv_name: str, text_column: str = "abstract", embedding_column: str = "abstract_embedding", model: str = "allenai/specter2_base") -> dict:
@@ -123,3 +116,49 @@ def numerical_filter(source_csv: str, output_csv: str = "Filtered_Output.csv", t
 def openalex_scraper(topic: str, csv_name: str = "scraped", limit: int = 10000) -> dict: 
     """Scrapes academic papers from OpenAlex based on a topic and saves them to a CSV."""
     return queue_mcp_task("openalex_scraper", _openalex_scraper, topic, csv_name=csv_name, limit=limit)
+
+
+
+
+FOLDER = "App/Backend/Visualizations"
+
+# 1. A static wrapper resource that loads the MCP Apps SDK
+@mcp.resource("ui://viewer/app.html")
+def viewer_app() -> str:
+    return """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script type="module">
+        import { App } from "https://unpkg.com/@modelcontextprotocol/ext-apps@0.4.0/app-with-deps";
+        const app = new App({ name: "HTML Viewer", version: "1.0.0" });
+        
+        // When the host pushes the tool result (the HTML string), inject it
+        app.ontoolresult = ({ content }) => {
+            const text = content?.find(c => c.type === 'text');
+            if (text) {
+                document.getElementById('container').innerHTML = text.text;
+            }
+        };
+        await app.connect();
+    </script>
+</head>
+<body>
+    <div id="container">Loading requested file...</div>
+</body>
+</html>"""
+
+@mcp.tool(app=AppConfig(resource_uri="ui://viewer/app.html"))
+def display_html_file(filename: str) -> str:
+    """Displays a specific HTML file from the workspace folder."""
+    filepath = os.path.join(FOLDER, filename)
+    
+    # Basic directory traversal protection
+    if not os.path.abspath(filepath).startswith(os.path.abspath(FOLDER)):
+        return "<h1>Error: Invalid file path</h1>"
+        
+    if not os.path.isfile(filepath):
+        return f"<h1>Error: {filename} not found</h1>"
+        
+    with open(filepath, "r", encoding="utf-8") as f:\
+        return f.read()

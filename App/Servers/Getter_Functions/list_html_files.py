@@ -6,17 +6,12 @@ def list_html_files() -> str:
     html_dir = "./App/Backend/Visualizations"
     catalog_info = ["# HTML Visualizations Catalog\n"]
     
-    # 1. Explicitly check if the directory exists
-    if not os.path.exists(html_dir):
-        return f"Error: HTML directory '{html_dir}' not found."
 
-    # 2. Use os.listdir instead of glob for consistent behavior
     files = [f for f in os.listdir(html_dir) if f.endswith(".html")]
     
     if not files:
         return "No HTML apps generated yet."
         
-    # 3. Add dynamic file data (like size) to ensure the payload changes
     for file in files:
         path = os.path.join(html_dir, file)
         try:

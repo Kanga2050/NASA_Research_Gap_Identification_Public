@@ -9,18 +9,14 @@ def keyword_score(csv_name: str, query: str, text_column: str, new_column_name: 
     print(f"Running keyword search for: '{query}'...")
     df = pd.read_csv(csv_path)
     
-    # Handle missing text values safely
     corpus = df[text_column].fillna("").tolist()
     
-    # Vectorize the text data and the incoming search query
     vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(corpus)
     query_vector = vectorizer.transform([query])
     
-    # Calculate lexical cosine similarity
     scores = cosine_similarity(query_vector, tfidf_matrix).flatten()
     
-    # Save the favorability metrics back to the CSV
     df[new_column_name] = scores
     df.to_csv(csv_path, index=False)
     print(f"Success! Keyword favorability saved to column '{new_column_name}'.")

@@ -9,10 +9,8 @@ target_path = os.path.abspath(os.path.join(current_dir, ".."))
 if target_path not in sys.path:
     sys.path.append(target_path)
 
-# Import the shared state manager and the queue helper
 from task_manager import shared_task_registry, add_task_to_queue, get_iso_time
 
-# Import all modules and alias them with an underscore to prevent namespace collisions
 from Backend.Annotation_Functions.Embed_Text import embed_text as _embed_text
 from Backend.Annotation_Functions.Reduce_Dimensionality import reduce_dimensionality as _reduce_dimensionality
 from Backend.Annotation_Functions.Cluster import cluster as _cluster
@@ -28,7 +26,6 @@ from Backend.Import_Data.OpenAlex_Scraper import openalex_scraper as _openalex_s
 
 app = FastAPI(title="Deconstructed Pipeline API")
 
-# --- Pydantic Models ---
 class EmbedTextRequest(BaseModel): csv_name: str; text_column: str = "abstract"; embedding_column: str = "abstract_embedding"; model: str = "allenai/specter2_base"
 class ReduceDimensionalityRequest(BaseModel): csv_name: str; embedding_column: str = "abstract_embedding"; output_column: str; n_components: int
 class ClusterRequest(BaseModel): csv_name: str; coordinate_column: str = "5d"; output_column: str = "topic_id"; min_cluster_size: int = 32; min_samples: int = 8
