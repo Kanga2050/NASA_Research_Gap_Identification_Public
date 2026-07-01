@@ -21,11 +21,10 @@ from Backend.Annotation_Functions.Keyword_Score import keyword_search as _keywor
 from Backend.Annotation_Functions.Semantic_Score import semantic_search as _semantic_search
 from Backend.Annotation_Functions.Hybrid_Score import hybrid_search as _hybrid_search
 from Backend.Distillation_Functions.Numerical_Filtering import numerical_search as _numerical_search
-
-# Import getter functions and alias them
 from Servers.Getter_Functions.list_html_files import list_html_files as _list_html_files
 from Servers.Getter_Functions.get_csv_catalog import get_csv_catalog as _get_csv_catalog
 from Servers.Getter_Functions.get_csv_segment import get_csv_segment as _get_csv_segment
+from Backend.Import_Data.Scraper import fetch_data as _fetch_data
 
 app = FastAPI(title="Deconstructed Pipeline API")
 
@@ -38,19 +37,15 @@ class KeywordSearchRequest(BaseModel): file_path: str; query: str; text_column: 
 class SemanticSearchRequest(BaseModel): file_path: str; query: str; embedding_column: str = "abstract_embedding"; new_column_name: str = "sem"
 class HybridSearchRequest(BaseModel): file_path: str; keyword_col: str = "kw"; semantic_col: str = "sem"; new_column_name: str = "hybrid"
 class NumericalSearchRequest(BaseModel): file_path: str; output_csv: str = "Filtered_Output.csv"; target_score_column: str = "hybrid"; threshold: float = 0.70
+class FetchDataRequest(BaseModel): topic: str; output_filename: str = "scraped.csv"; limit: int = 100000
 
-# --- Helper Logic ---
 def queue_rest_task(bg_tasks, func_name, func, *args, **kwargs):
     task_id = str(uuid.uuid4())
     now = get_iso_time()
     shared_task_registry[task_id] = {"status": "queued", "createdAt": now, "lastUpdatedAt": now}
-    
-    # Hand off the task insertion to FastAPI's background context loop,
-    # safely routing it to our sequential thread queue.
     bg_tasks.add_task(add_task_to_queue, task_id, func_name, func, *args, **kwargs)
     return {"task_id": task_id, "status": "queued"}
 
-# --- REST Endpoints (Using Original Names) ---
 
 @app.get("/api/task/status/{task_id}")
 def api_get_task_status(task_id: str):
@@ -101,3 +96,7 @@ def hybrid_search(data: HybridSearchRequest, bg_tasks: BackgroundTasks):
 @app.post("/api/pipeline/numerical-distillation")
 def numerical_search(data: NumericalSearchRequest, bg_tasks: BackgroundTasks): 
     return queue_rest_task(bg_tasks, "numerical_search", _numerical_search, data.file_path, data.output_csv, data.target_score_column, data.threshold)
+
+@app.post("/api/pipeline/fetch-data")
+def trigger_fetch_data(data: FetchDataRequest, bg_tasks: BackgroundTasks): 
+    return queue_rest_task(bg_tasks, "fetch_data", _fetch_data, data.topic, output_filename=data.output_filename, limit=data.limit)

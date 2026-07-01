@@ -26,6 +26,7 @@ from Backend.Distillation_Functions.Numerical_Filtering import numerical_search
 from Servers.Getter_Functions.list_html_files import list_html_files
 from Servers.Getter_Functions.get_csv_catalog import get_csv_catalog
 from Servers.Getter_Functions.get_csv_segment import get_csv_segment
+from Backend.Import_Data.Scraper import fetch_data as _fetch_data
 
 # Initialize the MCP Server
 mcp = FastMCP("Deconstructed Pipeline")
@@ -117,3 +118,8 @@ def trigger_hybrid_search(file_path: str, keyword_col: str = "kw", semantic_col:
 def trigger_numerical_search(file_path: str, output_csv: str = "Filtered_Output.csv", target_score_column: str = "hybrid", threshold: float = 0.70) -> dict:
     """Queue a numerical distillation filtering task."""
     return queue_mcp_task("numerical_search", numerical_search, file_path, output_csv, target_score_column, threshold)
+
+@mcp.tool()
+def trigger_fetch_data_task(topic: str, output_filename: str = "scraped.csv", limit: int = 10000) -> str: 
+    """Scrapes academic papers from OpenAlex based on a topic and saves them to a CSV."""
+    return queue_mcp_task("fetch_data", _fetch_data, topic, output_filename=output_filename, limit=limit)

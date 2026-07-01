@@ -1,15 +1,40 @@
+import sys
 import queue
 import threading
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-# --- Universal State & Queue ---
 shared_task_registry: Dict[str, Any] = {}
 task_queue: queue.Queue = queue.Queue()
 
 def get_iso_time() -> str:
     """Returns the current UTC time in ISO 8601 format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+class PrintCatcher:
+    """A custom stream that logs printed messages to the registry and the terminal."""
+    def __init__(self, registry: Dict[str, Any], task_id: str):
+        self.registry = registry
+        self.task_id = task_id
+        # Keep a reference to the original console output
+        self.terminal = sys.__stdout__ 
+
+    def write(self, message: str):
+        # 1. Print to the console normally
+        self.terminal.write(message)
+        
+        # 2. Update the registry with the latest print (ignore empty newlines)
+        cleaned_message = message.strip()
+        if cleaned_message:
+            # Ensure the task dict exists before updating
+            if self.task_id in self.registry:
+                self.registry[self.task_id]["latest_print"] = cleaned_message
+                self.registry[self.task_id]["lastUpdatedAt"] = get_iso_time()
+
+    def flush(self):
+        # Required to fully emulate sys.stdout
+        self.terminal.flush()
 
 def run_shared_task(task_id: str, function_name: str, func, *args, **kwargs):
     """Executes a pipeline step and logs state to the shared registry."""
@@ -18,8 +43,11 @@ def run_shared_task(task_id: str, function_name: str, func, *args, **kwargs):
         shared_task_registry[task_id]["lastUpdatedAt"] = get_iso_time()
         print(f"[Shared Engine] Running task {task_id} ({function_name})...")
         
-        # Execute the actual pipeline function
-        func(*args, **kwargs)
+        # Intercept print statements within this context block
+        catcher = PrintCatcher(shared_task_registry, task_id)
+        with redirect_stdout(catcher):
+            # Execute the actual pipeline function
+            func(*args, **kwargs)
         
         # Check if the task was cancelled while running
         if shared_task_registry[task_id]["status"] == "cancelled":
