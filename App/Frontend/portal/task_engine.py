@@ -54,7 +54,11 @@ class PrintCatcher:
 
 
 def _update_registry(task: TaskRecord) -> None:
-    shared_task_registry[task.task_id] = {
+    # Merge into any existing entry rather than replacing it outright -
+    # PrintCatcher.write() stashes "latest_print" on this same dict, and a
+    # blind overwrite (e.g. from a status poll) would erase it on every call.
+    entry = shared_task_registry.setdefault(task.task_id, {})
+    entry.update({
         "task_id": task.task_id,
         "user_id": task.user_id,
         "status": task.status,
@@ -62,7 +66,7 @@ def _update_registry(task: TaskRecord) -> None:
         "createdAt": task.created_at.strftime("%Y-%m-%dT%H:%M:%SZ") if task.created_at else get_iso_time(),
         "lastUpdatedAt": task.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ") if task.updated_at else get_iso_time(),
         "error": task.error,
-    }
+    })
 
 
 def _refresh_task(task_id: str) -> TaskRecord:

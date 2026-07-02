@@ -5,6 +5,16 @@
 {% block body %}
   <div class="layout">
     <div class="sidebar">
+      <div class="card">
+        <h2>Import</h2>
+        <form method="post" action="{% url 'import_file' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <label for="id_upload">CSV or HTML file</label>
+          <input type="file" name="upload" id="id_upload" accept=".csv,.html" required>
+          <button type="submit">Upload</button>
+        </form>
+      </div>
+
       {% if messages %}
         {% for message in messages %}
           <div class="message {{ message.tags }}">{{ message }}</div>
@@ -23,16 +33,16 @@
         </ul>
         <h3>CSV files</h3>
         <ul>
-          {% for file in csv_files %}
-            <li>{{ file }}</li>
+          {% for name in csv_names %}
+            <li>{{ name }}.csv</li>
           {% empty %}
             <li>No CSV files yet.</li>
           {% endfor %}
         </ul>
         <h3>HTML files</h3>
         <ul>
-          {% for file in html_files %}
-            <li>{{ file }}</li>
+          {% for name in html_names %}
+            <li>{{ name }}.html</li>
           {% empty %}
             <li>No HTML files yet.</li>
           {% endfor %}
@@ -55,7 +65,22 @@
           {% for field in task_form %}
             <p data-field="{{ field.name }}">
               {{ field.label_tag }}
-              {{ field }}
+              {% if field.name == "csv_name" %}
+                <select name="csv_name" data-role="csv-select">
+                  {% for name in csv_names %}<option value="{{ name }}">{{ name }}.csv</option>{% endfor %}
+                </select>
+                <input type="text" name="csv_name" data-role="csv-text" placeholder="New CSV name" style="display:none" disabled>
+              {% elif field.name == "source_csv" %}
+                <select name="source_csv" data-role="source-csv-select">
+                  {% for name in csv_names %}<option value="{{ name }}">{{ name }}.csv</option>{% endfor %}
+                </select>
+              {% elif field.name in column_field_names %}
+                <select name="{{ field.name }}" data-role="column-select" data-initial="{{ field.initial|default:'' }}">
+                  <option value="">Select a CSV first&hellip;</option>
+                </select>
+              {% else %}
+                {{ field }}
+              {% endif %}
               {{ field.errors }}
             </p>
           {% endfor %}
@@ -75,10 +100,36 @@
             numerical_filter: ["source_csv", "output_csv", "target_score_column", "threshold"],
             openalex_scraper: ["topic", "csv_name", "limit"],
           };
+          var ACTION_COLUMN_FIELDS = {
+            embed_text: ["text_column"],
+            reduce_dimensionality: ["embedding_column"],
+            cluster: ["embedding_column"],
+            distance_map: ["topic_column", "text_column", "embedding_column"],
+            keyword_score: ["text_column"],
+            semantic_score: ["embedding_column"],
+            hybrid_score: ["keyword_col", "semantic_col"],
+            numerical_filter: ["target_score_column"],
+            openalex_scraper: [],
+          };
+          var ACTION_CSV_SOURCE = {
+            embed_text: "csv_name",
+            reduce_dimensionality: "csv_name",
+            cluster: "csv_name",
+            distance_map: "csv_name",
+            keyword_score: "csv_name",
+            semantic_score: "csv_name",
+            hybrid_score: "csv_name",
+            numerical_filter: "source_csv",
+            openalex_scraper: null,
+          };
 
           var form = document.getElementById("task-form");
           var actionSelect = form.querySelector("[data-field='action'] select, [data-field='action'] input");
           var fieldRows = form.querySelectorAll("[data-field]");
+          var csvSelect = form.querySelector("[data-role='csv-select']");
+          var csvText = form.querySelector("[data-role='csv-text']");
+          var sourceCsvSelect = form.querySelector("[data-role='source-csv-select']");
+          var columnSelects = form.querySelectorAll("[data-role='column-select']");
 
           function updateVisibility() {
             var visible = ACTION_FIELDS[actionSelect.value] || [];
@@ -92,8 +143,69 @@
             });
           }
 
-          actionSelect.addEventListener("change", updateVisibility);
-          updateVisibility();
+          function updateCsvNameMode() {
+            var isScraper = actionSelect.value === "openalex_scraper";
+            csvSelect.disabled = isScraper;
+            csvSelect.style.display = isScraper ? "none" : "";
+            csvText.disabled = !isScraper;
+            csvText.style.display = isScraper ? "" : "none";
+          }
+
+          function populateColumns(columns) {
+            var relevant = ACTION_COLUMN_FIELDS[actionSelect.value] || [];
+            columnSelects.forEach(function (select) {
+              var fieldRow = select.closest("[data-field]");
+              if (relevant.indexOf(fieldRow.getAttribute("data-field")) === -1) {
+                return;
+              }
+              var initial = select.getAttribute("data-initial");
+              var previous = select.value;
+              select.innerHTML = "";
+              if (!columns.length) {
+                var placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "No columns available";
+                select.appendChild(placeholder);
+                return;
+              }
+              columns.forEach(function (col) {
+                var opt = document.createElement("option");
+                opt.value = col;
+                opt.textContent = col;
+                select.appendChild(opt);
+              });
+              if (columns.indexOf(previous) !== -1) {
+                select.value = previous;
+              } else if (columns.indexOf(initial) !== -1) {
+                select.value = initial;
+              }
+            });
+          }
+
+          function refreshColumns() {
+            var source = ACTION_CSV_SOURCE[actionSelect.value];
+            var csvName = source === "csv_name" ? csvSelect.value : source === "source_csv" ? sourceCsvSelect.value : null;
+            if (!csvName) {
+              populateColumns([]);
+              return;
+            }
+            fetch("/csvs/" + encodeURIComponent(csvName) + "/columns/")
+              .then(function (r) { return r.json(); })
+              .then(function (data) { populateColumns(data.columns || []); })
+              .catch(function () { populateColumns([]); });
+          }
+
+          function handleActionChange() {
+            updateVisibility();
+            updateCsvNameMode();
+            refreshColumns();
+          }
+
+          actionSelect.addEventListener("change", handleActionChange);
+          if (csvSelect) csvSelect.addEventListener("change", refreshColumns);
+          if (sourceCsvSelect) sourceCsvSelect.addEventListener("change", refreshColumns);
+
+          handleActionChange();
         })();
       </script>
 
@@ -119,10 +231,41 @@
           <p>{{ latest_task.error }}</p>
         </div>
       {% elif latest_task.status == 'queued' or latest_task.status == 'working' %}
-        <div class="card">
+        <div class="card" id="task-progress" data-task-id="{{ latest_task.task_id }}">
           <h2>{{ latest_task.function_name }} is {{ latest_task.status }}&hellip;</h2>
-          <p class="placeholder">The output will appear here once the task completes.</p>
+          <p class="placeholder" id="task-progress-print">Waiting for the task to start&hellip;</p>
         </div>
+        <script>
+          (function () {
+            var el = document.getElementById("task-progress");
+            var printEl = document.getElementById("task-progress-print");
+            var taskId = el.getAttribute("data-task-id");
+            var lastPrint = null;
+
+            function poll() {
+              fetch("/tasks/" + taskId + "/status/")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                  if (data.error) {
+                    setTimeout(poll, 2000);
+                    return;
+                  }
+                  if (data.latest_print && data.latest_print !== lastPrint) {
+                    lastPrint = data.latest_print;
+                    printEl.textContent = lastPrint;
+                  }
+                  if (data.status === "completed" || data.status === "failed" || data.status === "cancelled") {
+                    window.location.reload();
+                    return;
+                  }
+                  setTimeout(poll, 1200);
+                })
+                .catch(function () { setTimeout(poll, 2000); });
+            }
+
+            poll();
+          })();
+        </script>
       {% elif not latest_output %}
         <p class="placeholder">No preview is available for {{ latest_task.function_name }}.</p>
       {% elif latest_output.missing %}
@@ -158,11 +301,41 @@
         <p class="placeholder">From <code>{{ latest_output.function_name }}</code></p>
         <iframe src="{% url 'preview_output_html' name=latest_output.name %}"></iframe>
       {% endif %}
+
+      <div class="card" id="export-card">
+        <h2>Export</h2>
+        {% if csv_names or html_names %}
+          <form id="export-form">
+            <label for="export-select">File</label>
+            <select id="export-select">
+              {% if csv_names %}
+                <optgroup label="CSV">
+                  {% for name in csv_names %}
+                    <option value="{% url 'export_file' kind='csv' name=name %}">{{ name }}.csv</option>
+                  {% endfor %}
+                </optgroup>
+              {% endif %}
+              {% if html_names %}
+                <optgroup label="HTML">
+                  {% for name in html_names %}
+                    <option value="{% url 'export_file' kind='html' name=name %}">{{ name }}.html</option>
+                  {% endfor %}
+                </optgroup>
+              {% endif %}
+            </select>
+            <button type="submit">Download</button>
+          </form>
+          <script>
+            document.getElementById("export-form").addEventListener("submit", function (e) {
+              e.preventDefault();
+              var url = document.getElementById("export-select").value;
+              if (url) window.location.href = url;
+            });
+          </script>
+        {% else %}
+          <p class="placeholder">No files to export yet.</p>
+        {% endif %}
+      </div>
     </div>
   </div>
-  {% if latest_task_in_progress %}
-    <script>
-      setTimeout(function () { window.location.reload(); }, 3000);
-    </script>
-  {% endif %}
 {% endblock %}

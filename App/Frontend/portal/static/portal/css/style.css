@@ -59,8 +59,11 @@ code {
 }
 
 .topbar img {
-  height: 34px;
+  height: 40px;
   width: auto;
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
 }
 
 .topbar .brand-title {
