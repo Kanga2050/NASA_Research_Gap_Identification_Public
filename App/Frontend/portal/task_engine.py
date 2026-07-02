@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 import queue
 import threading
@@ -101,53 +102,42 @@ def _dispatcher_loop() -> None:
             pending_tasks.task_done()
 
 
+# Maps a queued function name to its "module.path:attribute". Kept as strings
+# so the (often heavy, ML-laden) backend module is only imported when a task of
+# that type actually runs, not when this module is loaded.
+CALLABLE_PATHS = {
+    "embed_text": "App.Backend.Annotation_Functions.Embed_Text:embed_text",
+    "reduce_dimensionality": "App.Backend.Annotation_Functions.Reduce_Dimensionality:reduce_dimensionality",
+    "cluster": "App.Backend.Annotation_Functions.Cluster:cluster",
+    "distance_map": "App.Backend.Visualization_Functions.Distance_Map:distance_map",
+    "keyword_score": "App.Backend.Annotation_Functions.Keyword_Score:keyword_score",
+    "semantic_score": "App.Backend.Annotation_Functions.Semantic_Score:semantic_score",
+    "hybrid_score": "App.Backend.Annotation_Functions.Hybrid_Score:hybrid_score",
+    "numerical_filter": "App.Backend.Distillation_Functions.Numerical_Filter:numerical_filter",
+    "openalex_scraper": "App.Backend.Import_Data.OpenAlex_Scraper:openalex_scraper",
+}
+
+
 def _deserialize_callable(function_name: str) -> Callable[..., Any]:
-    if function_name == "embed_text":
-        from App.Backend.Annotation_Functions.Embed_Text import embed_text
+    if function_name not in CALLABLE_PATHS:
+        raise KeyError(function_name)
+    module_path, attribute = CALLABLE_PATHS[function_name].split(":")
+    return getattr(importlib.import_module(module_path), attribute)
 
-        return embed_text
-    if function_name == "reduce_dimensionality":
-        from App.Backend.Annotation_Functions.Reduce_Dimensionality import reduce_dimensionality
 
-        return reduce_dimensionality
-    if function_name == "cluster":
-        from App.Backend.Annotation_Functions.Cluster import cluster
-
-        return cluster
-    if function_name == "distance_map":
-        from App.Backend.Visualization_Functions.Distance_Map import distance_map
-
-        return distance_map
-    if function_name == "keyword_score":
-        from App.Backend.Annotation_Functions.Keyword_Score import keyword_score
-
-        return keyword_score
-    if function_name == "semantic_score":
-        from App.Backend.Annotation_Functions.Semantic_Score import semantic_score
-
-        return semantic_score
-    if function_name == "hybrid_score":
-        from App.Backend.Annotation_Functions.Hybrid_Score import hybrid_score
-
-        return hybrid_score
-    if function_name == "numerical_filter":
-        from App.Backend.Distillation_Functions.Numerical_Filter import numerical_filter
-
-        return numerical_filter
-    if function_name == "openalex_scraper":
-        from App.Backend.Import_Data.OpenAlex_Scraper import openalex_scraper
-
-        return openalex_scraper
-    raise KeyError(function_name)
+def _set_status(task_id: str, status: str, **update_fields: Any) -> None:
+    """Persist a status change and mirror it into the in-memory registry (which
+    the status-poll endpoint reads), keeping DB and registry in lock-step."""
+    TaskRecord.objects.filter(task_id=task_id).update(status=status, **update_fields)
+    _refresh_task(task_id)
+    shared_task_registry[task_id]["status"] = status
 
 
 def _run_task(task_id: str) -> None:
     global active_count
     task = TaskRecord.objects.select_related("user").get(task_id=task_id)
     try:
-        TaskRecord.objects.filter(task_id=task_id).update(status=TaskRecord.Status.WORKING, started_at=django_timezone.now())
-        task = _refresh_task(task_id)
-        shared_task_registry[task_id]["status"] = TaskRecord.Status.WORKING
+        _set_status(task_id, TaskRecord.Status.WORKING, started_at=django_timezone.now())
         print(f"[Task Engine] Running task {task_id} ({task.function_name}) for user {task.user_id}...")
 
         catcher = PrintCatcher(shared_task_registry, task_id)
@@ -159,19 +149,14 @@ def _run_task(task_id: str) -> None:
             print(f"[Task Engine] Task {task_id} was cancelled during runtime.")
             return
 
-        TaskRecord.objects.filter(task_id=task_id).update(status=TaskRecord.Status.COMPLETED, finished_at=django_timezone.now(), error="")
-        _refresh_task(task_id)
-        shared_task_registry[task_id]["status"] = TaskRecord.Status.COMPLETED
+        _set_status(task_id, TaskRecord.Status.COMPLETED, finished_at=django_timezone.now(), error="")
         shared_task_registry[task_id]["final_result"] = f"Success: {task.function_name} completed."
     except Exception as exc:
-        TaskRecord.objects.filter(task_id=task_id).update(status=TaskRecord.Status.FAILED, finished_at=django_timezone.now(), error=str(exc))
-        _refresh_task(task_id)
-        shared_task_registry[task_id]["status"] = TaskRecord.Status.FAILED
+        _set_status(task_id, TaskRecord.Status.FAILED, finished_at=django_timezone.now(), error=str(exc))
         shared_task_registry[task_id]["error"] = str(exc)
     finally:
         with task_condition:
-            if task.user_id in active_users:
-                active_users.remove(task.user_id)
+            active_users.discard(task.user_id)
             active_count = max(0, active_count - 1)
             task_condition.notify_all()
 

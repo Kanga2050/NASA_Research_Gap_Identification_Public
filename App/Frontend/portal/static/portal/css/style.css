@@ -97,6 +97,19 @@ code {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Sign-out is a POST form (Django requires POST for logout) styled to match
+   the old topbar link. */
+.logout-form {
+  margin: 0;
+}
+
+button.topbar-link {
+  background: transparent;
+  font-family: var(--font-body);
+  font-weight: 400;
+  margin-top: 0;
+}
+
 /* Dashboard layout */
 .layout {
   display: flex;

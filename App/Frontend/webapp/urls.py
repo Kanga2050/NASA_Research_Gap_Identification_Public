@@ -20,7 +20,7 @@ urlpatterns = [
     path("", dashboard, name="dashboard"),
     path("signup/", signup, name="signup"),
     path("login/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
-    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("logout/", auth_views.LogoutView.as_view(template_name="registration/logged_out.html"), name="logout"),
     path("api-keys/new/", issue_api_key, name="issue_api_key"),
     path("tasks/new/", submit_task, name="submit_task"),
     path("tasks/<str:task_id>/status/", task_status, name="task_status"),

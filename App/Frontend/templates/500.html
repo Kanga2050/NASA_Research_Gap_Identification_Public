@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Server error – Research Gap Identification{% endblock %}
+
+{# Django renders 500.html without context processors, so this page avoids
+   {% url %} and request-dependent context; a hardcoded link home is safe. #}
+{% block body %}
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>Something went wrong</h1>
+      <p class="placeholder">The server hit an unexpected error. Please try again in a moment.</p>
+      <p><a href="/">Back to dashboard</a></p>
+    </div>
+  </div>
+{% endblock %}

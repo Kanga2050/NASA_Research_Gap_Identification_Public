@@ -71,7 +71,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/login/"
+# No LOGOUT_REDIRECT_URL: LogoutView renders registration/logged_out.html
+# (a confirmation page) instead of redirecting straight back to login.
 
 DATA_ROOT = BASE_DIR / "App" / "UserData"
 CSV_ROOT = DATA_ROOT / "csvs"

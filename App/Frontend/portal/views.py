@@ -28,6 +28,13 @@ COLUMN_FIELD_NAMES = [
     "target_score_column",
 ]
 
+# Maps an import/export "kind" (also the file extension) to the storage-root
+# accessor and dotted suffix for that file type. Shared by import_file/export_file.
+KIND_ROOTS = {
+    "csv": (user_csv_root, ".csv"),
+    "html": (user_html_root, ".html"),
+}
+
 
 def signup(request):
     if request.method == "POST":
@@ -107,20 +114,16 @@ def import_file(request):
         return redirect("dashboard")
 
     safe_name = os.path.basename(upload.name)
-    suffix = Path(safe_name).suffix.lower()
-    if suffix == ".csv":
-        target_root = user_csv_root(request.user)
-    elif suffix == ".html":
-        target_root = user_html_root(request.user)
-    else:
-        messages.error(request, "Only .csv and .html files can be imported.")
-        return redirect("dashboard")
-
     if not safe_name or safe_name in {".", ".."}:
         messages.error(request, "Invalid file name.")
         return redirect("dashboard")
 
-    destination = target_root / safe_name
+    kind = Path(safe_name).suffix.lower().lstrip(".")
+    if kind not in KIND_ROOTS:
+        messages.error(request, "Only .csv and .html files can be imported.")
+        return redirect("dashboard")
+
+    destination = KIND_ROOTS[kind][0](request.user) / safe_name
     with destination.open("wb") as out:
         for chunk in upload.chunks():
             out.write(chunk)
@@ -131,16 +134,11 @@ def import_file(request):
 
 @login_required
 def export_file(request, kind, name):
-    if kind == "csv":
-        root = user_csv_root(request.user)
-        suffix = ".csv"
-    elif kind == "html":
-        root = user_html_root(request.user)
-        suffix = ".html"
-    else:
+    if kind not in KIND_ROOTS:
         raise Http404("Unknown export kind.")
 
-    file_path = resolve_safe_path(root, name, suffix)
+    root_fn, suffix = KIND_ROOTS[kind]
+    file_path = resolve_safe_path(root_fn(request.user), name, suffix)
     if file_path is None or not file_path.exists():
         raise Http404("File not found.")
 
@@ -163,28 +161,41 @@ def issue_api_key(request):
     return redirect("dashboard")
 
 
+# Declarative spec for each task action, replacing a long if/elif ladder.
+#   "roots": which storage roots the backend function receives as *_root kwargs.
+#   "args":  the positional args passed to queue_user_task, each a
+#            (form_field, default) pair. A None field means `default` is a
+#            literal constant; otherwise the submitted value is used when
+#            truthy, falling back to `default` (which may be a callable taking
+#            the cleaned form data, for defaults computed from other fields).
+TASK_SPECS = {
+    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), (None, "abstract_embedding"), ("model_name", "allenai/specter2_base")]},
+    "reduce_dimensionality": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "abstract_embedding"), ("output_column", "2d"), ("n_components", 2)]},
+    "cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "5d"), ("output_column", "topic_id"), ("min_cluster_size", 32), ("min_samples", 8)]},
+    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics")]},
+    "keyword_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("text_column", "abstract"), ("output_column", "kw")]},
+    "semantic_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("embedding_column", "abstract_embedding"), ("output_column", "sem")]},
+    "hybrid_score": {"roots": ["csv"], "args": [("csv_name", ""), ("keyword_col", "kw"), ("semantic_col", "sem"), ("output_column", "hybrid")]},
+    "numerical_filter": {"roots": ["csv"], "args": [("source_csv", lambda c: c["csv_name"]), ("output_csv", "Filtered_Output"), ("target_score_column", "hybrid"), ("threshold", 0.7)]},
+    "openalex_scraper": {"roots": ["csv"], "args": [("topic", "space biology"), ("csv_name", "scraped"), ("limit", 10000)]},
+}
+
+ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root}
+
+
+def _resolve_arg(cleaned: dict, field, default):
+    if field is not None and cleaned.get(field):
+        return cleaned[field]
+    return default(cleaned) if callable(default) else default
+
+
 def _queue_task_for_user(user, action: str, cleaned: dict):
-    csv_root = str(user_csv_root(user))
-    html_root = str(user_html_root(user))
-    if action == "embed_text":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("text_column") or "abstract", "abstract_embedding", cleaned.get("model_name") or "allenai/specter2_base", csv_root=csv_root)
-    if action == "reduce_dimensionality":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("embedding_column") or "abstract_embedding", cleaned.get("output_column") or "2d", cleaned.get("n_components") or 2, csv_root=csv_root)
-    if action == "cluster":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("embedding_column") or "5d", cleaned.get("output_column") or "topic_id", cleaned.get("min_cluster_size") or 32, cleaned.get("min_samples") or 8, csv_root=csv_root)
-    if action == "distance_map":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("topic_column") or "topic_id", cleaned.get("text_column") or "abstract", cleaned.get("embedding_column") or "2d", cleaned.get("output_name") or f"{cleaned['csv_name']}_Topics", csv_root=csv_root, html_root=html_root)
-    if action == "keyword_score":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("query") or "", cleaned.get("text_column") or "abstract", cleaned.get("output_column") or "kw", csv_root=csv_root)
-    if action == "semantic_score":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("query") or "", cleaned.get("embedding_column") or "abstract_embedding", cleaned.get("output_column") or "sem", csv_root=csv_root)
-    if action == "hybrid_score":
-        return queue_user_task(user, action, cleaned["csv_name"], cleaned.get("keyword_col") or "kw", cleaned.get("semantic_col") or "sem", cleaned.get("output_column") or "hybrid", csv_root=csv_root)
-    if action == "numerical_filter":
-        return queue_user_task(user, action, cleaned.get("source_csv") or cleaned["csv_name"], cleaned.get("output_csv") or "Filtered_Output", cleaned.get("target_score_column") or "hybrid", cleaned.get("threshold") or 0.7, csv_root=csv_root)
-    if action == "openalex_scraper":
-        return queue_user_task(user, action, cleaned.get("topic") or "space biology", cleaned.get("csv_name") or "scraped", cleaned.get("limit") or 10000, csv_root=csv_root)
-    raise ValueError("Unknown action")
+    spec = TASK_SPECS.get(action)
+    if spec is None:
+        raise ValueError("Unknown action")
+    args = [_resolve_arg(cleaned, field, default) for field, default in spec["args"]]
+    root_kwargs = {f"{name}_root": str(ROOT_BUILDERS[name](user)) for name in spec["roots"]}
+    return queue_user_task(user, action, *args, **root_kwargs)
 
 
 @login_required

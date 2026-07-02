@@ -16,7 +16,10 @@
       <span class="spacer"></span>
       {% if user.is_authenticated %}
         <span class="topbar-user">{{ user.username }}</span>
-        <a class="topbar-link" href="{% url 'logout' %}">Sign out</a>
+        <form class="logout-form" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="topbar-link">Sign out</button>
+        </form>
       {% endif %}
       <img src="{% static 'portal/img/nasa-meatball.png' %}" alt="NASA insignia">
     </header>

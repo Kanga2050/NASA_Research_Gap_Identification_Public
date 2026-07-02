@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Signed out – Research Gap Identification{% endblock %}
+
+{% block body %}
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>Signed out</h1>
+      <p class="placeholder">You have been signed out of your session.</p>
+      <p><a href="{% url 'login' %}">Sign in again</a></p>
+    </div>
+  </div>
+{% endblock %}

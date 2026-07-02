@@ -70,29 +70,20 @@ def build_output_preview(task: TaskRecord, user) -> dict[str, Any] | None:
         return None
     output_name = args[meta["arg_index"]]
 
-    if meta["kind"] == "csv":
-        csv_path = resolve_safe_path(user_csv_root(user), output_name, ".csv")
-        if csv_path is None or not csv_path.exists():
-            return {"category": meta["category"], "kind": "csv", "name": output_name, "missing": True}
-        df = pd.read_csv(csv_path, nrows=PREVIEW_ROW_LIMIT)
-        return {
-            "category": meta["category"],
-            "label": CATEGORY_LABELS[meta["category"]],
-            "kind": "csv",
-            "name": output_name,
-            "function_name": task.function_name,
-            "columns": list(df.columns),
-            "rows": [[_truncate(value) for value in row] for row in df.itertuples(index=False)],
-            "preview_row_count": len(df),
-        }
+    kind = meta["kind"]
+    root = user_csv_root(user) if kind == "csv" else user_html_root(user)
+    path = resolve_safe_path(root, output_name, f".{kind}")
+    base = {"category": meta["category"], "kind": kind, "name": output_name}
 
-    html_path = resolve_safe_path(user_html_root(user), output_name, ".html")
-    if html_path is None or not html_path.exists():
-        return {"category": meta["category"], "kind": "html", "name": output_name, "missing": True}
-    return {
-        "category": meta["category"],
-        "label": CATEGORY_LABELS[meta["category"]],
-        "kind": "html",
-        "name": output_name,
-        "function_name": task.function_name,
-    }
+    if path is None or not path.exists():
+        return {**base, "missing": True}
+
+    preview = {**base, "label": CATEGORY_LABELS[meta["category"]], "function_name": task.function_name}
+    if kind == "csv":
+        df = pd.read_csv(path, nrows=PREVIEW_ROW_LIMIT)
+        preview.update(
+            columns=list(df.columns),
+            rows=[[_truncate(value) for value in row] for row in df.itertuples(index=False)],
+            preview_row_count=len(df),
+        )
+    return preview
