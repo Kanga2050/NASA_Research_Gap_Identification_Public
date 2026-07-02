@@ -1,61 +1,168 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Dashboard</title>
-  </head>
-  <body>
-    <h1>Dashboard</h1>
-    <p>Signed in as {{ request.user.username }}</p>
-    {% if messages %}
-      {% for message in messages %}
-        <p>{{ message }}</p>
-      {% endfor %}
-    {% endif %}
-    {% if request.session.last_api_key %}
-      <p><strong>New API key:</strong> {{ request.session.last_api_key }}</p>
-    {% endif %}
-    <ul>
-      <li>CSV root: {{ csv_root }}</li>
-      <li>HTML root: {{ html_root }}</li>
-      <li>Task root: {{ task_root }}</li>
-    </ul>
-    <h2>Files</h2>
-    <h3>CSV</h3>
-    <ul>
-      {% for file in csv_files %}
-        <li>{{ file }}</li>
-      {% empty %}
-        <li>No CSV files yet.</li>
-      {% endfor %}
-    </ul>
-    <h3>HTML</h3>
-    <ul>
-      {% for file in html_files %}
-        <li>{{ file }}</li>
-      {% empty %}
-        <li>No HTML files yet.</li>
-      {% endfor %}
-    </ul>
-    <form method="post" action="{% url 'issue_api_key' %}">
-      {% csrf_token %}
-      {{ api_key_form.as_p }}
-      <button type="submit">Create API key</button>
-    </form>
-    <h2>Queue a task</h2>
-    <form method="post" action="{% url 'submit_task' %}">
-      {% csrf_token %}
-      {{ task_form.as_p }}
-      <button type="submit">Queue task</button>
-    </form>
-    <h2>Recent tasks</h2>
-    <ul>
-      {% for task in tasks %}
-        <li>{{ task.createdAt }} - {{ task.function_name }} - {{ task.status }} - {{ task.task_id }}</li>
-      {% empty %}
-        <li>No tasks yet.</li>
-      {% endfor %}
-    </ul>
-    <p><a href="{% url 'logout' %}">Sign out</a></p>
-  </body>
- </html>
+{% extends "base.html" %}
+
+{% block title %}Dashboard – Research Gap Identification{% endblock %}
+
+{% block body %}
+  <div class="layout">
+    <div class="sidebar">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% if request.session.last_api_key %}
+        <div class="message success"><strong>New API key:</strong> {{ request.session.last_api_key }}</div>
+      {% endif %}
+
+      <div class="card">
+        <h3>Storage</h3>
+        <ul class="meta-list">
+          <li>CSV root: {{ csv_root }}</li>
+          <li>HTML root: {{ html_root }}</li>
+          <li>Task root: {{ task_root }}</li>
+        </ul>
+        <h3>CSV files</h3>
+        <ul>
+          {% for file in csv_files %}
+            <li>{{ file }}</li>
+          {% empty %}
+            <li>No CSV files yet.</li>
+          {% endfor %}
+        </ul>
+        <h3>HTML files</h3>
+        <ul>
+          {% for file in html_files %}
+            <li>{{ file }}</li>
+          {% empty %}
+            <li>No HTML files yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>API key</h2>
+        <form method="post" action="{% url 'issue_api_key' %}">
+          {% csrf_token %}
+          {{ api_key_form.as_p }}
+          <button type="submit">Create API key</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Queue a task</h2>
+        <form method="post" action="{% url 'submit_task' %}" id="task-form">
+          {% csrf_token %}
+          {% for field in task_form %}
+            <p data-field="{{ field.name }}">
+              {{ field.label_tag }}
+              {{ field }}
+              {{ field.errors }}
+            </p>
+          {% endfor %}
+          <button type="submit">Queue task</button>
+        </form>
+      </div>
+      <script>
+        (function () {
+          var ACTION_FIELDS = {
+            embed_text: ["csv_name", "text_column", "model_name"],
+            reduce_dimensionality: ["csv_name", "embedding_column", "output_column", "n_components"],
+            cluster: ["csv_name", "embedding_column", "output_column", "min_cluster_size", "min_samples"],
+            distance_map: ["csv_name", "topic_column", "text_column", "embedding_column", "output_name"],
+            keyword_score: ["csv_name", "query", "text_column", "output_column"],
+            semantic_score: ["csv_name", "query", "embedding_column", "output_column"],
+            hybrid_score: ["csv_name", "keyword_col", "semantic_col", "output_column"],
+            numerical_filter: ["source_csv", "output_csv", "target_score_column", "threshold"],
+            openalex_scraper: ["topic", "csv_name", "limit"],
+          };
+
+          var form = document.getElementById("task-form");
+          var actionSelect = form.querySelector("[data-field='action'] select, [data-field='action'] input");
+          var fieldRows = form.querySelectorAll("[data-field]");
+
+          function updateVisibility() {
+            var visible = ACTION_FIELDS[actionSelect.value] || [];
+            fieldRows.forEach(function (row) {
+              var name = row.getAttribute("data-field");
+              if (name === "action" || visible.indexOf(name) !== -1) {
+                row.style.display = "";
+              } else {
+                row.style.display = "none";
+              }
+            });
+          }
+
+          actionSelect.addEventListener("change", updateVisibility);
+          updateVisibility();
+        })();
+      </script>
+
+      <div class="card">
+        <h2>Recent tasks</h2>
+        {% for task in tasks %}
+          <div class="task-row">
+            <span>{{ task.createdAt }} &middot; {{ task.function_name }}</span>
+            <span class="status-pill {{ task.status }}">{{ task.status }}</span>
+          </div>
+        {% empty %}
+          <p class="placeholder">No tasks yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="output-panel">
+      {% if not latest_task %}
+        <p class="placeholder">No tasks have been queued yet. Queue a task to see its output here.</p>
+      {% elif latest_task.status == 'failed' %}
+        <div class="card">
+          <h2>{{ latest_task.function_name }} failed</h2>
+          <p>{{ latest_task.error }}</p>
+        </div>
+      {% elif latest_task.status == 'queued' or latest_task.status == 'working' %}
+        <div class="card">
+          <h2>{{ latest_task.function_name }} is {{ latest_task.status }}&hellip;</h2>
+          <p class="placeholder">The output will appear here once the task completes.</p>
+        </div>
+      {% elif not latest_output %}
+        <p class="placeholder">No preview is available for {{ latest_task.function_name }}.</p>
+      {% elif latest_output.missing %}
+        <div class="card">
+          <h2>{{ latest_output.label }}</h2>
+          <p>Expected output "{{ latest_output.name }}" was not found. It may have been moved or deleted.</p>
+        </div>
+      {% elif latest_output.kind == 'csv' %}
+        <h2>{{ latest_output.label }}: {{ latest_output.name }}.csv</h2>
+        <p class="placeholder">From <code>{{ latest_output.function_name }}</code> &middot; showing first {{ latest_output.preview_row_count }} rows</p>
+        <div class="output-table-wrap">
+          <table class="output-table">
+            <thead>
+              <tr>
+                {% for column in latest_output.columns %}
+                  <th>{{ column }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in latest_output.rows %}
+                <tr>
+                  {% for value in row %}
+                    <td title="{{ value }}">{{ value }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% elif latest_output.kind == 'html' %}
+        <h2>{{ latest_output.label }}: {{ latest_output.name }}.html</h2>
+        <p class="placeholder">From <code>{{ latest_output.function_name }}</code></p>
+        <iframe src="{% url 'preview_output_html' name=latest_output.name %}"></iframe>
+      {% endif %}
+    </div>
+  </div>
+  {% if latest_task_in_progress %}
+    <script>
+      setTimeout(function () { window.location.reload(); }, 3000);
+    </script>
+  {% endif %}
+{% endblock %}

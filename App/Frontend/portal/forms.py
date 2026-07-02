@@ -28,6 +28,7 @@ class TaskSubmitForm(forms.Form):
     embedding_column = forms.CharField(max_length=120, required=False, initial="abstract_embedding")
     output_column = forms.CharField(max_length=120, required=False)
     output_name = forms.CharField(max_length=120, required=False)
+    topic_column = forms.CharField(max_length=120, required=False, initial="topic_id")
     keyword_col = forms.CharField(max_length=120, required=False, initial="kw")
     semantic_col = forms.CharField(max_length=120, required=False, initial="sem")
     target_score_column = forms.CharField(max_length=120, required=False, initial="hybrid")

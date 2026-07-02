@@ -2,9 +2,13 @@ import os
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .forms import ApiKeyCreateForm, TaskSubmitForm
+from .models import TaskRecord
+from .output_preview import build_output_preview, get_latest_task, resolve_safe_path
 from .services import create_api_key
 from .task_engine import get_task_history, queue_user_task
 from App.Frontend.webapp.storage import user_csv_root, user_html_root, user_task_root
@@ -17,6 +21,16 @@ def dashboard(request):
     task_root = user_task_root(request.user)
     csv_files = sorted([name for name in os.listdir(csv_root) if name.endswith(".csv")])
     html_files = sorted([name for name in os.listdir(html_root) if name.endswith(".html")])
+
+    latest_task = get_latest_task(request.user)
+    latest_output = None
+    latest_task_in_progress = False
+    if latest_task is not None:
+        if latest_task.status == TaskRecord.Status.COMPLETED:
+            latest_output = build_output_preview(latest_task, request.user)
+        elif latest_task.status in (TaskRecord.Status.QUEUED, TaskRecord.Status.WORKING):
+            latest_task_in_progress = True
+
     context = {
         "api_key_form": ApiKeyCreateForm(),
         "task_form": TaskSubmitForm(),
@@ -26,8 +40,21 @@ def dashboard(request):
         "csv_files": csv_files,
         "html_files": html_files,
         "tasks": get_task_history(user=request.user, limit=25),
+        "latest_task": latest_task,
+        "latest_output": latest_output,
+        "latest_task_in_progress": latest_task_in_progress,
     }
     return render(request, "portal/dashboard.html", context)
+
+
+@login_required
+@xframe_options_sameorigin
+def preview_output_html(request, name):
+    html_path = resolve_safe_path(user_html_root(request.user), name, ".html")
+    if html_path is None or not html_path.exists():
+        raise Http404("Visualization not found.")
+
+    return HttpResponse(html_path.read_text(encoding="utf-8"), content_type="text/html")
 
 
 @login_required
