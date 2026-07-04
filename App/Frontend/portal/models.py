@@ -55,3 +55,25 @@ class UserStorageProfile(models.Model):
 
     def __str__(self) -> str:
         return f"storage:{self.user.username}"
+
+
+class AgentSettings(models.Model):
+    """Per-user configuration for the dashboard assistant: the user's own Gemini
+    API key (needed to call the model) and the model they want it to use."""
+
+    class GeminiModel(models.TextChoices):
+        FLASH = "gemini-2.5-flash", "Gemini 2.5 Flash"
+        FLASH_LITE = "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"
+        PRO = "gemini-2.5-pro", "Gemini 2.5 Pro"
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agent_settings")
+    gemini_api_key = models.CharField(max_length=200, blank=True)
+    model = models.CharField(max_length=64, choices=GeminiModel.choices, default=GeminiModel.FLASH)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_key(self) -> bool:
+        return bool(self.gemini_api_key)
+
+    def __str__(self) -> str:
+        return f"agent:{self.user.username}"

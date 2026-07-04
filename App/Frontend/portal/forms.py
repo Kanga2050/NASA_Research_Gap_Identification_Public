@@ -2,11 +2,31 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 
+from .models import AgentSettings
+
 
 class SignupForm(UserCreationForm):
     class Meta:
         model = get_user_model()
         fields = ("username",)
+
+
+class UsernameForm(forms.ModelForm):
+    class Meta:
+        model = get_user_model()
+        fields = ("username",)
+
+
+class AgentSettingsForm(forms.ModelForm):
+    class Meta:
+        model = AgentSettings
+        fields = ("gemini_api_key", "model")
+        labels = {"gemini_api_key": "Gemini API key", "model": "Model"}
+        widgets = {
+            "gemini_api_key": forms.PasswordInput(
+                render_value=True, attrs={"placeholder": "AIza…", "autocomplete": "off"}
+            ),
+        }
 
 
 class ApiKeyCreateForm(forms.Form):

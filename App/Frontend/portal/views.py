@@ -2,19 +2,32 @@ import os
 from pathlib import Path
 
 from django.contrib import messages
-from django.contrib.auth import login as auth_login
+from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.http import require_POST
 
+from .agent import AgentError, genai_installed, run_agent_turn
 from .data_lookups import list_csv_columns, list_user_csv_names, list_user_html_names
-from .forms import ApiKeyCreateForm, SignupForm, TaskSubmitForm
-from .models import TaskRecord
+from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
+from .models import AgentSettings, ApiKey, TaskRecord
 from .output_preview import build_output_preview, get_latest_task, resolve_safe_path
-from .services import create_api_key
+from .services import create_api_key, resolve_api_key
 from .task_engine import get_task_history, get_task_status, queue_user_task
-from App.Frontend.webapp.storage import user_csv_root, user_html_root, user_task_root
+from App.Frontend.webapp.storage import (
+    rename_user_storage,
+    storage_folder_name,
+    user_csv_root,
+    user_html_root,
+    user_task_root,
+)
+
+# Keep the persisted chat transcript bounded so the session (and each model
+# request) stays small; this holds ~AGENT_HISTORY_LIMIT/2 turns.
+AGENT_HISTORY_LIMIT = 30
 
 # Form fields that select an existing column from a CSV, rather than naming a
 # new one. The dashboard renders these as dropdowns populated dynamically
@@ -79,6 +92,10 @@ def dashboard(request):
         "latest_task": latest_task,
         "latest_output": latest_output,
         "latest_task_in_progress": latest_task_in_progress,
+        "api_keys": request.user.api_keys.order_by("-created_at"),
+        "agent_ready": genai_installed(),
+        "agent_has_key": _get_agent_settings(request.user).has_key,
+        "agent_history": request.session.get("agent_history", []),
     }
     return render(request, "portal/dashboard.html", context)
 
@@ -104,10 +121,8 @@ def preview_output_html(request, name):
 
 
 @login_required
+@require_POST
 def import_file(request):
-    if request.method != "POST":
-        return redirect("dashboard")
-
     upload = request.FILES.get("upload")
     if not upload:
         messages.error(request, "Choose a file to import.")
@@ -146,10 +161,8 @@ def export_file(request, kind, name):
 
 
 @login_required
+@require_POST
 def issue_api_key(request):
-    if request.method != "POST":
-        return redirect("dashboard")
-
     form = ApiKeyCreateForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Provide a valid API key name.")
@@ -199,10 +212,8 @@ def _queue_task_for_user(user, action: str, cleaned: dict):
 
 
 @login_required
+@require_POST
 def submit_task(request):
-    if request.method != "POST":
-        return redirect("dashboard")
-
     form = TaskSubmitForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Please fill in the task form correctly.")
@@ -216,3 +227,148 @@ def submit_task(request):
 
     messages.success(request, f"Queued {form.cleaned_data['action']} as {result['task_id']}")
     return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def revoke_api_key(request, key_id):
+    api_key = ApiKey.objects.filter(pk=key_id, user=request.user).first()
+    if api_key is None:
+        messages.error(request, "API key not found.")
+    elif not api_key.is_active:
+        messages.error(request, "That API key is already revoked.")
+    else:
+        api_key.revoke()
+        # If the agent was using this key, forget it so a fresh one is minted
+        # on the next chat message instead of authenticating with a dead key.
+        if request.session.get("agent_api_key_hash") == api_key.hashed_key:
+            request.session.pop("agent_api_key", None)
+            request.session.pop("agent_api_key_hash", None)
+        messages.success(request, f"Revoked API key “{api_key.name}”.")
+    return redirect("dashboard")
+
+
+def _ensure_agent_api_key(request) -> str:
+    """Return a live raw API key for the agent, minting one if the cached key is
+    missing or has since been revoked. The raw value is kept in the session (the
+    only place the un-hashed key survives after creation)."""
+    raw_key = request.session.get("agent_api_key")
+    if raw_key and resolve_api_key(raw_key) is not None:
+        return raw_key
+    api_key, raw_key = create_api_key(request.user, "Dashboard agent")
+    request.session["agent_api_key"] = raw_key
+    # Remember which stored key backs the agent so a later revoke can clear it.
+    request.session["agent_api_key_hash"] = api_key.hashed_key
+    return raw_key
+
+
+@login_required
+@require_POST
+def agent_chat(request):
+    message = (request.POST.get("message") or "").strip()
+    if not message:
+        return JsonResponse({"error": "Enter a message."}, status=400)
+    if not genai_installed():
+        return JsonResponse(
+            {"error": "The assistant is unavailable: the google-genai package is not installed."},
+            status=503,
+        )
+
+    settings = _get_agent_settings(request.user)
+    if not settings.has_key:
+        return JsonResponse(
+            {"error": "Add your Gemini API key in Settings to use the assistant."},
+            status=400,
+        )
+
+    history = request.session.get("agent_history", [])
+    try:
+        reply = run_agent_turn(
+            settings.gemini_api_key,
+            settings.model,
+            _ensure_agent_api_key(request),
+            history,
+            message,
+        )
+    except AgentError as exc:
+        return JsonResponse({"error": str(exc)}, status=502)
+
+    history = history + [
+        {"role": "user", "content": message},
+        {"role": "assistant", "content": reply},
+    ]
+    request.session["agent_history"] = history[-AGENT_HISTORY_LIMIT:]
+    return JsonResponse({"reply": reply})
+
+
+@login_required
+@require_POST
+def agent_reset(request):
+    request.session.pop("agent_history", None)
+    return JsonResponse({"ok": True})
+
+
+def _get_agent_settings(user) -> AgentSettings:
+    settings, _ = AgentSettings.objects.get_or_create(user=user)
+    return settings
+
+
+@login_required
+def account_settings(request):
+    settings = _get_agent_settings(request.user)
+    context = {
+        "username_form": UsernameForm(instance=request.user),
+        "password_form": PasswordChangeForm(request.user),
+        "agent_form": AgentSettingsForm(instance=settings),
+        "is_staff": request.user.is_staff,
+        "is_superuser": request.user.is_superuser,
+    }
+    return render(request, "portal/settings.html", context)
+
+
+@login_required
+@require_POST
+def update_username(request):
+    old_folder = storage_folder_name(request.user)
+    form = UsernameForm(request.POST, instance=request.user)
+    if not form.is_valid():
+        for error in form.errors.get("username", ["Could not update username."]):
+            messages.error(request, error)
+        return redirect("account_settings")
+
+    user = form.save()
+    # Keep the user's storage folder in sync with their (username-derived) name.
+    rename_user_storage(old_folder, storage_folder_name(user))
+    messages.success(request, "Username updated.")
+    return redirect("account_settings")
+
+
+@login_required
+@require_POST
+def change_password(request):
+    form = PasswordChangeForm(request.user, request.POST)
+    if not form.is_valid():
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                messages.error(request, error)
+        return redirect("account_settings")
+
+    user = form.save()
+    # Persisting a new password rotates the session hash; refresh it so the user
+    # isn't logged out.
+    update_session_auth_hash(request, user)
+    messages.success(request, "Password changed.")
+    return redirect("account_settings")
+
+
+@login_required
+@require_POST
+def update_agent_settings(request):
+    form = AgentSettingsForm(request.POST, instance=_get_agent_settings(request.user))
+    if not form.is_valid():
+        messages.error(request, "Could not save assistant settings.")
+        return redirect("account_settings")
+
+    form.save()
+    messages.success(request, "Assistant settings saved.")
+    return redirect("account_settings")

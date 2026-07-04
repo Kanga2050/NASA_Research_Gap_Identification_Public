@@ -50,15 +50,6 @@
       </div>
 
       <div class="card">
-        <h2>API key</h2>
-        <form method="post" action="{% url 'issue_api_key' %}">
-          {% csrf_token %}
-          {{ api_key_form.as_p }}
-          <button type="submit">Create API key</button>
-        </form>
-      </div>
-
-      <div class="card">
         <h2>Queue a task</h2>
         <form method="post" action="{% url 'submit_task' %}" id="task-form">
           {% csrf_token %}
@@ -220,6 +211,34 @@
           <p class="placeholder">No tasks yet.</p>
         {% endfor %}
       </div>
+
+      <div class="card">
+        <h2>API keys</h2>
+        <form method="post" action="{% url 'issue_api_key' %}">
+          {% csrf_token %}
+          {{ api_key_form.as_p }}
+          <button type="submit">Create API key</button>
+        </form>
+        <div class="api-key-list">
+          {% for key in api_keys %}
+            <div class="api-key-row {% if not key.is_active %}revoked{% endif %}">
+              <div class="api-key-meta">
+                <span class="api-key-name">{{ key.name }}</span>
+                <code>{{ key.prefix }}…</code>
+                {% if not key.is_active %}<span class="api-key-tag">revoked</span>{% endif %}
+              </div>
+              {% if key.is_active %}
+                <form method="post" action="{% url 'revoke_api_key' key_id=key.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn-revoke">Revoke</button>
+                </form>
+              {% endif %}
+            </div>
+          {% empty %}
+            <p class="placeholder">No API keys yet.</p>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
     <div class="output-panel">
@@ -336,6 +355,117 @@
           <p class="placeholder">No files to export yet.</p>
         {% endif %}
       </div>
+    </div>
+
+    <div class="agent-panel">
+      <div class="agent-header">
+        <h2>Assistant</h2>
+        <button type="button" id="agent-reset" class="agent-reset" title="Clear conversation">Clear</button>
+      </div>
+      <div class="agent-log" id="agent-log">
+        {% for message in agent_history %}
+          <div class="agent-msg {{ message.role }}">{{ message.content }}</div>
+        {% endfor %}
+        <p class="placeholder agent-empty" id="agent-empty"{% if agent_history %} style="display:none"{% endif %}>
+          Ask the assistant about your CSV and HTML files, or have it queue a pipeline step. It's powered by Gemini and connected to your data through the platform's MCP server.
+        </p>
+      </div>
+      {% if not agent_ready %}
+        <div class="message error">Assistant unavailable: the <code>google-genai</code> package is not installed on the server.</div>
+      {% elif not agent_has_key %}
+        <div class="message">Add your Gemini API key in <a href="{% url 'account_settings' %}">Settings</a> to use the assistant.</div>
+      {% endif %}
+      <form class="agent-form" id="agent-form">
+        <textarea id="agent-input" name="message" rows="2" placeholder="Message the assistant…" {% if not agent_ready or not agent_has_key %}disabled{% endif %}></textarea>
+        <button type="submit" id="agent-send" {% if not agent_ready or not agent_has_key %}disabled{% endif %}>Send</button>
+      </form>
+      <script>
+        (function () {
+          var CSRF = "{{ csrf_token }}";
+          var form = document.getElementById("agent-form");
+          var input = document.getElementById("agent-input");
+          var sendBtn = document.getElementById("agent-send");
+          var log = document.getElementById("agent-log");
+          var empty = document.getElementById("agent-empty");
+          var resetBtn = document.getElementById("agent-reset");
+
+          function scrollToBottom() { log.scrollTop = log.scrollHeight; }
+
+          function addMessage(role, text) {
+            if (empty) empty.style.display = "none";
+            var el = document.createElement("div");
+            el.className = "agent-msg " + role;
+            el.textContent = text;
+            log.appendChild(el);
+            scrollToBottom();
+            return el;
+          }
+
+          function setBusy(busy) {
+            input.disabled = busy;
+            sendBtn.disabled = busy;
+          }
+
+          scrollToBottom();
+
+          form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var text = input.value.trim();
+            if (!text) return;
+
+            addMessage("user", text);
+            input.value = "";
+            setBusy(true);
+            var pending = addMessage("assistant pending", "Thinking…");
+
+            fetch("{% url 'agent_chat' %}", {
+              method: "POST",
+              headers: {
+                "X-CSRFToken": CSRF,
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: "message=" + encodeURIComponent(text),
+            })
+              .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+              .then(function (res) {
+                pending.classList.remove("pending");
+                if (res.ok && res.data.reply) {
+                  pending.textContent = res.data.reply;
+                } else {
+                  pending.classList.add("error-msg");
+                  pending.textContent = res.data.error || "The assistant could not respond.";
+                }
+                scrollToBottom();
+              })
+              .catch(function () {
+                pending.classList.remove("pending");
+                pending.classList.add("error-msg");
+                pending.textContent = "Network error. Please try again.";
+              })
+              .finally(function () {
+                setBusy(false);
+                input.focus();
+              });
+          });
+
+          input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              form.requestSubmit();
+            }
+          });
+
+          resetBtn.addEventListener("click", function () {
+            fetch("{% url 'agent_reset' %}", {
+              method: "POST",
+              headers: { "X-CSRFToken": CSRF },
+            }).then(function () {
+              log.querySelectorAll(".agent-msg").forEach(function (n) { n.remove(); });
+              if (empty) empty.style.display = "";
+            });
+          });
+        })();
+      </script>
     </div>
   </div>
 {% endblock %}

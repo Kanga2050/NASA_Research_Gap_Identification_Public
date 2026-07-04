@@ -15,7 +15,7 @@
       <span class="brand-title">Research Gap Identification</span>
       <span class="spacer"></span>
       {% if user.is_authenticated %}
-        <span class="topbar-user">{{ user.username }}</span>
+        <a class="topbar-user" href="{% url 'account_settings' %}" title="Account settings">{{ user.username }}</a>
         <form class="logout-form" method="post" action="{% url 'logout' %}">
           {% csrf_token %}
           <button type="submit" class="topbar-link">Sign out</button>

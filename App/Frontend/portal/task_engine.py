@@ -31,6 +31,10 @@ active_count = 0
 task_condition = threading.Condition()
 dispatcher_started = False
 max_parallel_tasks = int(os.environ.get("DJANGO_MAX_PARALLEL_TASKS", "4"))
+# Hard ceiling on how many tasks the in-memory registry retains. Evicted entries
+# are transparently rebuilt from the database on the next status poll, so this
+# only bounds memory - it never loses data.
+MAX_REGISTRY_TASKS = 1000
 
 
 def get_iso_time() -> str:
@@ -54,6 +58,17 @@ class PrintCatcher:
         self.terminal.flush()
 
 
+def _enforce_registry_limit() -> None:
+    # Drop the oldest entries (insertion order) once the registry grows past its
+    # ceiling. Popped tasks are rehydrated from the DB whenever they're polled.
+    while len(shared_task_registry) > MAX_REGISTRY_TASKS:
+        try:
+            oldest_key = next(iter(shared_task_registry))
+        except StopIteration:
+            return
+        shared_task_registry.pop(oldest_key, None)
+
+
 def _update_registry(task: TaskRecord) -> None:
     # Merge into any existing entry rather than replacing it outright -
     # PrintCatcher.write() stashes "latest_print" on this same dict, and a
@@ -68,6 +83,7 @@ def _update_registry(task: TaskRecord) -> None:
         "lastUpdatedAt": task.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ") if task.updated_at else get_iso_time(),
         "error": task.error,
     })
+    _enforce_registry_limit()
 
 
 def _refresh_task(task_id: str) -> TaskRecord:

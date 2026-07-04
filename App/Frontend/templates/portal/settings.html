@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Settings – Research Gap Identification{% endblock %}
+
+{% block body %}
+  <div class="settings-wrap">
+    <div class="settings-head">
+      <h1>Account settings</h1>
+      <a class="back-link" href="{% url 'dashboard' %}">&larr; Back to dashboard</a>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="card">
+      <h2>Assistant (Gemini)</h2>
+      <p class="placeholder">Bring your own Gemini API key (the free tier works). It is used only to power the dashboard assistant for your account.</p>
+      <form method="post" action="{% url 'update_agent_settings' %}">
+        {% csrf_token %}
+        {{ agent_form.as_p }}
+        <button type="submit">Save assistant settings</button>
+      </form>
+      <p class="hint">Get a key at <code>aistudio.google.com/apikey</code>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Username</h2>
+      <form method="post" action="{% url 'update_username' %}">
+        {% csrf_token %}
+        {{ username_form.as_p }}
+        <button type="submit">Update username</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Password</h2>
+      <form method="post" action="{% url 'change_password' %}">
+        {% csrf_token %}
+        {{ password_form.as_p }}
+        <button type="submit">Change password</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Access level</h2>
+      <ul class="access-list">
+        <li>
+          <span>Admin access</span>
+          {% if is_superuser %}
+            <span class="access-badge yes">Superuser</span>
+          {% elif is_staff %}
+            <span class="access-badge yes">Staff</span>
+          {% else %}
+            <span class="access-badge no">Standard user</span>
+          {% endif %}
+        </li>
+      </ul>
+      {% if is_staff %}
+        <p class="hint">You can open the <a href="/admin/">Django admin</a>.</p>
+      {% else %}
+        <p class="hint">You do not have admin access to this instance.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

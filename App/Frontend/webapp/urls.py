@@ -5,15 +5,22 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 
 from App.Frontend.portal.views import (
+    account_settings,
+    agent_chat,
+    agent_reset,
+    change_password,
     csv_columns,
     dashboard,
     export_file,
     import_file,
     issue_api_key,
     preview_output_html,
+    revoke_api_key,
     signup,
     submit_task,
     task_status,
+    update_agent_settings,
+    update_username,
 )
 
 urlpatterns = [
@@ -22,6 +29,13 @@ urlpatterns = [
     path("login/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(template_name="registration/logged_out.html"), name="logout"),
     path("api-keys/new/", issue_api_key, name="issue_api_key"),
+    path("api-keys/<int:key_id>/revoke/", revoke_api_key, name="revoke_api_key"),
+    path("settings/", account_settings, name="account_settings"),
+    path("settings/username/", update_username, name="update_username"),
+    path("settings/password/", change_password, name="change_password"),
+    path("settings/agent/", update_agent_settings, name="update_agent_settings"),
+    path("agent/chat/", agent_chat, name="agent_chat"),
+    path("agent/reset/", agent_reset, name="agent_reset"),
     path("tasks/new/", submit_task, name="submit_task"),
     path("tasks/<str:task_id>/status/", task_status, name="task_status"),
     path("outputs/html/<str:name>/", preview_output_html, name="preview_output_html"),

@@ -1,6 +1,7 @@
 cloudscraper
 fastapi
 fastmcp
+google-genai
 PyMuPDF
 hdbscan
 numpy
