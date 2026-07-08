@@ -331,9 +331,12 @@ def _coerce_number(value):
 def studio_run(request):
     """Compile the node graph into queued tasks, in dependency (topological) order.
 
-    Per-user FIFO execution in the task engine means enqueuing in topological order
-    is sufficient for correct execution order -- an upstream node's output CSV/column
-    exists before a downstream node reads it, without any new dependency machinery.
+    Wires carry "carriage": a csv wire carries a table name, a column wire carries
+    {csv, column}. We propagate carriage through the graph in topological order to
+    resolve each function's source CSV (from its input wires) and column args, then
+    queue via TASK_SPECS. Per-user FIFO execution in the task engine means enqueuing
+    in topological order is sufficient for correct execution order -- no dependency
+    machinery needed. Source/bridge nodes (__csv__, __column__) queue nothing.
     """
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -347,51 +350,67 @@ def studio_run(request):
     if order is None:
         return JsonResponse({"error": "The pipeline has a cycle -- remove a connection."}, status=400)
 
-    # First upstream table producer for each node (single source enforced client-side).
+    # incoming[node] = list of (source_node, target_input_port_index)
     incoming = {nid: [] for nid in nodes}
     for edge in edges:
         src, dst = str(edge.get("from")), str(edge.get("to"))
         if dst in incoming and src in nodes:
-            incoming[dst].append(src)
+            incoming[dst].append((src, int(edge.get("toPort", 0))))
 
-    output_table = {}  # node id -> the CSV name it emits downstream
+    carry = {}  # node id -> its output carriage: {"wire","csv"[,"column"]}
     queued = []
     try:
         for nid in order:
             node = nodes[nid]
-            action = node.get("action")
-            entry = MANIFEST.get(action)
+            entry = MANIFEST.get(node.get("action"))
             if entry is None:
                 continue
+            in_by_port = {port: carry.get(src) for src, port in incoming.get(nid, [])}
 
-            ups = incoming.get(nid, [])
-            source_table = output_table.get(ups[0], "") if ups else ""
-
-            if action == "__csv__":
-                output_table[nid] = node.get("csv", "")
-                continue  # CSV input node queues nothing; it just names a table.
+            if entry["special"] == "csv_input":
+                carry[nid] = {"wire": "csv", "csv": node.get("csv", "")}
+                continue
+            if entry["special"] == "select_column":
+                src = in_by_port.get(0) or {}
+                carry[nid] = {"wire": "column", "csv": src.get("csv", ""), "column": node.get("column", "")}
+                continue
 
             cleaned = dict(node.get("fields") or {})
             for pref in entry["prefs"]:
                 if pref["widget"] == "number" and pref["param"] in cleaned:
                     cleaned[pref["param"]] = _coerce_number(cleaned[pref["param"]])
+
+            source_csv, csv_inputs = "", []
+            for i, inp in enumerate(entry["inputs"]):
+                wire = in_by_port.get(i)
+                if not wire:
+                    continue
+                if inp["wire"] == "csv":
+                    csv_inputs.append(wire.get("csv", ""))
+                    source_csv = source_csv or wire.get("csv", "")
+                else:  # column wire -> its column name is the arg; its CSV seeds the source
+                    cleaned[inp["param"]] = wire.get("column", "")
+                    source_csv = source_csv or wire.get("csv", "")
+
             if entry["table_param"]:
-                cleaned[entry["table_param"]] = source_table or cleaned.get(entry["table_param"], "")
+                cleaned[entry["table_param"]] = source_csv or cleaned.get(entry["table_param"], "")
+            if node.get("action") == "combine_csvs":
+                cleaned["source_csvs"] = ",".join(c for c in csv_inputs if c)
 
-            result = _queue_task_for_user(request.user, action, cleaned)
+            result = _queue_task_for_user(request.user, node["action"], cleaned)
 
-            out = entry.get("output")
-            out_name = (cleaned.get(out["param"]) or out["default"]) if out else ""
-            if entry["table_out"] == "same":
-                output_table[nid] = source_table
-            elif entry["table_out"] == "new":
-                output_table[nid] = out_name
+            out = entry["output"]
+            out_name = cleaned.get(out["param"]) or out.get("default", "")
+            if entry["category"] == "annotation":
+                carry[nid] = {"wire": "column", "csv": source_csv, "column": out_name}
+            elif entry["category"] == "distillation":
+                carry[nid] = {"wire": "csv", "csv": out_name}
             else:
-                output_table[nid] = ""
+                carry[nid] = {"wire": "none"}
 
             queued.append({
                 "task_id": result["task_id"],
-                "action": action,
+                "action": node["action"],
                 "category": entry["category"],
                 "output_name": out_name,
             })

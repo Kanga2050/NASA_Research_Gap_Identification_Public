@@ -819,6 +819,29 @@ table.output-table tr:nth-child(even) td {
 .wire-badge[data-t="number"] { background: var(--wire-number); }
 .wire-badge[data-t="date"] { background: var(--wire-date); }
 .wire-badge[data-t="embedding"] { background: var(--wire-embedding); }
+.wire-badge[data-t="csv"] { background: #334155; }
+
+/* Typed input/output port rows inside a node */
+.studio-node .port-in,
+.studio-node .port-out {
+  font-size: 0.76rem;
+  color: var(--text);
+  padding: 0.18rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.studio-node .port-in { margin-left: -0.15rem; }
+.studio-node .port-out {
+  justify-content: flex-end;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.studio-node .port-in em { color: var(--text-muted); font-style: normal; font-size: 0.68rem; }
+.studio-node .wire-badge { margin-left: 0; }
 
 /* Drawflow port + wire cosmetics */
 .studio-canvas .drawflow-node { background: transparent; border: none; padding: 0; box-shadow: 0 3px 10px rgba(20, 30, 50, 0.16); border-radius: 8px; }
