@@ -53,7 +53,7 @@ def reduce_dimensionality(
     df.loc[valid_rows, new_column_name] = pd.Series(reduced_embeddings.tolist(), index=valid_rows)
     
     print(f"Writing updated dataset safely to '{csv_path}'...")
-    temp_path = csv_path + ".tmp"
+    temp_path = Path(f"{csv_path}.tmp")
     df.to_csv(temp_path, index=False)
     
     os.replace(temp_path, csv_path)

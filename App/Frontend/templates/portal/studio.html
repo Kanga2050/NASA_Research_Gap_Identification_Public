@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}{% load cache_bust %}
+
+{% block title %}Studio – Research Gap Identification{% endblock %}
+
+{% block body %}
+  <link rel="stylesheet" href="{% static_versioned 'portal/vendor/drawflow.min.css' %}">
+
+  {{ manifest|json_script:"studio-manifest" }}
+  {{ csv_names|json_script:"studio-csvs" }}
+
+  <div class="studio" id="studio" data-csrf="{{ csrf_token }}"
+       data-columns-url="/csvs/__NAME__/columns/"
+       data-run-url="{% url 'studio_run' %}"
+       data-status-url="/tasks/__ID__/status/"
+       data-html-url="/outputs/html/__NAME__/">
+    <aside class="studio-palette" id="studio-palette"></aside>
+
+    <div class="studio-canvas">
+      <div class="studio-hint">Drag a node from the left onto the canvas · connect the table ports · then Run</div>
+      <div id="drawflow"></div>
+    </div>
+
+    <aside class="studio-side">
+      <button type="button" class="run-btn" id="run-btn">▶ Run pipeline</button>
+      <p class="placeholder" id="run-empty" style="margin-top:0.75rem">
+        Build a pipeline: <strong>CSV Input → Annotation/Distillation → Visualization</strong>.
+        Wire nodes through their table ports; pick columns inside each block. Run queues every
+        task to the server in dependency order.
+      </p>
+      <div class="run-status" id="run-status"></div>
+      <div class="run-results" id="run-results"></div>
+    </aside>
+  </div>
+
+  <script src="{% static_versioned 'portal/vendor/drawflow.min.js' %}"></script>
+  <script src="{% static_versioned 'portal/js/studio.js' %}"></script>
+{% endblock %}

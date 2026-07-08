@@ -1,4 +1,6 @@
+import json
 import os
+from collections import deque
 from pathlib import Path
 
 from django.contrib import messages
@@ -11,10 +13,16 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from .agent import AgentError, genai_installed, run_agent_turn
-from .data_lookups import list_csv_columns, list_user_csv_names, list_user_html_names
+from .data_lookups import (
+    list_csv_columns,
+    list_csv_columns_typed,
+    list_user_csv_names,
+    list_user_html_names,
+)
 from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
+from .graph_manifest import MANIFEST, PALETTE
 from .models import AgentSettings, ApiKey, TaskRecord
-from .output_preview import build_output_preview, get_latest_task, resolve_safe_path
+from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
 from .services import create_api_key, resolve_api_key
 from .task_engine import get_task_history, get_task_status, queue_user_task
 from App.Frontend.webapp.storage import (
@@ -39,6 +47,14 @@ COLUMN_FIELD_NAMES = [
     "keyword_col",
     "semantic_col",
     "target_score_column",
+    "target_column",
+    "dict_column",
+    "group_column",
+    "sort_column",
+    "subset_column",
+    "row_column",
+    "column_column",
+    "date_column",
 ]
 
 # Maps an import/export "kind" (also the file extension) to the storage-root
@@ -80,6 +96,7 @@ def dashboard(request):
             latest_task_in_progress = True
 
     context = {
+        "active_tab": "dashboard",
         "api_key_form": ApiKeyCreateForm(),
         "task_form": TaskSubmitForm(),
         "csv_root": csv_root,
@@ -102,12 +119,22 @@ def dashboard(request):
 
 @login_required
 def csv_columns(request, name):
-    return JsonResponse({"columns": list_csv_columns(request.user, name)})
+    # `columns` (name list) stays for the dashboard form; `typed` adds inferred
+    # wire types for the Studio node editor.
+    typed = list_csv_columns_typed(request.user, name)
+    return JsonResponse({"columns": [c["name"] for c in typed], "typed": typed})
 
 
 @login_required
 def task_status(request, task_id):
     return JsonResponse(get_task_status(task_id, user=request.user))
+
+
+@login_required
+def preview_output(request, kind, name):
+    """JSON preview of any CSV/HTML file the signed-in user owns, for the
+    center-column "view a previous output" dropdown."""
+    return JsonResponse(build_named_preview(request.user, kind, name))
 
 
 @login_required
@@ -182,15 +209,40 @@ def issue_api_key(request):
 #            truthy, falling back to `default` (which may be a callable taking
 #            the cleaned form data, for defaults computed from other fields).
 TASK_SPECS = {
-    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), (None, "abstract_embedding"), ("model_name", "allenai/specter2_base")]},
+    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("output_column", "abstract_embedding"), ("model_name", "allenai/specter2_base")]},
     "reduce_dimensionality": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "abstract_embedding"), ("output_column", "2d"), ("n_components", 2)]},
     "cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "5d"), ("output_column", "topic_id"), ("min_cluster_size", 32), ("min_samples", 8)]},
-    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics")]},
+    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics"), ("chart_title", "")]},
     "keyword_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("text_column", "abstract"), ("output_column", "kw")]},
     "semantic_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("embedding_column", "abstract_embedding"), ("output_column", "sem")]},
     "hybrid_score": {"roots": ["csv"], "args": [("csv_name", ""), ("keyword_col", "kw"), ("semantic_col", "sem"), ("output_column", "hybrid")]},
     "numerical_filter": {"roots": ["csv"], "args": [("source_csv", lambda c: c["csv_name"]), ("output_csv", "Filtered_Output"), ("target_score_column", "hybrid"), ("threshold", 0.7)]},
     "openalex_scraper": {"roots": ["csv"], "args": [("topic", "space biology"), ("csv_name", "scraped"), ("limit", 10000)]},
+    # Distillation
+    "categorical_filter": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Filtered_Output"), ("target_column", ""), ("expected_value", "")]},
+    "combine_csvs": {"roots": ["csv"], "args": [("source_csvs", ""), ("output_csv", "Combined_Corpus"), ("source_column", "source")]},
+    "aggregate_dictionary": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Aggregated_Counts"), ("dict_column", "word_freq")]},
+    "group_aggregate": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Grouped_Output"), ("group_column", ""), ("value_column", ""), ("agg", "count"), ("exclude", "")]},
+    "top_n_by_column": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Top_N_Output"), ("sort_column", ""), ("n", 100), ("ascending", False)]},
+    "deduplicate": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Deduplicated_Output"), ("subset_column", "")]},
+    "select_columns": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Selected_Columns_Output"), ("columns", ""), ("drop", False)]},
+    "cross_tab": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Cross_Tab_Output"), ("row_column", ""), ("column_column", "")]},
+    "arithmetic": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Arithmetic_Output"), ("column_a", ""), ("operation", "divide"), ("operand", ""), ("new_column_name", "result"), ("group_by", "")]},
+    # Annotation
+    "word_frequency": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("new_column_name", "word_freq"), ("ngram", 1)]},
+    "label_topics": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("new_column_name", "Topic_Label")]},
+    "text_length": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("new_column_name", "length"), ("unit", "words")]},
+    "extract_year": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "year")]},
+    "to_date": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "date")]},
+    "normalize_column": {"roots": ["csv"], "args": [("csv_name", ""), ("value_column", ""), ("new_column_name", "")]},
+    # Visualization
+    "bar_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("series_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_bar_chart"), ("top_n", 25), ("exclude", "")]},
+    "scatter_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("color_column", ""), ("size_column", ""), ("coord_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_scatter")]},
+    "histogram": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("value_column", ""), ("bins", 30), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_histogram"), ("color_column", ""), ("log_x", False), ("log_y", False)]},
+    "line_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("color_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_line_chart")]},
+    "box_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("value_column", ""), ("category_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_box_plot"), ("exclude", ""), ("log_y", False)]},
+    "heatmap": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_heatmap")]},
+    "pie_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_pie_chart"), ("top_n", 10), ("exclude", "")]},
 }
 
 ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root}
@@ -227,6 +279,126 @@ def submit_task(request):
 
     messages.success(request, f"Queued {form.cleaned_data['action']} as {result['task_id']}")
     return redirect("dashboard")
+
+
+@login_required
+def studio(request):
+    """Visual scripting canvas: nodes wired into a pipeline, queued in dependency
+    order by studio_run. Ships the function manifest and CSV names to the editor."""
+    return render(request, "portal/studio.html", {
+        "active_tab": "studio",
+        "csv_names": list_user_csv_names(request.user),
+        "manifest": {"nodes": MANIFEST, "palette": PALETTE},
+    })
+
+
+def _topo_sort(node_ids, edges):
+    """Kahn topological sort over the table edges. Returns an ordered list of node
+    ids, or None if the graph contains a cycle."""
+    indeg = {nid: 0 for nid in node_ids}
+    adj = {nid: [] for nid in node_ids}
+    for edge in edges:
+        src, dst = str(edge.get("from")), str(edge.get("to"))
+        if src in indeg and dst in indeg:
+            adj[src].append(dst)
+            indeg[dst] += 1
+    queue = deque(nid for nid in node_ids if indeg[nid] == 0)
+    order = []
+    while queue:
+        nid = queue.popleft()
+        order.append(nid)
+        for nxt in adj[nid]:
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                queue.append(nxt)
+    return order if len(order) == len(node_ids) else None
+
+
+def _coerce_number(value):
+    """Studio sends form values as strings; turn numeric-widget values back into
+    int/float so backend functions (e.g. bins, top_n) get real numbers."""
+    text = str(value).strip()
+    if text == "":
+        return value
+    try:
+        return float(text) if ("." in text or "e" in text.lower()) else int(text)
+    except ValueError:
+        return value
+
+
+@login_required
+@require_POST
+def studio_run(request):
+    """Compile the node graph into queued tasks, in dependency (topological) order.
+
+    Per-user FIFO execution in the task engine means enqueuing in topological order
+    is sufficient for correct execution order -- an upstream node's output CSV/column
+    exists before a downstream node reads it, without any new dependency machinery.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    nodes = {str(n.get("id")): n for n in payload.get("nodes", [])}
+    edges = payload.get("edges", [])
+
+    order = _topo_sort(list(nodes), edges)
+    if order is None:
+        return JsonResponse({"error": "The pipeline has a cycle -- remove a connection."}, status=400)
+
+    # First upstream table producer for each node (single source enforced client-side).
+    incoming = {nid: [] for nid in nodes}
+    for edge in edges:
+        src, dst = str(edge.get("from")), str(edge.get("to"))
+        if dst in incoming and src in nodes:
+            incoming[dst].append(src)
+
+    output_table = {}  # node id -> the CSV name it emits downstream
+    queued = []
+    try:
+        for nid in order:
+            node = nodes[nid]
+            action = node.get("action")
+            entry = MANIFEST.get(action)
+            if entry is None:
+                continue
+
+            ups = incoming.get(nid, [])
+            source_table = output_table.get(ups[0], "") if ups else ""
+
+            if action == "__csv__":
+                output_table[nid] = node.get("csv", "")
+                continue  # CSV input node queues nothing; it just names a table.
+
+            cleaned = dict(node.get("fields") or {})
+            for pref in entry["prefs"]:
+                if pref["widget"] == "number" and pref["param"] in cleaned:
+                    cleaned[pref["param"]] = _coerce_number(cleaned[pref["param"]])
+            if entry["table_param"]:
+                cleaned[entry["table_param"]] = source_table or cleaned.get(entry["table_param"], "")
+
+            result = _queue_task_for_user(request.user, action, cleaned)
+
+            out = entry.get("output")
+            out_name = (cleaned.get(out["param"]) or out["default"]) if out else ""
+            if entry["table_out"] == "same":
+                output_table[nid] = source_table
+            elif entry["table_out"] == "new":
+                output_table[nid] = out_name
+            else:
+                output_table[nid] = ""
+
+            queued.append({
+                "task_id": result["task_id"],
+                "action": action,
+                "category": entry["category"],
+                "output_name": out_name,
+            })
+    except Exception as exc:  # surface a bad graph without 500-ing
+        return JsonResponse({"error": f"Could not queue pipeline: {exc}", "tasks": queued}, status=400)
+
+    return JsonResponse({"tasks": queued})
 
 
 @login_required

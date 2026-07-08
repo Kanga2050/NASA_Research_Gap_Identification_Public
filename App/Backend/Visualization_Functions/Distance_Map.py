@@ -41,11 +41,12 @@ def get_topic_names(df, topic_column, text_column, top_n=3):
     return topic_names
 
 def distance_map(
-    csv_name: str, 
-    topic_column: str, 
+    csv_name: str,
+    topic_column: str,
     text_column: str = "abstract",
     coord_column: str = "2d",
     output_name: str = "Space_Biology_Topics",
+    title: str = "",
     csv_root: str | Path | None = None,
     html_root: str | Path | None = None,
 ):
@@ -73,7 +74,7 @@ def distance_map(
     fig = px.scatter(
         topic_stats, x='x', y='y', size='size',
         color='Topic_Label', hover_name='Topic_Label',
-        title='Intertopic Distance Map',
+        title=title or 'Intertopic Distance Map',
         size_max=60
     )
 

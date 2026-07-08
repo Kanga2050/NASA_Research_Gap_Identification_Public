@@ -131,6 +131,31 @@ CALLABLE_PATHS = {
     "hybrid_score": "App.Backend.Annotation_Functions.Hybrid_Score:hybrid_score",
     "numerical_filter": "App.Backend.Distillation_Functions.Numerical_Filter:numerical_filter",
     "openalex_scraper": "App.Backend.Import_Data.OpenAlex_Scraper:openalex_scraper",
+    # Distillation
+    "categorical_filter": "App.Backend.Distillation_Functions.Categorical_Filter:categorical_filter",
+    "combine_csvs": "App.Backend.Distillation_Functions.Combine_Csvs:combine_csvs",
+    "aggregate_dictionary": "App.Backend.Distillation_Functions.Aggregate_Dictionary:aggregate_dictionary",
+    "group_aggregate": "App.Backend.Distillation_Functions.Group_Aggregate:group_aggregate",
+    "top_n_by_column": "App.Backend.Distillation_Functions.Top_N_By_Column:top_n_by_column",
+    "deduplicate": "App.Backend.Distillation_Functions.Deduplicate:deduplicate",
+    "select_columns": "App.Backend.Distillation_Functions.Select_Columns:select_columns",
+    "cross_tab": "App.Backend.Distillation_Functions.Cross_Tab:cross_tab",
+    "arithmetic": "App.Backend.Distillation_Functions.Arithmetic:arithmetic",
+    # Annotation
+    "word_frequency": "App.Backend.Annotation_Functions.Word_Frequency:word_frequency",
+    "label_topics": "App.Backend.Annotation_Functions.Label_Topics:label_topics",
+    "text_length": "App.Backend.Annotation_Functions.Text_Length:text_length",
+    "extract_year": "App.Backend.Annotation_Functions.Extract_Year:extract_year",
+    "to_date": "App.Backend.Annotation_Functions.To_Date:to_date",
+    "normalize_column": "App.Backend.Annotation_Functions.Normalize_Column:normalize_column",
+    # Visualization
+    "bar_chart": "App.Backend.Visualization_Functions.Bar_Chart:bar_chart",
+    "scatter_plot": "App.Backend.Visualization_Functions.Scatter_Plot:scatter_plot",
+    "histogram": "App.Backend.Visualization_Functions.Histogram:histogram",
+    "line_chart": "App.Backend.Visualization_Functions.Line_Chart:line_chart",
+    "box_plot": "App.Backend.Visualization_Functions.Box_Plot:box_plot",
+    "heatmap": "App.Backend.Visualization_Functions.Heatmap:heatmap",
+    "pie_chart": "App.Backend.Visualization_Functions.Pie_Chart:pie_chart",
 }
 
 

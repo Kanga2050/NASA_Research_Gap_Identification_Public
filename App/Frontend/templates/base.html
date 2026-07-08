@@ -23,6 +23,12 @@
       {% endif %}
       <img src="{% static 'portal/img/nasa-meatball.png' %}" alt="NASA insignia">
     </header>
+    {% if user.is_authenticated %}
+      <nav class="tabbar">
+        <a href="{% url 'dashboard' %}" class="tab{% if active_tab == 'dashboard' %} active{% endif %}">Dashboard</a>
+        <a href="{% url 'studio' %}" class="tab{% if active_tab == 'studio' %} active{% endif %}">Studio</a>
+      </nav>
+    {% endif %}
     {% block body %}{% endblock %}
   </body>
 </html>

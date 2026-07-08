@@ -21,7 +21,7 @@ def embed_text(
     print(f"Loading model '{model_name}'...")
     model = SentenceTransformer(model_name)
     
-    temp_csv_path = csv_path + ".tmp"
+    temp_csv_path = Path(f"{csv_path}.tmp")
     
     if os.path.exists(temp_csv_path):
         os.remove(temp_csv_path)
