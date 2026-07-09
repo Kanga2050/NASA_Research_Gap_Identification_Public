@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import shutil
 from collections import deque
 from pathlib import Path
 
@@ -14,23 +16,31 @@ from django.views.decorators.http import require_POST
 
 from .agent import AgentError, genai_installed, run_agent_turn
 from .data_lookups import (
+    KIND_SUFFIX,
+    PUBLIC_ROOTS,
+    USER_ROOTS,
     list_csv_columns,
     list_csv_columns_typed,
+    list_public,
     list_user_csv_names,
+    list_user_files,
     list_user_html_names,
+    list_user_template_names,
 )
+from .file_meta import DESCRIPTIONS_FILE, get_description, set_description
 from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
 from .graph_manifest import MANIFEST, PALETTE
 from .models import AgentSettings, ApiKey, TaskRecord
 from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
 from .services import create_api_key, resolve_api_key
-from .task_engine import get_task_history, get_task_status, queue_user_task
+from .task_engine import get_active_tasks, get_task_history, get_task_status, queue_user_task
 from App.Frontend.webapp.storage import (
     rename_user_storage,
     storage_folder_name,
     user_csv_root,
     user_html_root,
     user_task_root,
+    user_template_root,
 )
 
 # Keep the persisted chat transcript bounded so the session (and each model
@@ -57,12 +67,12 @@ COLUMN_FIELD_NAMES = [
     "date_column",
 ]
 
-# Maps an import/export "kind" (also the file extension) to the storage-root
-# accessor and dotted suffix for that file type. Shared by import_file/export_file.
-KIND_ROOTS = {
-    "csv": (user_csv_root, ".csv"),
-    "html": (user_html_root, ".html"),
-}
+# Maps an import/export "kind" to the per-user storage-root accessor and dotted
+# suffix for that file type. Shared by import_file/export_file/publish/describe.
+KIND_ROOTS = {kind: (USER_ROOTS[kind], KIND_SUFFIX[kind]) for kind in KIND_SUFFIX}
+
+# Uploaded file extension -> import kind. Templates arrive as .json.
+EXT_TO_KIND = {"csv": "csv", "html": "html", "json": "template"}
 
 
 def signup(request):
@@ -104,6 +114,10 @@ def dashboard(request):
         "task_root": task_root,
         "csv_names": csv_names,
         "html_names": html_names,
+        "csv_files": list_user_files(request.user, "csv"),
+        "html_files": list_user_files(request.user, "html"),
+        "template_files": list_user_files(request.user, "template"),
+        "template_names": list_user_template_names(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
         "tasks": get_task_history(user=request.user, limit=25),
         "latest_task": latest_task,
@@ -128,6 +142,13 @@ def csv_columns(request, name):
 @login_required
 def task_status(request, task_id):
     return JsonResponse(get_task_status(task_id, user=request.user))
+
+
+@login_required
+def active_tasks(request):
+    """The user's ongoing (working) + scheduled (queued) tasks. Polled by the
+    shared live panel on both the Dashboard and Studio tabs so they stay in sync."""
+    return JsonResponse({"tasks": get_active_tasks(request.user)})
 
 
 @login_required
@@ -156,19 +177,25 @@ def import_file(request):
         return redirect("dashboard")
 
     safe_name = os.path.basename(upload.name)
-    if not safe_name or safe_name in {".", ".."}:
+    if not safe_name or safe_name in {".", ".."} or safe_name == DESCRIPTIONS_FILE:
         messages.error(request, "Invalid file name.")
         return redirect("dashboard")
 
-    kind = Path(safe_name).suffix.lower().lstrip(".")
-    if kind not in KIND_ROOTS:
-        messages.error(request, "Only .csv and .html files can be imported.")
+    ext = Path(safe_name).suffix.lower().lstrip(".")
+    kind = EXT_TO_KIND.get(ext)
+    if kind is None:
+        messages.error(request, "Only .csv, .html, and .json (template) files can be imported.")
         return redirect("dashboard")
 
-    destination = KIND_ROOTS[kind][0](request.user) / safe_name
+    root = USER_ROOTS[kind](request.user)
+    destination = root / safe_name
     with destination.open("wb") as out:
         for chunk in upload.chunks():
             out.write(chunk)
+
+    description = request.POST.get("description", "")
+    if description.strip():
+        set_description(root, Path(safe_name).stem, description)
 
     messages.success(request, f"Imported {safe_name}.")
     return redirect("dashboard")
@@ -185,6 +212,110 @@ def export_file(request, kind, name):
         raise Http404("File not found.")
 
     return FileResponse(file_path.open("rb"), as_attachment=True, filename=f"{name}{suffix}")
+
+
+def _unique_destination(folder: Path, name: str, suffix: str):
+    """A non-clobbering destination path in `folder` for `name+suffix`, appending
+    `_2`, `_3`, ... on collision. Returns (path, final_stem)."""
+    candidate = folder / f"{name}{suffix}"
+    if not candidate.exists():
+        return candidate, name
+    index = 2
+    while True:
+        stem = f"{name}_{index}"
+        alt = folder / f"{stem}{suffix}"
+        if not alt.exists():
+            return alt, stem
+        index += 1
+
+
+def _copy_between_libraries(src_root: Path, dst_root: Path, kind: str, name: str):
+    """Copy `name` of `kind` from one library folder to another, carrying its
+    description along. Returns the destination stem, or None if the source is
+    missing / unsafe."""
+    suffix = KIND_SUFFIX[kind]
+    src = resolve_safe_path(src_root, name, suffix)
+    if src is None or not src.exists():
+        return None
+    dst, final_stem = _unique_destination(dst_root, name, suffix)
+    shutil.copy2(src, dst)
+    description = get_description(src_root, name)
+    if description:
+        set_description(dst_root, final_stem, description)
+    return final_stem
+
+
+@login_required
+@require_POST
+def publish_file(request):
+    """Copy one of the user's files into the shared public library (open commons)."""
+    kind = request.POST.get("kind")
+    name = request.POST.get("name", "")
+    if kind not in KIND_SUFFIX:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+
+    try:
+        final_stem = _copy_between_libraries(USER_ROOTS[kind](request.user), PUBLIC_ROOTS[kind](), kind, name)
+    except OSError as exc:
+        messages.error(request, f"Could not publish: {exc}")
+        return redirect("dashboard")
+
+    if final_stem is None:
+        messages.error(request, "File not found.")
+    else:
+        messages.success(request, f"Published {final_stem}{KIND_SUFFIX[kind]} to the public library.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def import_from_public(request):
+    """Copy a chosen file from the public library into the user's own storage."""
+    kind = request.POST.get("kind")
+    name = request.POST.get("name", "")
+    if kind not in KIND_SUFFIX:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+
+    try:
+        final_stem = _copy_between_libraries(PUBLIC_ROOTS[kind](), USER_ROOTS[kind](request.user), kind, name)
+    except OSError as exc:
+        messages.error(request, f"Could not import: {exc}")
+        return redirect("dashboard")
+
+    if final_stem is None:
+        messages.error(request, "Public file not found.")
+    else:
+        messages.success(request, f"Imported {final_stem}{KIND_SUFFIX[kind]} from the public library.")
+    return redirect("dashboard")
+
+
+@login_required
+def public_list(request):
+    """JSON contents of the shared public library, for the Dashboard pull UI."""
+    return JsonResponse({kind: list_public(kind) for kind in KIND_SUFFIX})
+
+
+@login_required
+@require_POST
+def describe_file(request):
+    """Set/update the description on one of the user's files."""
+    kind = request.POST.get("kind")
+    name = request.POST.get("name", "")
+    if kind not in KIND_SUFFIX:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+
+    root = USER_ROOTS[kind](request.user)
+    path = resolve_safe_path(root, name, KIND_SUFFIX[kind])
+    if path is None or not path.exists():
+        messages.error(request, "File not found.")
+        return redirect("dashboard")
+
+    set_description(root, name, request.POST.get("description", ""))
+    messages.success(request, f"Updated description for {name}.")
+    return redirect("dashboard")
 
 
 @login_required
@@ -418,6 +549,62 @@ def studio_run(request):
         return JsonResponse({"error": f"Could not queue pipeline: {exc}", "tasks": queued}, status=400)
 
     return JsonResponse({"tasks": queued})
+
+
+def _safe_template_name(raw: str) -> str:
+    """Sanitize a user-supplied template name to a filesystem-safe stem."""
+    safe = re.sub(r"[^\w.\-]", "_", (raw or "").strip()).strip("._ ")
+    if safe == Path(DESCRIPTIONS_FILE).stem:
+        return ""
+    return safe
+
+
+@login_required
+def list_templates(request):
+    """The user's saved Studio templates (name + description) for the load dropdown."""
+    return JsonResponse({"templates": list_user_files(request.user, "template")})
+
+
+@login_required
+@require_POST
+def save_template(request):
+    """Persist the current Studio graph (a Drawflow export) as a named JSON template
+    file on the user's account, so it can be reloaded, exported, or published."""
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    name = _safe_template_name(payload.get("name", ""))
+    if not name:
+        return JsonResponse({"error": "Enter a valid template name."}, status=400)
+
+    graph = payload.get("graph")
+    if not isinstance(graph, dict):
+        return JsonResponse({"error": "Missing graph data."}, status=400)
+
+    root = user_template_root(request.user)
+    path = resolve_safe_path(root, name, ".json")
+    if path is None:
+        return JsonResponse({"error": "Invalid template name."}, status=400)
+
+    path.write_text(json.dumps(graph), encoding="utf-8")
+    set_description(root, name, payload.get("description", ""))
+    return JsonResponse({"ok": True, "name": name})
+
+
+@login_required
+def load_template(request, name):
+    """Return a saved template's Drawflow graph so the Studio can import it."""
+    root = user_template_root(request.user)
+    path = resolve_safe_path(root, name, ".json")
+    if path is None or not path.exists():
+        raise Http404("Template not found.")
+    try:
+        graph = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return JsonResponse({"error": "Template is corrupt."}, status=400)
+    return JsonResponse({"name": name, "graph": graph, "description": get_description(root, name)})
 
 
 @login_required

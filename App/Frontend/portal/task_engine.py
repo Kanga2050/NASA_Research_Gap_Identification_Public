@@ -245,3 +245,27 @@ def get_task_history(user=None, limit: int = 20) -> list[dict[str, Any]]:
         }
         for task in qs[:limit]
     ]
+
+
+def get_active_tasks(user, limit: int = 50) -> list[dict[str, Any]]:
+    """The user's currently ongoing (working) and scheduled (queued) tasks,
+    oldest-queued first so the FIFO order is visible. Shared by the Dashboard and
+    Studio live task panels so both tabs reflect the same queue in real time."""
+    qs = (
+        TaskRecord.objects.filter(
+            user=user,
+            status__in=[TaskRecord.Status.WORKING, TaskRecord.Status.QUEUED],
+        )
+        .order_by("created_at")[:limit]
+    )
+    tasks = []
+    for task in qs:
+        entry = shared_task_registry.get(task.task_id, {})
+        tasks.append({
+            "task_id": task.task_id,
+            "status": task.status,
+            "function_name": task.function_name,
+            "createdAt": task.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "latest_print": entry.get("latest_print", ""),
+        })
+    return tasks

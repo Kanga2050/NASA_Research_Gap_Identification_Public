@@ -9,10 +9,18 @@
         <h2>Import</h2>
         <form method="post" action="{% url 'import_file' %}" enctype="multipart/form-data">
           {% csrf_token %}
-          <label for="id_upload">CSV or HTML file</label>
-          <input type="file" name="upload" id="id_upload" accept=".csv,.html" required>
+          <label for="id_upload">CSV, HTML, or template (.json) file</label>
+          <input type="file" name="upload" id="id_upload" accept=".csv,.html,.json" required>
+          <label for="id_upload_desc">Description (optional)</label>
+          <input type="text" name="description" id="id_upload_desc" placeholder="What is this file?">
           <button type="submit">Upload</button>
         </form>
+
+        <h3>Public library</h3>
+        <p class="placeholder">Pull shared CSVs, visualizations, and templates into your account.</p>
+        <div id="public-library" data-url="{% url 'public_list' %}" data-import-url="{% url 'import_from_public' %}">
+          <p class="placeholder">Loading public files&hellip;</p>
+        </div>
       </div>
 
       {% if messages %}
@@ -32,22 +40,129 @@
           <li>Task root: {{ task_root }}</li>
         </ul>
         <h3>CSV files</h3>
-        <ul>
-          {% for name in csv_names %}
-            <li>{{ name }}.csv</li>
+        <ul class="file-list">
+          {% for f in csv_files %}
+            <li class="file-row" data-kind="csv" data-name="{{ f.name }}">
+              <div class="file-main">
+                <span class="file-name">{{ f.name }}.csv</span>
+                <span class="file-actions">
+                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
+                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
+                </span>
+              </div>
+              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
+            </li>
           {% empty %}
-            <li>No CSV files yet.</li>
+            <li class="placeholder">No CSV files yet.</li>
           {% endfor %}
         </ul>
         <h3>HTML files</h3>
-        <ul>
-          {% for name in html_names %}
-            <li>{{ name }}.html</li>
+        <ul class="file-list">
+          {% for f in html_files %}
+            <li class="file-row" data-kind="html" data-name="{{ f.name }}">
+              <div class="file-main">
+                <span class="file-name">{{ f.name }}.html</span>
+                <span class="file-actions">
+                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
+                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
+                </span>
+              </div>
+              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
+            </li>
           {% empty %}
-            <li>No HTML files yet.</li>
+            <li class="placeholder">No HTML files yet.</li>
+          {% endfor %}
+        </ul>
+        <h3>Templates</h3>
+        <ul class="file-list">
+          {% for f in template_files %}
+            <li class="file-row" data-kind="template" data-name="{{ f.name }}">
+              <div class="file-main">
+                <span class="file-name">{{ f.name }}.json</span>
+                <span class="file-actions">
+                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
+                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
+                </span>
+              </div>
+              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
+            </li>
+          {% empty %}
+            <li class="placeholder">No templates yet. Save one in the Studio.</li>
           {% endfor %}
         </ul>
       </div>
+      <script>
+        (function () {
+          var CSRF = "{{ csrf_token }}";
+          function post(url, params) {
+            var body = Object.keys(params).map(function (k) {
+              return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+            }).join("&");
+            return fetch(url, {
+              method: "POST",
+              headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" },
+              credentials: "same-origin",
+              body: body,
+            });
+          }
+          function esc(v) {
+            return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+          }
+
+          // Publish / edit-description on the user's own files.
+          document.querySelectorAll(".sidebar .file-list").forEach(function (list) {
+            if (list.closest("#public-library")) return;
+            list.addEventListener("click", function (e) {
+              var row = e.target.closest(".file-row");
+              if (!row) return;
+              var kind = row.getAttribute("data-kind");
+              var name = row.getAttribute("data-name");
+              if (e.target.classList.contains("file-publish")) {
+                if (!confirm("Publish " + name + " to the shared public library?")) return;
+                post("{% url 'publish_file' %}", { kind: kind, name: name }).then(function () { window.location.reload(); });
+              } else if (e.target.classList.contains("file-describe")) {
+                var descEl = row.querySelector(".file-desc");
+                var current = descEl ? descEl.textContent.trim() : "";
+                var next = prompt("Description for " + name + ":", current);
+                if (next === null) return;
+                post("{% url 'describe_file' %}", { kind: kind, name: name, description: next }).then(function () { window.location.reload(); });
+              }
+            });
+          });
+
+          // Public library: list + pull.
+          var lib = document.getElementById("public-library");
+          if (lib) {
+            var IMPORT_URL = lib.getAttribute("data-import-url");
+            var SUFFIX = { csv: ".csv", html: ".html", template: ".json" };
+            var LABELS = { csv: "CSV", html: "HTML", template: "Templates" };
+            function group(kind, items) {
+              if (!items.length) return "";
+              var rows = items.map(function (it) {
+                var desc = it.description ? '<div class="file-desc">' + esc(it.description) + "</div>" : "";
+                return '<li class="file-row" data-kind="' + kind + '" data-name="' + esc(it.name) + '">' +
+                  '<div class="file-main"><span class="file-name">' + esc(it.name) + esc(SUFFIX[kind]) + "</span>" +
+                  '<button type="button" class="public-pull">Pull</button></div>' + desc + "</li>";
+              }).join("");
+              return "<h4>" + esc(LABELS[kind]) + "</h4><ul class=\"file-list\">" + rows + "</ul>";
+            }
+            fetch(lib.getAttribute("data-url"), { credentials: "same-origin" })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                var html = ["csv", "html", "template"].map(function (k) { return group(k, d[k] || []); }).join("");
+                lib.innerHTML = html || '<p class="placeholder">The public library is empty.</p>';
+              })
+              .catch(function () { lib.innerHTML = '<p class="placeholder">Could not load the public library.</p>'; });
+            lib.addEventListener("click", function (e) {
+              if (!e.target.classList.contains("public-pull")) return;
+              var row = e.target.closest(".file-row");
+              post(IMPORT_URL, { kind: row.getAttribute("data-kind"), name: row.getAttribute("data-name") })
+                .then(function () { window.location.reload(); });
+            });
+          }
+        })();
+      </script>
 
       <div class="card">
         <h2>Queue a task</h2>
@@ -468,7 +583,7 @@
 
       <div class="card" id="export-card">
         <h2>Export</h2>
-        {% if csv_names or html_names %}
+        {% if csv_names or html_names or template_files %}
           <form id="export-form">
             <label for="export-select">File</label>
             <select id="export-select">
@@ -483,6 +598,13 @@
                 <optgroup label="HTML">
                   {% for name in html_names %}
                     <option value="{% url 'export_file' kind='html' name=name %}">{{ name }}.html</option>
+                  {% endfor %}
+                </optgroup>
+              {% endif %}
+              {% if template_files %}
+                <optgroup label="Templates">
+                  {% for f in template_files %}
+                    <option value="{% url 'export_file' kind='template' name=f.name %}">{{ f.name }}.json</option>
                   {% endfor %}
                 </optgroup>
               {% endif %}

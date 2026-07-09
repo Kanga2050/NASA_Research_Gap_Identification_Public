@@ -20,6 +20,11 @@
   var RUN_URL = root.getAttribute("data-run-url");
   var STATUS_URL = root.getAttribute("data-status-url");
   var HTML_URL = root.getAttribute("data-html-url");
+  var TEMPLATES_URL = root.getAttribute("data-templates-url");
+  var TEMPLATE_SAVE_URL = root.getAttribute("data-template-save-url");
+  var TEMPLATE_LOAD_URL = root.getAttribute("data-template-load-url");
+  var USER_KEY = root.getAttribute("data-user") || "anon";
+  var STORAGE_KEY = "studio:graph:" + USER_KEY;
 
   var columnCache = {}; // csvName -> [{name, type}]
 
@@ -27,6 +32,46 @@
   var editor = new Drawflow(container);
   editor.reroute = true;
   editor.start();
+
+  // ---------------------------------------------------- local persistence
+  // The canvas is saved to localStorage on every edit and rehydrated on load so
+  // it survives tab switches / reloads (tabs are separate full-page routes).
+  var restoring = false; // suppress autosave while importing a graph
+  var saveTimer = null;
+  function saveLocal() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(editor.export())); } catch (e) {}
+  }
+  function autosave() {
+    if (restoring) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveLocal, 400);
+  }
+  function loadLocal() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function graphHasNodes(graph) {
+    try { return Object.keys(graph.drawflow.Home.data).length > 0; }
+    catch (e) { return false; }
+  }
+  // Re-render every node's widgets and rebind its events. Drawflow.import restores
+  // node DOM + data but not our event listeners, so rebuild each from node.data.
+  function rerenderAllNodes() {
+    allNodeIds().forEach(function (id) { renderNode(id); });
+  }
+  // Replace the canvas with an imported graph (from localStorage or a template).
+  function importGraph(graph) {
+    restoring = true;
+    try {
+      editor.clear();
+      editor.import(graph);
+      rerenderAllNodes();
+    } finally { restoring = false; }
+    refreshAll();
+    saveLocal();
+  }
 
   // ---------------------------------------------------------------- helpers
   function esc(v) {
@@ -357,6 +402,15 @@
   });
   editor.on("connectionRemoved", refreshAll);
 
+  // Any node removal (✕ button, Delete/Backspace key, or context menu) must
+  // re-derive columns/labels; every graph edit is persisted to localStorage.
+  editor.on("nodeRemoved", function () { refreshAll(); autosave(); });
+  editor.on("nodeCreated", autosave);
+  editor.on("nodeDataChanged", autosave);
+  editor.on("nodeMoved", autosave);
+  editor.on("connectionCreated", autosave);
+  editor.on("connectionRemoved", autosave);
+
   // --------------------------------------------------------------- palette
   (function buildPalette() {
     var pal = document.getElementById("studio-palette");
@@ -462,6 +516,75 @@
       });
   });
 
-  // Seed the canvas with a CSV input node so the editor isn't blank.
-  if (CSV_NAMES.length) createNode("__csv__", 40, 60);
+  // ------------------------------------------------------- templates + clear
+  var templateSelect = document.getElementById("template-load");
+  var saveTemplateBtn = document.getElementById("save-template-btn");
+  var clearBtn = document.getElementById("clear-canvas-btn");
+
+  function refreshTemplateList() {
+    if (!templateSelect || !TEMPLATES_URL) return;
+    fetch(TEMPLATES_URL, { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = d.templates || [];
+        templateSelect.innerHTML = '<option value="">Load a template…</option>' +
+          items.map(function (t) {
+            var label = t.description ? t.name + " — " + t.description : t.name;
+            return '<option value="' + esc(t.name) + '">' + esc(label) + "</option>";
+          }).join("");
+      })
+      .catch(function () {});
+  }
+
+  if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
+    var payload = compile();
+    if (!payload.nodes.length) { flash("Add some nodes before saving a template."); return; }
+    var name = (prompt("Template name:") || "").trim();
+    if (!name) return;
+    var description = (prompt("Description (optional):") || "").trim();
+    fetch(TEMPLATE_SAVE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+      body: JSON.stringify({ name: name, description: description, graph: editor.export() })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok || res.data.error) { flash(res.data.error || "Could not save template."); return; }
+        flash("Saved template “" + res.data.name + "”.");
+        refreshTemplateList();
+      })
+      .catch(function () { flash("Network error saving template."); });
+  });
+
+  if (templateSelect) templateSelect.addEventListener("change", function () {
+    var name = templateSelect.value;
+    if (!name) return;
+    fetch(TEMPLATE_LOAD_URL.replace("__NAME__", encodeURIComponent(name)), { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error || !d.graph) { flash(d.error || "Could not load template."); return; }
+        importGraph(d.graph);
+      })
+      .catch(function () { flash("Network error loading template."); })
+      .then(function () { templateSelect.value = ""; });
+  });
+
+  if (clearBtn) clearBtn.addEventListener("click", function () {
+    if (!confirm("Clear the canvas? This removes all nodes.")) return;
+    restoring = true;
+    try { editor.clear(); } finally { restoring = false; }
+    if (CSV_NAMES.length) createNode("__csv__", 40, 60);
+    saveLocal();
+  });
+
+  // Restore the saved canvas if present; otherwise seed a starter CSV node so
+  // the editor isn't blank.
+  var saved = loadLocal();
+  if (saved && graphHasNodes(saved)) {
+    importGraph(saved);
+  } else if (CSV_NAMES.length) {
+    createNode("__csv__", 40, 60);
+  }
+
+  refreshTemplateList();
 })();

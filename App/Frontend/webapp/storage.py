@@ -58,3 +58,23 @@ def user_html_root(user) -> Path:
 
 def user_task_root(user) -> Path:
     return ensure_directory(user_storage_root(user) / "tasks")
+
+
+def user_template_root(user) -> Path:
+    """Per-user folder for saved Studio graph templates (JSON files)."""
+    return ensure_directory(user_storage_root(user) / "templates")
+
+
+# --- Shared "public" library folders -----------------------------------------
+# A single commons any signed-in user can publish to and pull from. CSVs and
+# HTML visualizations already ship populated; Templates is created on demand.
+def public_csv_root() -> Path:
+    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "CSVs")
+
+
+def public_html_root() -> Path:
+    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "Visualizations")
+
+
+def public_template_root() -> Path:
+    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "Templates")

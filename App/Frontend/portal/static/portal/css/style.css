@@ -643,9 +643,9 @@ table.output-table tr:nth-child(even) td {
   height: calc(100vh - 100px);
   --wire-text: #64748b;
   --wire-number: #2563eb;
-  --wire-date: #0d9488;
+  --wire-date: #0a3c91;
   --wire-embedding: #7c3aed;
-  --cat-source: #0d9488;
+  --cat-source: #0a3c91;
   --cat-annotation: var(--nasa-blue);
   --cat-distillation: #7c3aed;
   --cat-visualization: var(--nasa-red);
@@ -844,8 +844,135 @@ table.output-table tr:nth-child(even) td {
 .studio-node .wire-badge { margin-left: 0; }
 
 /* Drawflow port + wire cosmetics */
-.studio-canvas .drawflow-node { background: transparent; border: none; padding: 0; box-shadow: 0 3px 10px rgba(20, 30, 50, 0.16); border-radius: 8px; }
-.studio-canvas .drawflow-node .drawflow_content_node { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+#drawflow .drawflow-node,
+#drawflow .drawflow-node.selected { background: transparent; border: none; padding: 0; box-shadow: 0 3px 10px rgba(20, 30, 50, 0.16); border-radius: 8px; }
+#drawflow .drawflow-node .drawflow_content_node { background: var(--surface); border: 1px solid rgba(20, 30, 50, 0.06); border-radius: 8px; overflow: hidden; }
 .studio-canvas .drawflow .connection .main-path { stroke: #8b97a8; stroke-width: 2.5px; }
-.studio-canvas .drawflow-node .input,
-.studio-canvas .drawflow-node .output { background: #fff; border: 2px solid #8b97a8; height: 12px; width: 12px; }
+#drawflow .drawflow-node .input,
+#drawflow .drawflow-node .output { background: #fff; border: 2px solid #8b97a8; height: 12px; width: 12px; }
+
+/* ---- Shared live task panel (Dashboard + Studio) ---- */
+.active-tasks {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 300px;
+  max-height: 45vh;
+  overflow-y: auto;
+  z-index: 60;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(20, 30, 50, 0.18);
+  padding: 0.6rem 0.75rem;
+}
+.active-tasks-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--nasa-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.4rem;
+}
+.active-tasks-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  margin-left: 0.25rem;
+  border-radius: 999px;
+  background: var(--nasa-red);
+  color: #fff;
+  font-size: 0.7rem;
+}
+.active-task-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.active-task-row:last-child { border-bottom: none; }
+.active-task-fn {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  word-break: break-word;
+}
+.active-task-print {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- File lists with descriptions, publish/pull actions ---- */
+.file-list { list-style: none; padding: 0; margin: 0.25rem 0 0.5rem; }
+.file-list .file-row {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.file-list .file-row:last-child { border-bottom: none; }
+.file-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.file-name {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text);
+  word-break: break-word;
+}
+.file-actions { display: inline-flex; gap: 0.3rem; flex: 0 0 auto; }
+.file-actions button,
+.public-pull {
+  margin-top: 0;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.72rem;
+  background: var(--nasa-blue);
+}
+.file-actions button:hover,
+.public-pull:hover { background: var(--nasa-blue-dark); }
+.file-actions .file-describe { background: var(--text-muted); }
+.file-desc {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  white-space: pre-wrap;
+}
+.file-desc.empty { display: none; }
+#public-library h4 {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.5rem 0 0.2rem;
+}
+
+/* ---- Studio template controls ---- */
+.studio-templates {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.studio-templates label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+.studio-template-actions { display: flex; gap: 0.4rem; }
+.studio-template-actions button { flex: 1 1 auto; padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+.btn-secondary { background: var(--text-muted); }
+.btn-secondary:hover { background: #47515e; }
