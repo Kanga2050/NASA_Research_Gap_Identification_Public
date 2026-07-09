@@ -3,12 +3,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 def numerical_filter(source_csv: str, output_csv: str, target_score_column: str, threshold: float, csv_root: str | Path | None = None):
-    source_csv = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_csv = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     print(f"Filtering dataset on '{target_score_column}' with a minimum threshold of {threshold}...")
-    df = pd.read_csv(source_csv)
+    df = pd.read_csv(source_path)
 
     if target_score_column not in df.columns:
         raise ValueError(f"Score column '{target_score_column}' was not found in the source dataset.")
@@ -31,8 +33,8 @@ def numerical_filter(source_csv: str, output_csv: str, target_score_column: str,
     filtered_df = df[mask.fillna(False)]
     filtered_df = filtered_df.sort_values(by=target_score_column, ascending=False)
     
-    filtered_df.to_csv(output_csv, index=False)
-    print(f"Search complete! Extracted {len(filtered_df)} target items into a brand new file: '{output_csv}'")
+    filtered_df.to_csv(output_path, index=False)
+    print(f"Search complete! Extracted {len(filtered_df)} target items into a brand new file: '{output_path}'")
 
 if __name__ == "__main__":
     numerical_filter(

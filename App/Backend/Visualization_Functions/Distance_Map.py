@@ -2,42 +2,19 @@ import pandas as pd
 import numpy as np
 import ast
 import plotly.express as px
-import spacy
-from collections import Counter
 from pathlib import Path
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
-
-try:
-    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-    HAS_POS_TAGS = True
-except OSError:
-    nlp = spacy.blank("en")
-    HAS_POS_TAGS = False
+from Backend.nlp_utils import top_keywords
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def get_topic_names(df, topic_column, text_column, top_n=3):
     topic_names = {}
     for topic_id in df[topic_column].unique():
-        if topic_id == -1: continue
-        
-        topic_texts = " ".join(df[df[topic_column] == topic_id][text_column].fillna("").tolist())
-        
-        doc = nlp(topic_texts[:100000]) # Limit length for performance
-        if HAS_POS_TAGS:
-            words = [
-                (token.lemma_ or token.text).lower() for token in doc
-                if token.is_alpha and not token.is_stop and token.pos_ in ["NOUN", "ADJ"]
-            ]
-        else:
-            words = [
-                (token.lemma_ or token.text).lower() for token in doc
-                if token.is_alpha and not token.is_stop
-            ]
-        
-        common = Counter(words).most_common(top_n)
-        topic_names[topic_id] = ", ".join([word for word, count in common])
-        
+        if topic_id == -1:
+            continue
+        topic_texts = df[df[topic_column] == topic_id][text_column].fillna("").tolist()
+        topic_names[topic_id] = top_keywords(topic_texts, top_n)
     return topic_names
 
 def distance_map(
@@ -50,8 +27,8 @@ def distance_map(
     csv_root: str | Path | None = None,
     html_root: str | Path | None = None,
 ):
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     

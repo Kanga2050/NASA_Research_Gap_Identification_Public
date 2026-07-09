@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import hdbscan
 import ast
-import os
+
+from Backend.backend_utils import atomic_write_csv
+from Servers.storage_paths import resolve_csv_path
 
 def cluster(
     csv_name: str, 
@@ -26,7 +28,7 @@ def cluster(
     - min_samples: Controls how conservative the clustering is (higher = more noise).
     """
     
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
     if new_column_name is None:
         new_column_name = f"{embedding_column}_topic"
         
@@ -56,13 +58,10 @@ def cluster(
     df[new_column_name] = None
     
     df.loc[valid_rows, new_column_name] = cluster_labels
-    
+
     print(f"Writing updated dataset safely to '{csv_path}'...")
-    temp_path = Path(f"{csv_path}.tmp")
-    df.to_csv(temp_path, index=False)
-    
-    os.replace(temp_path, csv_path)
-    
+    atomic_write_csv(df, csv_path)
+
     print(f"Success! Topic labels added to column '{new_column_name}'.")
     print("Note: A label of '-1' means the entry is 'noise' and doesn't fit into a dense topic.")
 

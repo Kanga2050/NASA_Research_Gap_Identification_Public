@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def histogram(
@@ -22,8 +22,8 @@ def histogram(
     of favorability scores). Pass `color_column` to overlay one series per category
     (e.g. by source); `log_x`/`log_y` switch that axis to a logarithmic scale, which
     is handy when counts span several orders of magnitude."""
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
 
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)

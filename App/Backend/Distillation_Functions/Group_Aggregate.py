@@ -2,16 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from Backend.backend_utils import drop_excluded
+from Servers.storage_paths import resolve_csv_path
+
 ALLOWED_AGGS = {"count", "mean", "sum", "min", "max"}
-
-
-def drop_excluded(df, column, exclude):
-    """Drop rows whose `column` value (compared as text) is in the comma-separated
-    `exclude` list. Used to omit non-topics like the HDBSCAN noise cluster (-1)."""
-    if not exclude:
-        return df
-    drop = {value.strip() for value in str(exclude).split(",") if value.strip()}
-    return df[~df[column].astype(str).isin(drop)]
 
 
 def group_aggregate(source_csv: str, output_csv: str, group_column: str, value_column: str = "", agg: str = "count", exclude: str = "", csv_root: str | Path | None = None):
@@ -22,8 +16,8 @@ def group_aggregate(source_csv: str, output_csv: str, group_column: str, value_c
     mean/sum/min/max to `value_column`. `exclude` drops comma-separated values of the
     first group column before aggregating (e.g. "-1" to omit the HDBSCAN noise
     cluster). Result is sorted by the aggregate descending."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     agg = (agg or "count").lower()
     if agg not in ALLOWED_AGGS:

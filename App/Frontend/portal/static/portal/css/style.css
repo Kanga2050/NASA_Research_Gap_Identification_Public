@@ -759,6 +759,7 @@ table.output-table tr:nth-child(even) td {
 /* ---- Custom node rendering inside Drawflow ---- */
 .studio-node {
   min-width: 210px;
+  max-width: 320px;
   font-family: var(--font-body);
 }
 .studio-node .node-head {
@@ -843,38 +844,19 @@ table.output-table tr:nth-child(even) td {
 .studio-node .port-in em { color: var(--text-muted); font-style: normal; font-size: 0.68rem; }
 .studio-node .wire-badge { margin-left: 0; }
 
-/* Drawflow port + wire cosmetics */
+/* Drawflow port + wire cosmetics. The vendored default (.drawflow-node) hard-codes
+   width:160px, which clips or slack-spaces our node content (210-320px, depending on
+   how many fields a function has); size the box off its content instead. */
 #drawflow .drawflow-node,
-#drawflow .drawflow-node.selected { background: transparent; border: none; padding: 0; box-shadow: 0 3px 10px rgba(20, 30, 50, 0.16); border-radius: 8px; }
-#drawflow .drawflow-node .drawflow_content_node { background: var(--surface); border: 1px solid rgba(20, 30, 50, 0.06); border-radius: 8px; overflow: hidden; }
+#drawflow .drawflow-node.selected { background: transparent; border: none; padding: 0; width: max-content; min-height: 0; box-shadow: 0 3px 10px rgba(20, 30, 50, 0.16); border-radius: 8px; }
+#drawflow .drawflow-node .drawflow_content_node { background: var(--surface); border: 1px solid rgba(20, 30, 50, 0.06); border-radius: 8px; width: max-content; overflow: hidden; }
 .studio-canvas .drawflow .connection .main-path { stroke: #8b97a8; stroke-width: 2.5px; }
 #drawflow .drawflow-node .input,
 #drawflow .drawflow-node .output { background: #fff; border: 2px solid #8b97a8; height: 12px; width: 12px; }
 
-/* ---- Shared live task panel (Dashboard + Studio) ---- */
-.active-tasks {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  width: 300px;
-  max-height: 45vh;
-  overflow-y: auto;
-  z-index: 60;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(20, 30, 50, 0.18);
-  padding: 0.6rem 0.75rem;
-}
-.active-tasks-head {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  color: var(--nasa-blue);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 0.4rem;
-}
+/* ---- Task feed rows: Dashboard "Recent tasks" (.task-row, defined above) and
+   Studio "Active tasks" (.active-task-row) both render the same /tasks/feed/
+   response, so they stay visually + informationally consistent. ---- */
 .active-tasks-count {
   display: inline-flex;
   align-items: center;
@@ -941,6 +923,8 @@ table.output-table tr:nth-child(even) td {
 .file-actions button:hover,
 .public-pull:hover { background: var(--nasa-blue-dark); }
 .file-actions .file-describe { background: var(--text-muted); }
+.file-actions .file-delete { background: transparent; color: var(--nasa-red); border: 1px solid var(--nasa-red); }
+.file-actions .file-delete:hover { background: var(--nasa-red); color: #fff; }
 .file-desc {
   font-size: 0.74rem;
   color: var(--text-muted);
@@ -975,4 +959,149 @@ table.output-table tr:nth-child(even) td {
 .studio-template-actions { display: flex; gap: 0.4rem; }
 .studio-template-actions button { flex: 1 1 auto; padding: 0.4rem 0.5rem; font-size: 0.8rem; }
 .btn-secondary { background: var(--text-muted); }
+
+.studio-palette-title {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ============================ Dashboard + Studio tabs on one page ============================ */
+/* Both panels stay mounted (rather than display:none) so the inactive one keeps
+   real layout dimensions — Drawflow measures its canvas size on init, and a
+   display:none container would hand it a 0x0 box. */
+.tab-panel {
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.tab-panel.active {
+  visibility: visible;
+  position: static;
+  pointer-events: auto;
+}
+
+/* ============================ Info icons + tooltip ============================ */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #9aa5b1;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  cursor: help;
+  position: relative;
+}
+.info-icon:hover,
+.info-icon:focus {
+  background: var(--nasa-blue);
+  outline: none;
+}
+.info-icon::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 80;
+  bottom: 130%;
+  left: 0;
+  width: 230px;
+  max-width: 60vw;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: #1b1f24;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+.info-icon:hover::after,
+.info-icon:focus::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Bigger "how do I get started" icon next to the site title */
+.info-icon-title {
+  width: 18px;
+  height: 18px;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  padding: 0;
+  margin-left: 0.1rem;
+  cursor: pointer;
+}
+.info-icon-title:hover,
+.info-icon-title:focus {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+/* ============================ Getting-started modal ============================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(16, 24, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.modal-overlay[hidden] { display: none; }
+
+.modal-panel {
+  width: 480px;
+  max-width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.modal-panel-head h2 { margin: 0; }
+
+.modal-close {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  margin-top: 0;
+}
+.modal-close:hover { color: var(--text); }
+
+.modal-panel h3 { margin-top: 1rem; }
+.modal-panel h3:first-of-type { margin-top: 0.25rem; }
+.modal-panel p { margin: 0 0 0.25rem; font-size: 0.88rem; }
 .btn-secondary:hover { background: #47515e; }

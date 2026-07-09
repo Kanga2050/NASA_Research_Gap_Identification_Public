@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 OPERATIONS = {
     "add": lambda a, b: a + b,
     "subtract": lambda a, b: a - b,
@@ -18,8 +20,8 @@ def arithmetic(source_csv: str, output_csv: str, column_a: str, operation: str, 
     `operand` is a column, the operand is replaced by its per-group SUM (broadcast to
     every row) -- so e.g. count / sum(count) within each group yields each row's share
     of its group, which times 100 is a percentage."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     op = (operation or "").lower()
     if op not in OPERATIONS:

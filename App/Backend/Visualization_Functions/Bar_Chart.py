@@ -3,16 +3,8 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
-
-
-def drop_excluded(df, column, exclude):
-    """Drop rows whose `column` value (as text) is in the comma-separated `exclude`
-    list -- e.g. "-1" to omit the HDBSCAN noise cluster from a topic chart."""
-    if not exclude:
-        return df
-    drop = {value.strip() for value in str(exclude).split(",") if value.strip()}
-    return df[~df[column].astype(str).isin(drop)]
+from Backend.backend_utils import drop_excluded
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def bar_chart(
@@ -32,8 +24,8 @@ def bar_chart(
     `series_column` to split each bar into grouped sub-bars (e.g. counts per source).
     `top_n` keeps only the largest categories; `exclude` drops comma-separated
     category values first (e.g. "-1" to omit the HDBSCAN noise cluster)."""
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
 
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)

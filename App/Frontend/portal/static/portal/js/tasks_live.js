@@ -1,15 +1,18 @@
-/* Shared live task panel.
+/* Shared task feed.
  *
- * Polls /tasks/active/ for the signed-in user's ongoing (working) + scheduled
- * (queued) tasks and renders them. Because this lives in base.html it appears on
- * both the Dashboard and Studio tabs, so a task queued on one tab shows up live
- * on the other — keeping the two views in sync without a manual reload.
+ * Polls GET /tasks/feed/ for the signed-in user's recent tasks (newest first,
+ * same list the Dashboard renders server-side at page load) and uses that one
+ * response to refresh two different views of the same data:
+ *   - #recent-tasks-list (Dashboard "Recent tasks"): every task, as-is.
+ *   - #active-tasks-list (Studio "Active tasks"): just the queued/working ones.
+ * Because both panels are mounted on the same page and read the same fetch,
+ * a task queued from either tab is reflected identically, live, on both.
  */
 (function () {
-  var root = document.getElementById("active-tasks");
-  if (!root) return;
-  var list = document.getElementById("active-tasks-list");
-  var count = document.getElementById("active-tasks-count");
+  var recentList = document.getElementById("recent-tasks-list");
+  var activeList = document.getElementById("active-tasks-list");
+  var activeCount = document.getElementById("active-tasks-count");
+  if (!recentList && !activeList) return;
   var POLL_MS = 1500;
   var lastJson = null;
 
@@ -18,16 +21,29 @@
       .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  function render(tasks) {
+  function renderRecent(tasks) {
+    if (!recentList) return;
     if (!tasks.length) {
-      root.style.display = "none";
-      list.innerHTML = "";
-      if (count) count.textContent = "";
+      recentList.innerHTML = '<p class="placeholder">No tasks yet.</p>';
       return;
     }
-    root.style.display = "";
-    if (count) count.textContent = String(tasks.length);
-    list.innerHTML = tasks.map(function (t) {
+    recentList.innerHTML = tasks.map(function (t) {
+      return '<div class="task-row">' +
+        "<span>" + esc(t.createdAt) + " &middot; " + esc(t.function_name) + "</span>" +
+        '<span class="status-pill ' + esc(t.status) + '">' + esc(t.status) + "</span>" +
+        "</div>";
+    }).join("");
+  }
+
+  function renderActive(tasks) {
+    if (!activeList) return;
+    var active = tasks.filter(function (t) { return t.status === "queued" || t.status === "working"; });
+    if (activeCount) activeCount.textContent = active.length ? String(active.length) : "";
+    if (!active.length) {
+      activeList.innerHTML = '<p class="placeholder">No active tasks right now.</p>';
+      return;
+    }
+    activeList.innerHTML = active.map(function (t) {
       var print = t.latest_print
         ? '<span class="active-task-print" title="' + esc(t.latest_print) + '">' + esc(t.latest_print) + "</span>"
         : "";
@@ -39,12 +55,16 @@
   }
 
   function poll() {
-    fetch("/tasks/active/", { headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
+    fetch("/tasks/feed/", { headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : { tasks: [] }; })
       .then(function (d) {
         var tasks = d.tasks || [];
         var signature = JSON.stringify(tasks);
-        if (signature !== lastJson) { lastJson = signature; render(tasks); }
+        if (signature !== lastJson) {
+          lastJson = signature;
+          renderRecent(tasks);
+          renderActive(tasks);
+        }
       })
       .catch(function () {})
       .then(function () { setTimeout(poll, POLL_MS); });

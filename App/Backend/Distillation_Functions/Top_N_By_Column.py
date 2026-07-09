@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 
 def _as_bool(value) -> bool:
     if isinstance(value, bool):
@@ -13,8 +15,8 @@ def top_n_by_column(source_csv: str, output_csv: str, sort_column: str, n: int =
     """Sort a CSV by `sort_column` and keep the top `n` rows, writing them to a new
     CSV. Unlike `numerical_filter` this is threshold-free -- e.g. "top 100 papers by
     favorability" regardless of the absolute score."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     ascending = _as_bool(ascending)
     print(f"Selecting top {n} rows of '{source_csv}' by '{sort_column}' ({'ascending' if ascending else 'descending'})...")

@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 
 def _as_bool(value) -> bool:
     if isinstance(value, bool):
@@ -14,8 +16,8 @@ def select_columns(source_csv: str, output_csv: str, columns: str, drop=False, c
     `drop` is true, keeps everything EXCEPT those columns. Handy for stripping a
     heavy embedding column before export, or slimming a table down to what a chart
     needs."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     wanted = [col.strip() for col in str(columns).split(",") if col.strip()]
     if not wanted:

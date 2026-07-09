@@ -2,13 +2,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 
 def deduplicate(source_csv: str, output_csv: str, subset_column: str, csv_root: str | Path | None = None):
     """Drop rows that repeat a value in `subset_column`, keeping the first
     occurrence, and write the de-duplicated rows to a new CSV (e.g. dedupe papers
     by title or doi)."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     print(f"De-duplicating '{source_csv}' on '{subset_column}'...")
     df = pd.read_csv(source_path)

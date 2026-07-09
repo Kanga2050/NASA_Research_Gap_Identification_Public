@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 
 def _parse_dict(cell):
     if isinstance(cell, dict):
@@ -25,8 +27,8 @@ def aggregate_dictionary(source_csv: str, output_csv: str, dict_column: str, csv
     `dict_column` across every row, producing a new two-column CSV [key, sum],
     sorted by descending sum. Pairs with `word_frequency` to build a corpus-wide
     frequency table ready for a bar chart."""
-    source_path = Path(csv_root) / f"{source_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{source_csv}.csv")
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    source_path = resolve_csv_path(source_csv, csv_root)
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     print(f"Aggregating dictionaries from column '{dict_column}' in '{source_csv}'...")
     df = pd.read_csv(source_path)

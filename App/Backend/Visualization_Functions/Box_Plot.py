@@ -3,16 +3,8 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
-
-
-def drop_excluded(df, column, exclude):
-    """Drop rows whose `column` value (as text) is in the comma-separated `exclude`
-    list -- e.g. "-1" to omit the HDBSCAN noise cluster from a per-topic box plot."""
-    if not exclude:
-        return df
-    drop = {value.strip() for value in str(exclude).split(",") if value.strip()}
-    return df[~df[column].astype(str).isin(drop)]
+from Backend.backend_utils import drop_excluded
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def box_plot(
@@ -29,8 +21,8 @@ def box_plot(
     """Render a box plot of `value_column`'s distribution. Pass `category_column` to
     draw one box per category (e.g. favorability spread per topic). `exclude` drops
     comma-separated category values first; `log_y` uses a logarithmic y-axis."""
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
 
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)

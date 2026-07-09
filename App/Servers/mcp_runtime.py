@@ -274,9 +274,6 @@ def pie_chart(api_key: str, csv_name: str, category_column: str, value_column: s
     return queue_user_task(user, "pie_chart", csv_name, category_column, value_column, title, output_name, top_n, exclude, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
-FOLDER = "App/Backend/Visualizations"
-
-
 @mcp.resource("ui://viewer/app.html")
 def viewer_app() -> str:
     return """<!DOCTYPE html>

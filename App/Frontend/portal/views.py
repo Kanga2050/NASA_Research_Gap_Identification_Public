@@ -27,19 +27,18 @@ from .data_lookups import (
     list_user_html_names,
     list_user_template_names,
 )
-from .file_meta import DESCRIPTIONS_FILE, get_description, set_description
+from .file_meta import DESCRIPTIONS_FILE, get_description, remove_description, set_description
 from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
 from .graph_manifest import MANIFEST, PALETTE
 from .models import AgentSettings, ApiKey, TaskRecord
 from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
 from .services import create_api_key, resolve_api_key
-from .task_engine import get_active_tasks, get_task_history, get_task_status, queue_user_task
+from .task_engine import get_task_history, get_task_status, queue_user_task
 from App.Frontend.webapp.storage import (
     rename_user_storage,
     storage_folder_name,
     user_csv_root,
     user_html_root,
-    user_task_root,
     user_template_root,
 )
 
@@ -88,11 +87,7 @@ def signup(request):
     return render(request, "registration/signup.html", {"form": form})
 
 
-@login_required
-def dashboard(request):
-    csv_root = user_csv_root(request.user)
-    html_root = user_html_root(request.user)
-    task_root = user_task_root(request.user)
+def _dashboard_context(request):
     csv_names = list_user_csv_names(request.user)
     html_names = list_user_html_names(request.user)
 
@@ -105,13 +100,14 @@ def dashboard(request):
         elif latest_task.status in (TaskRecord.Status.QUEUED, TaskRecord.Status.WORKING):
             latest_task_in_progress = True
 
-    context = {
-        "active_tab": "dashboard",
+    tasks = get_task_history(user=request.user, limit=20)
+    # "Active tasks" (Studio) is just this same list filtered to queued/working, so
+    # the Dashboard's "Recent tasks" and the Studio's "Active tasks" always agree.
+    active_tasks = [t for t in tasks if t["status"] in ("queued", "working")]
+
+    return {
         "api_key_form": ApiKeyCreateForm(),
         "task_form": TaskSubmitForm(),
-        "csv_root": csv_root,
-        "html_root": html_root,
-        "task_root": task_root,
         "csv_names": csv_names,
         "html_names": html_names,
         "csv_files": list_user_files(request.user, "csv"),
@@ -119,16 +115,31 @@ def dashboard(request):
         "template_files": list_user_files(request.user, "template"),
         "template_names": list_user_template_names(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
-        "tasks": get_task_history(user=request.user, limit=25),
+        "tasks": tasks,
+        "active_tasks": active_tasks,
         "latest_task": latest_task,
         "latest_output": latest_output,
         "latest_task_in_progress": latest_task_in_progress,
-        "api_keys": request.user.api_keys.order_by("-created_at"),
+        "api_keys": request.user.api_keys.order_by("-created_at")[:20],
         "agent_ready": genai_installed(),
         "agent_has_key": _get_agent_settings(request.user).has_key,
         "agent_history": request.session.get("agent_history", []),
     }
-    return render(request, "portal/dashboard.html", context)
+
+
+def _studio_context(request):
+    """Visual scripting canvas: nodes wired into a pipeline, queued in dependency
+    order by studio_run. Ships the function manifest and CSV names to the editor."""
+    return {
+        "csv_names": list_user_csv_names(request.user),
+        "manifest": {"nodes": MANIFEST, "palette": PALETTE},
+    }
+
+
+@login_required
+def dashboard(request):
+    context = {**_dashboard_context(request), **_studio_context(request), "active_tab": "dashboard"}
+    return render(request, "portal/workspace.html", context)
 
 
 @login_required
@@ -145,10 +156,11 @@ def task_status(request, task_id):
 
 
 @login_required
-def active_tasks(request):
-    """The user's ongoing (working) + scheduled (queued) tasks. Polled by the
-    shared live panel on both the Dashboard and Studio tabs so they stay in sync."""
-    return JsonResponse({"tasks": get_active_tasks(request.user)})
+def task_feed(request):
+    """The same task list the Dashboard's "Recent tasks" renders at page load
+    (newest first, up to 20). Polled by tasks_live.js, which also derives the
+    Studio's "Active tasks" from this same response, so both stay in sync."""
+    return JsonResponse({"tasks": get_task_history(user=request.user, limit=20)})
 
 
 @login_required
@@ -320,6 +332,28 @@ def describe_file(request):
 
 @login_required
 @require_POST
+def delete_file(request):
+    """Permanently delete one of the user's own files (CSV, HTML, or template)."""
+    kind = request.POST.get("kind")
+    name = request.POST.get("name", "")
+    if kind not in KIND_SUFFIX:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+
+    root = USER_ROOTS[kind](request.user)
+    path = resolve_safe_path(root, name, KIND_SUFFIX[kind])
+    if path is None or not path.exists():
+        messages.error(request, "File not found.")
+        return redirect("dashboard")
+
+    path.unlink()
+    remove_description(root, name)
+    messages.success(request, f"Deleted {name}{KIND_SUFFIX[kind]}.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
 def issue_api_key(request):
     form = ApiKeyCreateForm(request.POST)
     if not form.is_valid():
@@ -414,13 +448,8 @@ def submit_task(request):
 
 @login_required
 def studio(request):
-    """Visual scripting canvas: nodes wired into a pipeline, queued in dependency
-    order by studio_run. Ships the function manifest and CSV names to the editor."""
-    return render(request, "portal/studio.html", {
-        "active_tab": "studio",
-        "csv_names": list_user_csv_names(request.user),
-        "manifest": {"nodes": MANIFEST, "palette": PALETTE},
-    })
+    context = {**_dashboard_context(request), **_studio_context(request), "active_tab": "studio"}
+    return render(request, "portal/workspace.html", context)
 
 
 def _topo_sort(node_ids, edges):

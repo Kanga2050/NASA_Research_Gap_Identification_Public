@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def line_chart(
@@ -19,8 +19,8 @@ def line_chart(
     """Render a line chart of `y_column` against `x_column`, sorted by x (e.g. paper
     counts per year). Pass `color_column` to draw one line per category. Pre-
     aggregate with `group_aggregate` when you want one point per x value."""
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
 
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)

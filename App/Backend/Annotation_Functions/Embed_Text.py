@@ -4,6 +4,8 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 import os
 
+from Servers.storage_paths import resolve_csv_path
+
 def embed_text(
     csv_name: str, 
     text_column: str, 
@@ -17,7 +19,7 @@ def embed_text(
     Reads a CSV, generates text embeddings for a specific column, 
     and updates the CSV in-place with the new column.
     """
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
     print(f"Loading model '{model_name}'...")
     model = SentenceTransformer(model_name)
     

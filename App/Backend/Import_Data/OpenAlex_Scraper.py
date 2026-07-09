@@ -5,7 +5,7 @@ import pandas as pd
 import time
 from pathlib import Path
 
-from Servers.storage_paths import resolve_csv_root
+from Servers.storage_paths import resolve_csv_path
 
 def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Path | None = None):
     headers = {
@@ -13,21 +13,25 @@ def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Pa
     }
 
     base_url = "https://api.openalex.org/works"
-    
+
     params = {
         'search': topic,
         'filter': "has_abstract:true",
-        'per_page':200,
+        'per_page': 200,
         'cursor': '*',
-        'api_key': "n66C3l0O086hALzQQDEDq4"
     }
+    # Premium OpenAlex accounts get a higher rate limit via an API key; anonymous
+    # (or "polite pool") requests work fine without one.
+    api_key = os.environ.get("OPENALEX_API_KEY")
+    if api_key:
+        params['api_key'] = api_key
 
     columns = [
         'openalex_id', 'title', 'doi', 'abstract', 'publish_time',
         'authors', 'journal', 'pmcid', 'pubmed_id'
     ]
 
-    output_filename = resolve_csv_root(csv_root) / f"{csv_name}.csv"
+    output_filename = resolve_csv_path(csv_name, csv_root)
     pd.DataFrame(columns = columns).to_csv(output_filename, index=False)
     print(f"Initialized clean file: {output_filename}")
     total_collected = 0

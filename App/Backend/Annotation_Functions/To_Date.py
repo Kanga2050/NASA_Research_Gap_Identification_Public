@@ -1,8 +1,10 @@
-import os
 import warnings
 from pathlib import Path
 
 import pandas as pd
+
+from Backend.backend_utils import atomic_write_csv
+from Servers.storage_paths import resolve_csv_path
 
 
 def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_root: str | Path | None = None):
@@ -12,7 +14,7 @@ def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_
     result is a proper "date" type that downstream numeric/range filtering, sorting
     and time-axis charts can use directly. Values pandas can't parse become blank.
     """
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
 
     print(f"Normalizing '{date_column}' in '{csv_name}' to ISO-8601 dates...")
     df = pd.read_csv(csv_path)
@@ -29,9 +31,7 @@ def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_
     iso = parsed.dt.strftime("%Y-%m-%d")
     df[new_column_name] = iso.where(parsed.notna(), "")
 
-    temp_path = Path(str(csv_path) + ".tmp")
-    df.to_csv(temp_path, index=False)
-    os.replace(temp_path, csv_path)
+    atomic_write_csv(df, csv_path)
     filled = int(parsed.notna().sum())
     print(f"Success! Wrote ISO dates for {filled}/{len(df)} rows into column '{new_column_name}'.")
 

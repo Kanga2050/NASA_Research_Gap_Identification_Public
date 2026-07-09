@@ -1,14 +1,16 @@
-import os
 from pathlib import Path
 
 import pandas as pd
+
+from Backend.backend_utils import atomic_write_csv
+from Servers.storage_paths import resolve_csv_path
 
 
 def text_length(csv_name: str, text_column: str, new_column_name: str = "length", unit: str = "words", csv_root: str | Path | None = None):
     """Add a numeric column measuring the length of `text_column`. `unit="words"`
     counts whitespace-separated tokens; `unit="chars"` counts characters. Useful as
     an axis for scatter plots (e.g. abstract length vs. favorability)."""
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
 
     print(f"Measuring text length of '{text_column}' in '{csv_name}' ({unit})...")
     df = pd.read_csv(csv_path)
@@ -22,9 +24,7 @@ def text_length(csv_name: str, text_column: str, new_column_name: str = "length"
     else:
         df[new_column_name] = text.str.split().apply(len)
 
-    temp_path = Path(str(csv_path) + ".tmp")
-    df.to_csv(temp_path, index=False)
-    os.replace(temp_path, csv_path)
+    atomic_write_csv(df, csv_path)
     print(f"Success! Length saved to column '{new_column_name}'.")
 
 

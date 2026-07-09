@@ -1,7 +1,7 @@
 import os
 import sys
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -270,7 +270,7 @@ class PieChartRequest(BaseModel):
     exclude: str = ""
 
 
-def _get_user(x_api_key: str | None):
+def _current_user(x_api_key: str | None = Header(default=None, alias="X-API-Key")):
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header.")
     api_key = resolve_api_key(x_api_key)
@@ -283,9 +283,11 @@ def _queue(user, function_name: str, *args, **kwargs):
     return queue_user_task(user, function_name, *args, **kwargs)
 
 
+CurrentUser = Depends(_current_user)
+
+
 @app.get("/api/task/status/{task_id}")
-def api_get_task_status(task_id: str, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def api_get_task_status(task_id: str, user=CurrentUser):
     status = get_task_status(task_id, user=user)
     if status.get("error"):
         raise HTTPException(status_code=404, detail=status["error"])
@@ -293,207 +295,173 @@ def api_get_task_status(task_id: str, x_api_key: str | None = Header(default=Non
 
 
 @app.get("/api/catalog/get-csv-catalog")
-def get_csv_catalog(x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def get_csv_catalog(user=CurrentUser):
     return _get_csv_catalog(user_csv_root(user))
 
 
 @app.get("/api/catalog/list-html-files")
-def list_html_files(x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def list_html_files(user=CurrentUser):
     return _list_html_files(user_html_root(user))
 
 
 @app.get("/api/data/get-csv-segment")
-def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str, user=CurrentUser):
     return _get_csv_segment(csv_name, start_row, num_rows, columns, user_csv_root(user))
 
 
 @app.post("/api/pipeline/embed_text")
-def embed_text(data: EmbedTextRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def embed_text(data: EmbedTextRequest, user=CurrentUser):
     return _queue(user, "embed_text", data.csv_name, data.text_column, data.embedding_column, data.model, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/reduce-dimensionality")
-def reduce_dimensionality(data: ReduceDimensionalityRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def reduce_dimensionality(data: ReduceDimensionalityRequest, user=CurrentUser):
     return _queue(user, "reduce_dimensionality", data.csv_name, data.embedding_column, data.output_column, data.n_components, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/cluster")
-def cluster(data: ClusterRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def cluster(data: ClusterRequest, user=CurrentUser):
     return _queue(user, "cluster", data.csv_name, data.coordinate_column, data.output_column, data.min_cluster_size, data.min_samples, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/distance-map")
-def generate_intertopic_distance_map(data: DistanceMapRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def generate_intertopic_distance_map(data: DistanceMapRequest, user=CurrentUser):
     return _queue(user, "distance_map", data.csv_name, data.topic_column, data.text_column, data.coordinate_column, data.output_name, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/keyword-score")
-def keyword_score(data: KeywordScoreRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def keyword_score(data: KeywordScoreRequest, user=CurrentUser):
     return _queue(user, "keyword_score", data.csv_name, data.query, data.text_column, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/semantic-score")
-def semantic_score(data: SemanticScoreRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def semantic_score(data: SemanticScoreRequest, user=CurrentUser):
     return _queue(user, "semantic_score", data.csv_name, data.query, data.embedding_column, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/hybrid-score")
-def hybrid_score(data: HybridScoreRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def hybrid_score(data: HybridScoreRequest, user=CurrentUser):
     return _queue(user, "hybrid_score", data.csv_name, data.keyword_col, data.semantic_col, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/numerical-filter")
-def numerical_filter(data: NumericalFilterRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def numerical_filter(data: NumericalFilterRequest, user=CurrentUser):
     return _queue(user, "numerical_filter", data.csv_name, data.output_csv, data.target_score_column, data.threshold, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/fetch-data")
-def trigger_fetch_data(data: OpenAlexScraperRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def trigger_fetch_data(data: OpenAlexScraperRequest, user=CurrentUser):
     return _queue(user, "openalex_scraper", data.topic, data.csv_name, data.limit, csv_root=str(user_csv_root(user)))
 
 
 # ---- Distillation ----
 @app.post("/api/pipeline/categorical-filter")
-def categorical_filter(data: CategoricalFilterRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def categorical_filter(data: CategoricalFilterRequest, user=CurrentUser):
     return _queue(user, "categorical_filter", data.source_csv, data.output_csv, data.target_column, data.expected_value, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/combine-csvs")
-def combine_csvs(data: CombineCsvsRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def combine_csvs(data: CombineCsvsRequest, user=CurrentUser):
     return _queue(user, "combine_csvs", data.source_csvs, data.output_csv, data.source_column, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/aggregate-dictionary")
-def aggregate_dictionary(data: AggregateDictionaryRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def aggregate_dictionary(data: AggregateDictionaryRequest, user=CurrentUser):
     return _queue(user, "aggregate_dictionary", data.source_csv, data.output_csv, data.dict_column, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/group-aggregate")
-def group_aggregate(data: GroupAggregateRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def group_aggregate(data: GroupAggregateRequest, user=CurrentUser):
     return _queue(user, "group_aggregate", data.source_csv, data.output_csv, data.group_column, data.value_column, data.agg, data.exclude, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/top-n-by-column")
-def top_n_by_column(data: TopNByColumnRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def top_n_by_column(data: TopNByColumnRequest, user=CurrentUser):
     return _queue(user, "top_n_by_column", data.source_csv, data.output_csv, data.sort_column, data.n, data.ascending, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/deduplicate")
-def deduplicate(data: DeduplicateRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def deduplicate(data: DeduplicateRequest, user=CurrentUser):
     return _queue(user, "deduplicate", data.source_csv, data.output_csv, data.subset_column, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/select-columns")
-def select_columns(data: SelectColumnsRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def select_columns(data: SelectColumnsRequest, user=CurrentUser):
     return _queue(user, "select_columns", data.source_csv, data.output_csv, data.columns, data.drop, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/cross-tab")
-def cross_tab(data: CrossTabRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def cross_tab(data: CrossTabRequest, user=CurrentUser):
     return _queue(user, "cross_tab", data.source_csv, data.output_csv, data.row_column, data.column_column, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/arithmetic")
-def arithmetic(data: ArithmeticRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def arithmetic(data: ArithmeticRequest, user=CurrentUser):
     return _queue(user, "arithmetic", data.source_csv, data.output_csv, data.column_a, data.operation, data.operand, data.new_column, data.group_by, csv_root=str(user_csv_root(user)))
 
 
 # ---- Annotation ----
 @app.post("/api/pipeline/word-frequency")
-def word_frequency(data: WordFrequencyRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def word_frequency(data: WordFrequencyRequest, user=CurrentUser):
     return _queue(user, "word_frequency", data.csv_name, data.text_column, data.new_column_name, data.ngram, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/label-topics")
-def label_topics(data: LabelTopicsRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def label_topics(data: LabelTopicsRequest, user=CurrentUser):
     return _queue(user, "label_topics", data.csv_name, data.topic_column, data.text_column, data.new_column_name, data.top_n, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/text-length")
-def text_length(data: TextLengthRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def text_length(data: TextLengthRequest, user=CurrentUser):
     return _queue(user, "text_length", data.csv_name, data.text_column, data.new_column_name, data.unit, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/extract-year")
-def extract_year(data: ExtractYearRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def extract_year(data: ExtractYearRequest, user=CurrentUser):
     return _queue(user, "extract_year", data.csv_name, data.date_column, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/to-date")
-def to_date(data: ToDateRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def to_date(data: ToDateRequest, user=CurrentUser):
     return _queue(user, "to_date", data.csv_name, data.date_column, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 @app.post("/api/pipeline/normalize-column")
-def normalize_column(data: NormalizeColumnRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def normalize_column(data: NormalizeColumnRequest, user=CurrentUser):
     return _queue(user, "normalize_column", data.csv_name, data.value_column, data.new_column_name, csv_root=str(user_csv_root(user)))
 
 
 # ---- Visualization ----
 @app.post("/api/pipeline/bar-chart")
-def bar_chart(data: BarChartRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def bar_chart(data: BarChartRequest, user=CurrentUser):
     return _queue(user, "bar_chart", data.csv_name, data.category_column, data.value_column, data.series_column, data.title, data.output_name, data.top_n, data.exclude, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/scatter-plot")
-def scatter_plot(data: ScatterPlotRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def scatter_plot(data: ScatterPlotRequest, user=CurrentUser):
     return _queue(user, "scatter_plot", data.csv_name, data.x_column, data.y_column, data.color_column, data.size_column, data.coord_column, data.title, data.output_name, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/histogram")
-def histogram(data: HistogramRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def histogram(data: HistogramRequest, user=CurrentUser):
     return _queue(user, "histogram", data.csv_name, data.value_column, data.bins, data.title, data.output_name, data.color_column, data.log_x, data.log_y, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/line-chart")
-def line_chart(data: LineChartRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def line_chart(data: LineChartRequest, user=CurrentUser):
     return _queue(user, "line_chart", data.csv_name, data.x_column, data.y_column, data.color_column, data.title, data.output_name, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/box-plot")
-def box_plot(data: BoxPlotRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def box_plot(data: BoxPlotRequest, user=CurrentUser):
     return _queue(user, "box_plot", data.csv_name, data.value_column, data.category_column, data.title, data.output_name, data.exclude, data.log_y, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/heatmap")
-def heatmap(data: HeatmapRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def heatmap(data: HeatmapRequest, user=CurrentUser):
     return _queue(user, "heatmap", data.csv_name, data.x_column, data.y_column, data.value_column, data.title, data.output_name, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))
 
 
 @app.post("/api/pipeline/pie-chart")
-def pie_chart(data: PieChartRequest, x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    user = _get_user(x_api_key)
+def pie_chart(data: PieChartRequest, user=CurrentUser):
     return _queue(user, "pie_chart", data.csv_name, data.category_column, data.value_column, data.title, data.output_name, data.top_n, data.exclude, csv_root=str(user_csv_root(user)), html_root=str(user_html_root(user)))

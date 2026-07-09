@@ -13,6 +13,10 @@
   <body>
     <header class="topbar">
       <span class="brand-title">Research Gap Identification</span>
+      {% if user.is_authenticated %}
+        <button type="button" class="info-icon info-icon-title" id="site-info-btn" tabindex="0"
+                aria-haspopup="dialog" aria-controls="getting-started-panel" title="How to get started">i</button>
+      {% endif %}
       <span class="spacer"></span>
       {% if user.is_authenticated %}
         <a class="topbar-user" href="{% url 'account_settings' %}" title="Account settings">{{ user.username }}</a>
@@ -25,10 +29,36 @@
     </header>
     {% if user.is_authenticated %}
       <nav class="tabbar">
-        <a href="{% url 'dashboard' %}" class="tab{% if active_tab == 'dashboard' %} active{% endif %}">Dashboard</a>
-        <a href="{% url 'studio' %}" class="tab{% if active_tab == 'studio' %} active{% endif %}">Studio</a>
+        <a href="{% url 'dashboard' %}" data-tab="dashboard" class="tab{% if active_tab == 'dashboard' %} active{% endif %}">Dashboard</a>
+        <a href="{% url 'studio' %}" data-tab="studio" class="tab{% if active_tab == 'studio' %} active{% endif %}">Studio</a>
       </nav>
+
+      <div class="modal-overlay" id="getting-started-overlay" hidden>
+        <div class="modal-panel card" id="getting-started-panel" role="dialog" aria-modal="true" aria-labelledby="getting-started-title">
+          <div class="modal-panel-head">
+            <h2 id="getting-started-title">Getting started</h2>
+            <button type="button" class="modal-close" id="getting-started-close" aria-label="Close">&times;</button>
+          </div>
+          <h3>Studio</h3>
+          <p>A drag-and-drop canvas for building a data pipeline visually. Drag blocks from the
+            left palette onto the canvas, wire them together by connecting their ports, then
+            press <strong>Run pipeline</strong> to queue every step in order.</p>
+          <h3>The Assistant</h3>
+          <p>A chat panel (bottom-right of the Dashboard) you can ask questions or give plain-language
+            instructions to — it can inspect your files and queue pipeline steps for you. Add a
+            Gemini API key in Settings to turn it on.</p>
+          <h3>Queueing tasks</h3>
+          <p>The "Queue a task" form on the Dashboard runs one pipeline step at a time (import,
+            annotate, filter, chart, etc.) against your CSV/HTML files without needing the visual
+            canvas. Watch its progress in the Dashboard's "Recent tasks" or the Studio's "Active
+            tasks".</p>
+        </div>
+      </div>
     {% endif %}
     {% block body %}{% endblock %}
+    {% if user.is_authenticated %}
+      <script src="{% static_versioned 'portal/js/tasks_live.js' %}"></script>
+      <script src="{% static_versioned 'portal/js/workspace-tabs.js' %}"></script>
+    {% endif %}
   </body>
 </html>

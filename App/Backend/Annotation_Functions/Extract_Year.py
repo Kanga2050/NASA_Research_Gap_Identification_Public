@@ -1,14 +1,16 @@
-import os
 from pathlib import Path
 
 import pandas as pd
+
+from Backend.backend_utils import atomic_write_csv
+from Servers.storage_paths import resolve_csv_path
 
 
 def extract_year(csv_name: str, date_column: str, new_column_name: str = "year", csv_root: str | Path | None = None):
     """Parse a four-digit year out of `date_column` into a new numeric column.
     Tries full date parsing first, then falls back to the first 4-digit run for any
     values pandas can't parse. Unlocks temporal charts (e.g. publications per year)."""
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
 
     print(f"Extracting year from '{date_column}' in '{csv_name}'...")
     df = pd.read_csv(csv_path)
@@ -27,9 +29,7 @@ def extract_year(csv_name: str, date_column: str, new_column_name: str = "year",
 
     df[new_column_name] = years.astype("Int64")
 
-    temp_path = Path(str(csv_path) + ".tmp")
-    df.to_csv(temp_path, index=False)
-    os.replace(temp_path, csv_path)
+    atomic_write_csv(df, csv_path)
     filled = int(df[new_column_name].notna().sum())
     print(f"Success! Extracted a year for {filled}/{len(df)} rows into column '{new_column_name}'.")
 

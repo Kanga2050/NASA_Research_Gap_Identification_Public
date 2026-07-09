@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import umap
 import ast
-import os
+
+from Backend.backend_utils import atomic_write_csv
+from Servers.storage_paths import resolve_csv_path
 
 def reduce_dimensionality(
     csv_name: str, 
@@ -26,7 +28,7 @@ def reduce_dimensionality(
     - metric: Distance metric. 'cosine' is best for text embeddings.
     """
     
-    csv_path = Path(csv_root) / f"{csv_name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{csv_name}.csv")
+    csv_path = resolve_csv_path(csv_name, csv_root)
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)
     
@@ -51,13 +53,10 @@ def reduce_dimensionality(
     df[new_column_name] = None
     
     df.loc[valid_rows, new_column_name] = pd.Series(reduced_embeddings.tolist(), index=valid_rows)
-    
+
     print(f"Writing updated dataset safely to '{csv_path}'...")
-    temp_path = Path(f"{csv_path}.tmp")
-    df.to_csv(temp_path, index=False)
-    
-    os.replace(temp_path, csv_path)
-    
+    atomic_write_csv(df, csv_path)
+
     print(f"Success! Dimensionality reduction complete. Column '{new_column_name}' added.")
 
 if __name__ == "__main__":

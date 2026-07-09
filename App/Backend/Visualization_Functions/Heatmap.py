@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
-from Servers.storage_paths import resolve_csv_root, resolve_html_root
+from Servers.storage_paths import resolve_csv_path, resolve_html_path
 
 
 def heatmap(
@@ -19,8 +19,8 @@ def heatmap(
     """Render a 2D heatmap. With no `value_column` it shows the count density of
     (x, y) pairs; with one, it pivots to show the mean of `value_column` for each
     (x, y) cell."""
-    csv_path = resolve_csv_root(csv_root) / f"{csv_name}.csv"
-    output_html = resolve_html_root(html_root) / f"{output_name}.html"
+    csv_path = resolve_csv_path(csv_name, csv_root)
+    output_html = resolve_html_path(output_name, html_root)
 
     print(f"Loading data from '{csv_path}'...")
     df = pd.read_csv(csv_path)

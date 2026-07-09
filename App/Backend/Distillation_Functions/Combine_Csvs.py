@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from Servers.storage_paths import resolve_csv_path
+
 
 def combine_csvs(source_csvs: str, output_csv: str, source_column: str = "source", csv_root: str | Path | None = None):
     """Stack several CSVs into one (outer-union of columns), adding `source_column`
@@ -11,11 +13,11 @@ def combine_csvs(source_csvs: str, output_csv: str, source_column: str = "source
     if len(names) < 2:
         raise ValueError("Provide at least two comma-separated CSV names to combine.")
 
-    output_path = Path(csv_root) / f"{output_csv}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{output_csv}.csv")
+    output_path = resolve_csv_path(output_csv, csv_root)
 
     frames = []
     for name in names:
-        source_path = Path(csv_root) / f"{name}.csv" if csv_root is not None else Path(f"App/Backend/CSVs/{name}.csv")
+        source_path = resolve_csv_path(name, csv_root)
         print(f"Loading '{name}'...")
         part = pd.read_csv(source_path)
         part[source_column] = name
