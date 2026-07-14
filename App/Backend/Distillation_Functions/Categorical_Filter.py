@@ -12,16 +12,17 @@ def categorical_filter(source_csv: str, output_csv: str, target_column: str, exp
     source_path = resolve_csv_path(source_csv, csv_root)
     output_path = resolve_csv_path(output_csv, csv_root)
 
-    print(f"Filtering '{source_csv}' where {target_column} == {expected_value!r}...")
+    print(f"Loading '{source_csv}.csv' to keep rows where {target_column} == {expected_value!r}...")
     df = pd.read_csv(source_path)
 
     if target_column not in df.columns:
         raise ValueError(f"Column '{target_column}' was not found in the source dataset.")
 
+    print(f"Scanning {len(df):,} rows for exact matches...")
     matched = df[df[target_column].astype(str) == str(expected_value)]
 
     matched.to_csv(output_path, index=False)
-    print(f"Success! Extracted {len(matched)} matching rows into a new file: '{output_csv}'.")
+    print(f"Success! Extracted {len(matched):,} of {len(df):,} rows where {target_column} == {expected_value!r} → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

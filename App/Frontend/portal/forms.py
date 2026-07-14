@@ -51,6 +51,7 @@ class TaskSubmitForm(forms.Form):
         ("extract_year", "Extract year"),
         ("to_date", "To date (ISO-8601)"),
         ("normalize_column", "Normalize column"),
+        ("hierarchical_cluster", "Hierarchical cluster"),
         ("numerical_filter", "Numerical filter"),
         ("categorical_filter", "Categorical filter"),
         ("top_n_by_column", "Top N by column"),
@@ -69,7 +70,9 @@ class TaskSubmitForm(forms.Form):
         ("heatmap", "Heatmap"),
         ("pie_chart", "Pie chart"),
         ("distance_map", "Distance map"),
+        ("hierarchical_dendrogram", "Hierarchical dendrogram"),
         ("openalex_scraper", "OpenAlex scrape"),
+        ("chunk_pdfs", "Chunk PDFs"),
     ]
 
     action = forms.ChoiceField(choices=ACTION_CHOICES)
@@ -79,8 +82,8 @@ class TaskSubmitForm(forms.Form):
     output_csv = forms.CharField(max_length=120, required=False)
     query = forms.CharField(max_length=300, required=False)
     topic = forms.CharField(max_length=300, required=False)
-    text_column = forms.CharField(max_length=120, required=False, initial="abstract")
-    embedding_column = forms.CharField(max_length=120, required=False, initial="abstract_embedding")
+    text_column = forms.CharField(max_length=120, required=False, initial="text")
+    embedding_column = forms.CharField(max_length=120, required=False, initial="text_embedding")
     output_column = forms.CharField(max_length=120, required=False)
     output_name = forms.CharField(max_length=120, required=False)
     topic_column = forms.CharField(max_length=120, required=False, initial="topic_id")
@@ -93,6 +96,15 @@ class TaskSubmitForm(forms.Form):
     min_samples = forms.IntegerField(required=False, initial=8)
     threshold = forms.FloatField(required=False, initial=0.7)
     limit = forms.IntegerField(required=False, initial=10000)
+    # Import: chunk_pdfs (comma-separated PDF collection folder names)
+    folders = forms.CharField(max_length=1000, required=False)
+    source_label = forms.CharField(max_length=120, required=False)
+    chunk_words = forms.IntegerField(required=False, initial=250)
+    overlap_words = forms.IntegerField(required=False, initial=40)
+    # enrich defaults on; unchecking has no effect from the form (a False value is
+    # falsy and falls back to the TASK_SPECS default) -- pass enrich=False via MCP/API
+    # for a purely offline run.
+    enrich = forms.BooleanField(required=False, initial=True)
     # Distillation
     target_column = forms.CharField(max_length=120, required=False)
     expected_value = forms.CharField(max_length=300, required=False)
@@ -132,3 +144,9 @@ class TaskSubmitForm(forms.Form):
     exclude = forms.CharField(max_length=300, required=False)
     log_x = forms.BooleanField(required=False, initial=False)
     log_y = forms.BooleanField(required=False, initial=False)
+    # Hierarchical clustering (agglomerate topics into super-clusters / dendrogram)
+    n_clusters = forms.IntegerField(required=False, initial=10)
+    orientation = forms.ChoiceField(
+        choices=[("left", "left"), ("right", "right"), ("bottom", "bottom"), ("top", "top")],
+        required=False, initial="left",
+    )

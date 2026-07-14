@@ -24,14 +24,20 @@ def group_aggregate(source_csv: str, output_csv: str, group_column: str, value_c
         raise ValueError(f"Unsupported aggregation '{agg}'. Choose one of {sorted(ALLOWED_AGGS)}.")
 
     group_cols = [col.strip() for col in str(group_column).split(",") if col.strip()]
-    print(f"Grouping '{source_csv}' by {group_cols} ({agg})...")
+    op_desc = "counting rows" if (agg == "count" or not value_column) else f"taking {agg} of '{value_column}'"
+    print(f"Loading '{source_csv}.csv' to group by {group_cols} ({op_desc})...")
     df = pd.read_csv(source_path)
 
     missing = [col for col in group_cols if col not in df.columns]
     if missing:
         raise ValueError(f"Group column(s) {missing} were not found in the source dataset.")
 
+    before = len(df)
     df = drop_excluded(df, group_cols[0], exclude)
+    if exclude:
+        print(f"Excluded {before - len(df):,} rows via exclude='{exclude}'; aggregating {len(df):,} rows...")
+    else:
+        print(f"Aggregating {len(df):,} rows into groups...")
 
     if agg == "count" or not value_column:
         result = df.groupby(group_cols, dropna=False).size().reset_index(name="count")
@@ -44,7 +50,7 @@ def group_aggregate(source_csv: str, output_csv: str, group_column: str, value_c
 
     result = result.sort_values(by=result_column, ascending=False)
     result.to_csv(output_path, index=False)
-    print(f"Success! Wrote {len(result)} groups into '{output_csv}'.")
+    print(f"Success! Summarized {len(df):,} rows into {len(result):,} groups (column '{result_column}') → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

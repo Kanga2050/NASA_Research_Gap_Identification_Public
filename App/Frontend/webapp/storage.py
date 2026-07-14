@@ -60,9 +60,22 @@ def user_task_root(user) -> Path:
     return ensure_directory(user_storage_root(user) / "tasks")
 
 
+def user_pdf_root(user) -> Path:
+    """Per-user PDF area. Unlike csvs/html (flat files), this holds *collection*
+    subfolders (`pdfs/<collection>/*.pdf`) that chunk_pdfs ingests as a unit."""
+    return ensure_directory(user_storage_root(user) / "pdfs")
+
+
 def user_template_root(user) -> Path:
     """Per-user folder for saved Studio graph templates (JSON files)."""
     return ensure_directory(user_storage_root(user) / "templates")
+
+
+def user_paper_root(user) -> Path:
+    """Per-user folder for Synthesize research papers (JSON block-model docs).
+    A paper is authored/re-edited as JSON here, then *built* into a self-contained
+    interactive .html that lands in the user's html/ area (see Paper_Builder)."""
+    return ensure_directory(user_storage_root(user) / "papers")
 
 
 # --- Shared "public" library folders -----------------------------------------
@@ -78,3 +91,15 @@ def public_html_root() -> Path:
 
 def public_template_root() -> Path:
     return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "Templates")
+
+
+def public_paper_root() -> Path:
+    """Shared library of Synthesize papers (JSON block-model docs) any signed-in
+    user can pull as a starting template — e.g. the Space Biology report."""
+    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "Papers")
+
+
+def public_pdf_root() -> Path:
+    """Shared PDF library: `App/Backend/PDFs/<collection>/*.pdf`. Any signed-in
+    user can pull a collection from here into their own pdfs area."""
+    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "PDFs")

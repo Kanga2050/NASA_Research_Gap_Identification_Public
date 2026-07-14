@@ -22,7 +22,7 @@ def line_chart(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a line chart of '{y_column}' over '{x_column}'...")
     df = pd.read_csv(csv_path)
     for column in (x_column, y_column):
         if column not in df.columns:
@@ -31,13 +31,15 @@ def line_chart(
     color = color_column or None
     data = df.sort_values(by=x_column)
 
+    lines = data[color].nunique() if color else 1
+    print(f"Rendering {lines} line(s) across {len(data):,} points, sorted by '{x_column}'...")
     fig = px.line(
         data, x=x_column, y=y_column, color=color,
         title=title or f"{y_column} over {x_column}",
         markers=True,
     )
     fig.write_html(output_html)
-    print(f"Success! Line chart saved to {output_html}")
+    print(f"Success! Line chart ({lines} series, {len(data):,} points) saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

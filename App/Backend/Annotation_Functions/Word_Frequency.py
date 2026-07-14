@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from Backend.backend_utils import atomic_write_csv
+from Backend.backend_utils import ProgressReporter, atomic_write_csv
 from Backend.nlp_utils import MAX_TEXT_CHARS, NLP, lemmas
 from Servers.storage_paths import resolve_csv_path
 
@@ -17,7 +17,7 @@ def word_frequency(csv_name: str, text_column: str, new_column_name: str = "word
     into one corpus-wide [key, sum] table for charting."""
     csv_path = resolve_csv_path(csv_name, csv_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to count word frequencies in column '{text_column}'...")
     df = pd.read_csv(csv_path)
 
     if text_column not in df.columns:
@@ -26,19 +26,20 @@ def word_frequency(csv_name: str, text_column: str, new_column_name: str = "word
     ngram = max(1, int(ngram))
     texts = df[text_column].fillna("").astype(str).str.slice(0, MAX_TEXT_CHARS).tolist()
 
-    print(f"Counting per-row word frequencies (ngram={ngram}) across {len(texts)} rows...")
+    unit = "words" if ngram == 1 else f"{ngram}-word phrases"
+    reporter = ProgressReporter(f"Counting {unit} across {len(texts):,} rows", len(texts))
     frequencies = []
-    for doc in NLP.pipe(texts, batch_size=64):
+    for i, doc in enumerate(NLP.pipe(texts, batch_size=64), start=1):
         tokens = lemmas(doc)
         if ngram > 1:
             tokens = ["_".join(tokens[i:i + ngram]) for i in range(len(tokens) - ngram + 1)]
         frequencies.append(json.dumps(dict(Counter(tokens))))
+        reporter.update(i)
 
     df[new_column_name] = frequencies
 
-    print(f"Writing updated dataset safely to '{csv_path}'...")
     atomic_write_csv(df, csv_path)
-    print(f"Success! Per-row word frequencies saved to column '{new_column_name}'.")
+    print(f"Success! Counted {unit} into per-row frequency dictionaries in column '{new_column_name}' for {len(texts):,} rows.")
 
 
 if __name__ == "__main__":

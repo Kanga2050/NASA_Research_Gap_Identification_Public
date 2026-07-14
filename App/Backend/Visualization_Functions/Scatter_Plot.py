@@ -27,13 +27,14 @@ def scatter_plot(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a scatter plot...")
     df = pd.read_csv(csv_path)
 
     if coord_column:
         if coord_column not in df.columns:
             raise ValueError(f"Coordinate column '{coord_column}' was not found in the CSV.")
         valid = df[coord_column].dropna().index
+        print(f"Unpacking {len(valid):,} '[x, y]' coordinate pairs from column '{coord_column}'...")
         parsed = df.loc[valid, coord_column].apply(ast.literal_eval)
         df["x"] = np.nan
         df["y"] = np.nan
@@ -55,13 +56,14 @@ def scatter_plot(
     if size:
         df[size] = pd.to_numeric(df[size], errors="coerce").clip(lower=0)
 
+    print(f"Rendering scatter plot of {len(df):,} points ({x_axis} vs {y_axis}" + (f", coloured by '{color}'" if color else "") + ")...")
     fig = px.scatter(
         df, x=x_axis, y=y_axis, color=color, size=size,
         title=title or f"{y_axis} vs {x_axis}",
         opacity=0.7,
     )
     fig.write_html(output_html)
-    print(f"Success! Scatter plot saved to {output_html}")
+    print(f"Success! Scatter plot of {len(df):,} points saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

@@ -12,16 +12,17 @@ def deduplicate(source_csv: str, output_csv: str, subset_column: str, csv_root: 
     source_path = resolve_csv_path(source_csv, csv_root)
     output_path = resolve_csv_path(output_csv, csv_root)
 
-    print(f"De-duplicating '{source_csv}' on '{subset_column}'...")
+    print(f"Loading '{source_csv}.csv' to drop rows repeating a value in '{subset_column}'...")
     df = pd.read_csv(source_path)
 
     if subset_column not in df.columns:
         raise ValueError(f"Column '{subset_column}' was not found in the source dataset.")
 
     before = len(df)
+    print(f"Scanning {before:,} rows for duplicate '{subset_column}' values (keeping the first of each)...")
     result = df.drop_duplicates(subset=[subset_column])
     result.to_csv(output_path, index=False)
-    print(f"Success! Removed {before - len(result)} duplicate rows; {len(result)} remain in '{output_csv}'.")
+    print(f"Success! Removed {before - len(result):,} duplicate rows; {len(result):,} unique rows remain → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

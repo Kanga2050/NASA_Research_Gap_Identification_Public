@@ -13,7 +13,7 @@ def normalize_column(csv_name: str, value_column: str, new_column_name: str = ""
     column. A constant column normalizes to all-zeros."""
     csv_path = resolve_csv_path(csv_name, csv_root)
 
-    print(f"Normalizing '{value_column}' in '{csv_name}' to 0-1...")
+    print(f"Loading '{csv_name}.csv' to min-max scale column '{value_column}' to 0-1...")
     df = pd.read_csv(csv_path)
 
     if value_column not in df.columns:
@@ -21,6 +21,7 @@ def normalize_column(csv_name: str, value_column: str, new_column_name: str = ""
 
     column = pd.to_numeric(df[value_column], errors="coerce")
     low, high = column.min(), column.max()
+    print(f"Scaling {len(df):,} values from range [{low}, {high}] into [0, 1]...")
     if pd.isna(low) or high == low:
         normalized = column * 0
     else:
@@ -30,8 +31,10 @@ def normalize_column(csv_name: str, value_column: str, new_column_name: str = ""
     df[target] = normalized
 
     atomic_write_csv(df, csv_path)
-    action = "overwrote" if target == value_column else f"wrote column '{target}' from"
-    print(f"Success! Normalized values {action} '{value_column}'.")
+    if target == value_column:
+        print(f"Success! Overwrote '{value_column}' in place with its 0-1 normalized values ({len(df):,} rows).")
+    else:
+        print(f"Success! Wrote 0-1 normalized values of '{value_column}' into new column '{target}' ({len(df):,} rows).")
 
 
 if __name__ == "__main__":

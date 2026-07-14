@@ -31,6 +31,7 @@
       <nav class="tabbar">
         <a href="{% url 'dashboard' %}" data-tab="dashboard" class="tab{% if active_tab == 'dashboard' %} active{% endif %}">Dashboard</a>
         <a href="{% url 'studio' %}" data-tab="studio" class="tab{% if active_tab == 'studio' %} active{% endif %}">Studio</a>
+        <a href="{% url 'synthesize' %}" data-tab="synthesize" class="tab{% if active_tab == 'synthesize' %} active{% endif %}">Synthesize</a>
       </nav>
 
       <div class="modal-overlay" id="getting-started-overlay" hidden>

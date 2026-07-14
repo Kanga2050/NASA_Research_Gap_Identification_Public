@@ -22,6 +22,7 @@ FUNCTION_OUTPUT_META = {
     "hybrid_score": {"category": "annotation", "kind": "csv", "arg_index": 0},
     "numerical_filter": {"category": "distillation", "kind": "csv", "arg_index": 1},
     "openalex_scraper": {"category": "distillation", "kind": "csv", "arg_index": 1},
+    "chunk_pdfs": {"category": "distillation", "kind": "csv", "arg_index": 1},
     "distance_map": {"category": "visualization", "kind": "html", "arg_index": 4},
     # Distillation (output CSV name is the 2nd positional arg)
     "categorical_filter": {"category": "distillation", "kind": "csv", "arg_index": 1},
@@ -40,6 +41,7 @@ FUNCTION_OUTPUT_META = {
     "extract_year": {"category": "annotation", "kind": "csv", "arg_index": 0},
     "to_date": {"category": "annotation", "kind": "csv", "arg_index": 0},
     "normalize_column": {"category": "annotation", "kind": "csv", "arg_index": 0},
+    "hierarchical_cluster": {"category": "annotation", "kind": "csv", "arg_index": 0},
     # Visualization (output HTML name position varies per function signature)
     "bar_chart": {"category": "visualization", "kind": "html", "arg_index": 5},
     "scatter_plot": {"category": "visualization", "kind": "html", "arg_index": 7},
@@ -48,6 +50,7 @@ FUNCTION_OUTPUT_META = {
     "box_plot": {"category": "visualization", "kind": "html", "arg_index": 4},
     "heatmap": {"category": "visualization", "kind": "html", "arg_index": 5},
     "pie_chart": {"category": "visualization", "kind": "html", "arg_index": 4},
+    "hierarchical_dendrogram": {"category": "visualization", "kind": "html", "arg_index": 4},
 }
 
 CATEGORY_LABELS = {

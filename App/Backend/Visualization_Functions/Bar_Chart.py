@@ -27,7 +27,7 @@ def bar_chart(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a bar chart of '{category_column}'...")
     df = pd.read_csv(csv_path)
     if category_column not in df.columns:
         raise ValueError(f"Column '{category_column}' was not found in the CSV.")
@@ -36,6 +36,8 @@ def bar_chart(
     series = series_column or None
     group_cols = [category_column] + ([series] if series else [])
 
+    measure = f"summed '{value_column}'" if value_column else "row counts"
+    print(f"Aggregating {len(df):,} rows into per-'{category_column}' {measure}...")
     if value_column:
         if value_column not in df.columns:
             raise ValueError(f"Value column '{value_column}' was not found in the CSV.")
@@ -55,6 +57,8 @@ def bar_chart(
         data[series] = data[series].astype(str)
     data = data.sort_values(y_column, ascending=False)
 
+    bars = data[category_column].nunique()
+    print(f"Rendering bar chart of {bars} categories" + (f" split by '{series}'" if series else "") + "...")
     fig = px.bar(
         data, x=category_column, y=y_column, color=series,
         title=title or f"{y_column} by {category_column}",
@@ -62,7 +66,7 @@ def bar_chart(
     )
     fig.update_layout(xaxis={"categoryorder": "total descending"})
     fig.write_html(output_html)
-    print(f"Success! Bar chart saved to {output_html}")
+    print(f"Success! Bar chart of {bars} categories saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

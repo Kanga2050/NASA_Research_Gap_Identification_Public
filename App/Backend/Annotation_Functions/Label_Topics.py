@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from Backend.backend_utils import atomic_write_csv
+from Backend.backend_utils import ProgressReporter, atomic_write_csv
 from Backend.nlp_utils import top_keywords
 from Servers.storage_paths import resolve_csv_path
 
@@ -16,26 +16,26 @@ def label_topics(csv_name: str, topic_column: str = "topic_id", text_column: str
     onto the topic column."""
     csv_path = resolve_csv_path(csv_name, csv_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to label topics in column '{topic_column}' from text in '{text_column}'...")
     df = pd.read_csv(csv_path)
     for column in (topic_column, text_column):
         if column not in df.columns:
             raise ValueError(f"Column '{column}' was not found in the CSV.")
 
     topics = [topic for topic in df[topic_column].dropna().unique() if topic != -1]
-    print(f"Generating keyword labels for {len(topics)} topics...")
+    reporter = ProgressReporter(f"Labelling {len(topics)} topics (top {int(top_n)} keywords each)", len(topics))
     labels = {}
-    for topic in topics:
+    for i, topic in enumerate(topics, start=1):
         topic_texts = df.loc[df[topic_column] == topic, text_column].fillna("").tolist()
         labels[topic] = top_keywords(topic_texts, int(top_n))
+        reporter.update(i)
 
     # Dictionary lookup: map each row's topic to its label; unlabelled rows (noise,
     # or a topic with no keywords) fall back to the topic value as text.
     df[new_column_name] = df[topic_column].map(labels).fillna(df[topic_column].astype(str))
 
-    print(f"Writing updated dataset safely to '{csv_path}'...")
     atomic_write_csv(df, csv_path)
-    print(f"Success! Topic labels saved to column '{new_column_name}'.")
+    print(f"Success! Keyword labels for {len(topics)} topics saved to column '{new_column_name}' in '{csv_name}.csv'.")
 
 
 if __name__ == "__main__":

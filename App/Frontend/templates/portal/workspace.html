@@ -5,9 +5,12 @@
 
 {% block body %}
   <link rel="stylesheet" href="{% static_versioned 'portal/vendor/drawflow.min.css' %}">
+  <link rel="stylesheet" href="{% static_versioned 'portal/css/synthesize.css' %}">
 
   {{ manifest|json_script:"studio-manifest" }}
   {{ csv_names|json_script:"studio-csvs" }}
+  {{ html_names|json_script:"synthesize-charts" }}
+  {{ paper_files|json_script:"synthesize-papers" }}
 
   <div class="tab-panel{% if active_tab == 'dashboard' %} active{% endif %}" data-tab="dashboard">
   <div class="layout">
@@ -172,6 +175,104 @@
       </script>
 
       <div class="card">
+        <h2>PDF collections <span class="info-icon" tabindex="0" data-tip="Folders of PDFs you can chunk into a dataset with the Chunk PDFs task. Upload your own, or pull a shared collection from the public library.">i</span></h2>
+        <form method="post" action="{% url 'upload_pdfs' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <label for="id_pdf_collection">Collection name</label>
+          <input type="text" name="collection" id="id_pdf_collection" placeholder="e.g. My_Papers" required>
+          <label for="id_pdf_files">PDF files</label>
+          <input type="file" name="pdfs" id="id_pdf_files" accept=".pdf" multiple required>
+          <button type="submit">Upload PDFs</button>
+        </form>
+        <div id="pdf-collections" data-url="{% url 'pdf_folders' %}"
+             data-delete-url="{% url 'delete_pdf_folder' %}"
+             data-import-url="{% url 'import_pdf_folder_from_public' %}">
+          <p class="placeholder">Loading PDF collections&hellip;</p>
+        </div>
+      </div>
+      <script>
+        (function () {
+          var CSRF = "{{ csrf_token }}";
+          var box = document.getElementById("pdf-collections");
+          if (!box) return;
+          function post(url, params) {
+            var body = Object.keys(params).map(function (k) {
+              return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+            }).join("&");
+            return fetch(url, {
+              method: "POST",
+              headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" },
+              credentials: "same-origin",
+              body: body,
+            });
+          }
+          function row(folder, action, label) {
+            var li = document.createElement("li");
+            li.className = "file-row";
+            var main = document.createElement("div");
+            main.className = "file-main";
+            var name = document.createElement("span");
+            name.className = "file-name";
+            name.textContent = folder.name + " (" + folder.count + " PDFs)";
+            var acts = document.createElement("span");
+            acts.className = "file-actions";
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = label;
+            btn.addEventListener("click", action);
+            acts.appendChild(btn);
+            main.appendChild(name);
+            main.appendChild(acts);
+            li.appendChild(main);
+            return li;
+          }
+          function render(data) {
+            box.innerHTML = "";
+            var yours = document.createElement("h3");
+            yours.textContent = "Your collections";
+            box.appendChild(yours);
+            var ul = document.createElement("ul");
+            ul.className = "file-list";
+            (data.user || []).forEach(function (f) {
+              ul.appendChild(row(f, function () {
+                if (!confirm("Delete PDF collection '" + f.name + "'?")) return;
+                post(box.getAttribute("data-delete-url"), { name: f.name }).then(function () { window.location.reload(); });
+              }, "Delete"));
+            });
+            if (!(data.user || []).length) {
+              var none = document.createElement("li");
+              none.className = "placeholder";
+              none.textContent = "No collections yet. Upload PDFs above.";
+              ul.appendChild(none);
+            }
+            box.appendChild(ul);
+
+            var pub = document.createElement("h3");
+            pub.textContent = "Public library";
+            box.appendChild(pub);
+            var ul2 = document.createElement("ul");
+            ul2.className = "file-list";
+            (data.public || []).forEach(function (f) {
+              ul2.appendChild(row(f, function () {
+                post(box.getAttribute("data-import-url"), { name: f.name }).then(function () { window.location.reload(); });
+              }, "Pull"));
+            });
+            if (!(data.public || []).length) {
+              var none2 = document.createElement("li");
+              none2.className = "placeholder";
+              none2.textContent = "The public PDF library is empty.";
+              ul2.appendChild(none2);
+            }
+            box.appendChild(ul2);
+          }
+          fetch(box.getAttribute("data-url"), { credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(render)
+            .catch(function () { box.innerHTML = '<p class="placeholder">Could not load PDF collections.</p>'; });
+        })();
+      </script>
+
+      <div class="card">
         <h2>Queue a task <span class="info-icon" tabindex="0" data-tip="Run one data-processing or visualization step on your files, without building a full Studio pipeline.">i</span></h2>
         <form method="post" action="{% url 'submit_task' %}" id="task-form">
           {% csrf_token %}
@@ -187,6 +288,13 @@
                 <select name="source_csv" data-role="source-csv-select">
                   {% for name in csv_names %}<option value="{{ name }}">{{ name }}.csv</option>{% endfor %}
                 </select>
+              {% elif field.name == "folders" %}
+                <select multiple size="5" data-role="pdf-folders-select">
+                  {% for name in pdf_folder_choices %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+                </select>
+                <small class="placeholder">Ctrl/Cmd-click to pick one or more collections.</small>
+                <input type="hidden" name="folders" data-role="pdf-folders-value">
+              {% elif field.name in column_field_names %}
               {% elif field.name in column_field_names %}
                 <select name="{{ field.name }}" data-role="column-select" data-initial="{{ field.initial|default:'' }}">
                   <option value="">Select a CSV first&hellip;</option>
@@ -215,6 +323,7 @@
             extract_year: ["csv_name", "date_column", "new_column_name"],
             to_date: ["csv_name", "date_column", "new_column_name"],
             normalize_column: ["csv_name", "value_column", "new_column_name"],
+            hierarchical_cluster: ["csv_name", "topic_column", "embedding_column", "output_column", "n_clusters"],
             numerical_filter: ["source_csv", "output_csv", "target_score_column", "threshold"],
             categorical_filter: ["source_csv", "output_csv", "target_column", "expected_value"],
             top_n_by_column: ["source_csv", "output_csv", "sort_column", "n", "ascending"],
@@ -233,7 +342,9 @@
             heatmap: ["csv_name", "x_column", "y_column", "value_column", "chart_title", "output_name"],
             pie_chart: ["csv_name", "category_column", "value_column", "chart_title", "output_name", "top_n", "exclude"],
             distance_map: ["csv_name", "topic_column", "text_column", "embedding_column", "output_name", "chart_title"],
+            hierarchical_dendrogram: ["csv_name", "topic_column", "text_column", "embedding_column", "output_name", "chart_title", "top_n", "orientation"],
             openalex_scraper: ["topic", "csv_name", "limit"],
+            chunk_pdfs: ["folders", "csv_name", "source_label", "chunk_words", "overlap_words", "enrich"],
           };
           var ACTION_COLUMN_FIELDS = {
             embed_text: ["text_column"],
@@ -248,6 +359,7 @@
             extract_year: ["date_column"],
             to_date: ["date_column"],
             normalize_column: [],
+            hierarchical_cluster: ["topic_column", "embedding_column"],
             numerical_filter: ["target_score_column"],
             categorical_filter: ["target_column"],
             top_n_by_column: ["sort_column"],
@@ -266,7 +378,9 @@
             heatmap: [],
             pie_chart: [],
             distance_map: ["topic_column", "text_column", "embedding_column"],
+            hierarchical_dendrogram: ["topic_column", "text_column", "embedding_column"],
             openalex_scraper: [],
+            chunk_pdfs: [],
           };
           var ACTION_CSV_SOURCE = {
             embed_text: "csv_name",
@@ -281,6 +395,7 @@
             extract_year: "csv_name",
             to_date: "csv_name",
             normalize_column: "csv_name",
+            hierarchical_cluster: "csv_name",
             numerical_filter: "source_csv",
             categorical_filter: "source_csv",
             top_n_by_column: "source_csv",
@@ -299,7 +414,9 @@
             heatmap: "csv_name",
             pie_chart: "csv_name",
             distance_map: "csv_name",
+            hierarchical_dendrogram: "csv_name",
             openalex_scraper: null,
+            chunk_pdfs: null,
           };
 
           var form = document.getElementById("task-form");
@@ -323,11 +440,14 @@
           }
 
           function updateCsvNameMode() {
-            var isScraper = actionSelect.value === "openalex_scraper";
-            csvSelect.disabled = isScraper;
-            csvSelect.style.display = isScraper ? "none" : "";
-            csvText.disabled = !isScraper;
-            csvText.style.display = isScraper ? "" : "none";
+            // Actions that produce a brand-new CSV (ACTION_CSV_SOURCE === null, e.g.
+            // openalex_scraper, chunk_pdfs) name their output via the free-text box;
+            // everything else picks an existing CSV from the dropdown.
+            var producesNewCsv = ACTION_CSV_SOURCE[actionSelect.value] === null;
+            csvSelect.disabled = producesNewCsv;
+            csvSelect.style.display = producesNewCsv ? "none" : "";
+            csvText.disabled = !producesNewCsv;
+            csvText.style.display = producesNewCsv ? "" : "none";
           }
 
           function populateColumns(columns) {
@@ -379,6 +499,19 @@
             updateCsvNameMode();
             refreshColumns();
           }
+
+          // PDF-collection multi-select -> hidden comma-separated "folders" input.
+          var pdfFoldersSelect = form.querySelector("[data-role='pdf-folders-select']");
+          var pdfFoldersValue = form.querySelector("[data-role='pdf-folders-value']");
+          function syncPdfFolders() {
+            if (!pdfFoldersSelect || !pdfFoldersValue) return;
+            pdfFoldersValue.value = Array.prototype.filter
+              .call(pdfFoldersSelect.options, function (o) { return o.selected; })
+              .map(function (o) { return o.value; })
+              .join(",");
+          }
+          if (pdfFoldersSelect) pdfFoldersSelect.addEventListener("change", syncPdfFolders);
+          form.addEventListener("submit", syncPdfFolders);
 
           actionSelect.addEventListener("change", handleActionChange);
           if (csvSelect) csvSelect.addEventListener("change", refreshColumns);
@@ -804,6 +937,61 @@
   </div>
   </div>
 
+  <div class="tab-panel{% if active_tab == 'synthesize' %} active{% endif %}" data-tab="synthesize">
+  <div class="synthesize" id="synthesize" data-csrf="{{ csrf_token }}"
+       data-user="{{ user.username }}"
+       data-papers-url="{% url 'list_papers' %}"
+       data-paper-save-url="{% url 'save_paper' %}"
+       data-paper-build-url="{% url 'build_paper' %}"
+       data-paper-load-url="/papers/__NAME__/"
+       data-html-url="/outputs/html/__NAME__/">
+    <aside class="synth-side">
+      <div class="card synth-doc-card">
+        <h2>Paper <span class="info-icon" tabindex="0" data-tip="Compose a research paper from your own charts and data. Add sections, cite sources, then Build a self-contained interactive report that appears in your Visualizations.">i</span></h2>
+        <label class="synth-label" for="synth-title-input">Title</label>
+        <input type="text" id="synth-title-input" class="synth-title-input" placeholder="Untitled paper">
+        <div class="synth-doc-actions">
+          <select id="synth-open"><option value="">Open a paper…</option></select>
+          <button type="button" id="synth-new" class="btn-secondary">New</button>
+        </div>
+        <div class="synth-doc-actions">
+          <button type="button" id="synth-save">Save</button>
+          <button type="button" id="synth-build">▶ Build report</button>
+        </div>
+        <div class="synth-status" id="synth-status"></div>
+      </div>
+
+      <div class="card synth-insert-card">
+        <h2>Add section <span class="info-icon" tabindex="0" data-tip="Insert a new block at the end of the paper. Hover any block to drag-reorder or delete it.">i</span></h2>
+        <div class="synth-add-grid" id="synth-add-grid"></div>
+      </div>
+
+      <div class="card synth-sources-card">
+        <h2>Sources <span class="info-icon" tabindex="0" data-tip="Add a source once; cite it inline from the selection toolbar. References are numbered and formatted automatically.">i</span></h2>
+        <div id="synth-sources-list"></div>
+        <button type="button" id="synth-add-source" class="btn-secondary">+ Add source</button>
+      </div>
+    </aside>
+
+    <div class="synth-canvas">
+      <div class="synth-canvas-hint">Click any text to edit · select text for <b>B</b>/<i>I</i>/cite · hover a block for drag &amp; delete</div>
+      <div class="synthesize-doc" id="synthesize-doc">
+        <div class="page" id="synth-page"></div>
+      </div>
+    </div>
+
+    <!-- floating inline-formatting toolbar (shown on text selection) -->
+    <div class="synth-inline-toolbar" id="synth-inline-toolbar" hidden>
+      <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+      <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+      <button type="button" data-cmd="tag" title="Insert a term pill">tag</button>
+      <button type="button" data-cmd="cite" title="Insert a citation">cite</button>
+      <button type="button" data-cmd="clear" title="Clear formatting">×</button>
+    </div>
+  </div>
+  </div>
+
   <script src="{% static_versioned 'portal/vendor/drawflow.min.js' %}"></script>
   <script src="{% static_versioned 'portal/js/studio.js' %}"></script>
+  <script src="{% static_versioned 'portal/js/synthesize.js' %}"></script>
 {% endblock %}

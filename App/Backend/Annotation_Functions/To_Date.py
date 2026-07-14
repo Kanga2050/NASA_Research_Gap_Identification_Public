@@ -16,7 +16,7 @@ def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_
     """
     csv_path = resolve_csv_path(csv_name, csv_root)
 
-    print(f"Normalizing '{date_column}' in '{csv_name}' to ISO-8601 dates...")
+    print(f"Loading '{csv_name}.csv' to normalize column '{date_column}' into ISO-8601 dates...")
     df = pd.read_csv(csv_path)
 
     if date_column not in df.columns:
@@ -24,6 +24,7 @@ def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_
 
     # format="mixed" parses each value independently, so heterogeneous inputs
     # ("2015-03-01", "March 2018", "2012/06/15") all resolve; unparseable -> NaT.
+    print(f"Parsing {len(df):,} mixed-format dates into canonical YYYY-MM-DD...")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         parsed = pd.to_datetime(df[date_column], errors="coerce", format="mixed")
@@ -33,7 +34,7 @@ def to_date(csv_name: str, date_column: str, new_column_name: str = "date", csv_
 
     atomic_write_csv(df, csv_path)
     filled = int(parsed.notna().sum())
-    print(f"Success! Wrote ISO dates for {filled}/{len(df)} rows into column '{new_column_name}'.")
+    print(f"Success! Wrote sortable ISO-8601 dates for {filled:,}/{len(df):,} rows into column '{new_column_name}'.")
 
 
 if __name__ == "__main__":

@@ -68,6 +68,12 @@ SOURCE_NODES = [
        prefs=[_pref("topic", "Topic", "text", "space biology"),
               _pref("limit", "Max papers", "number", 10000)],
        output=_out_csv("csv_name", "scraped")),
+    _n("chunk_pdfs", "PDF Import", "source", table_param=None, inputs=[],
+       prefs=[_pref("folders", "PDF folders (comma-separated)", "text", ""),
+              _pref("source_label", "Source label", "text", ""),
+              _pref("chunk_words", "Words/chunk", "number", 250),
+              _pref("overlap_words", "Overlap words", "number", 40)],
+       output=_out_csv("csv_name", "pdf_chunks")),
 ]
 
 # ---- Annotation nodes: column input(s) -> new column ----
@@ -75,7 +81,7 @@ ANNOTATION_NODES = [
     _n("embed_text", "Embed Text", "annotation", table_param="csv_name",
        inputs=[_col_in("text_column", "Text", ["text"])],
        prefs=[_pref("model_name", "Model", "text", "allenai/specter2_base")],
-       output=_out_col("output_column", "embedding", "abstract_embedding")),
+       output=_out_col("output_column", "embedding", "text_embedding")),
     _n("reduce_dimensionality", "Reduce Dimensionality", "annotation", table_param="csv_name",
        inputs=[_col_in("embedding_column", "Embedding", ["embedding"])],
        prefs=[_pref("n_components", "Components", "number", 2)],
@@ -118,6 +124,11 @@ ANNOTATION_NODES = [
     _n("normalize_column", "Normalize Column", "annotation", table_param="csv_name",
        inputs=[_col_in("value_column", "Value", ["number"])],
        output=_out_col("new_column_name", "number", "")),
+    _n("hierarchical_cluster", "Hierarchical Cluster", "annotation", table_param="csv_name",
+       inputs=[_col_in("topic_column", "Topic id", ["number", "text"]),
+               _col_in("embedding_column", "Embedding / coord", ["embedding"])],
+       prefs=[_pref("n_clusters", "Super-clusters", "number", 10)],
+       output=_out_col("output_column", "number", "hcluster")),
 ]
 
 # ---- Distillation nodes: csv input (+ column params) -> new csv ----
@@ -218,6 +229,14 @@ VISUALIZATION_NODES = [
                _col_in("embedding_column", "2d coord", ["embedding"])],
        prefs=[_pref("chart_title", "Title", "text", "")],
        output=_out_html("output_name", "Topics")),
+    _n("hierarchical_dendrogram", "Topic Dendrogram", "visualization", table_param="csv_name",
+       inputs=[_col_in("topic_column", "Topic id", ["number", "text"]),
+               _col_in("text_column", "Text", ["text"]),
+               _col_in("embedding_column", "Embedding / coord", ["embedding"])],
+       prefs=[_pref("chart_title", "Title", "text", ""),
+              _pref("top_n", "Top N topics", "number", 30),
+              _pref("orientation", "Orientation", "select", "left", ["left", "right", "bottom", "top"])],
+       output=_out_html("output_name", "Dendrogram")),
 ]
 
 ALL_NODES = SOURCE_NODES + ANNOTATION_NODES + DISTILLATION_NODES + VISUALIZATION_NODES

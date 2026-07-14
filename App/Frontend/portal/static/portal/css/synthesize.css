@@ -1,0 +1,180 @@
+/* ============================================================================
+   Synthesize tab — a block editor whose canvas is PIXEL-IDENTICAL to the built
+   research report. The block below is the report's own stylesheet, scoped under
+   `.synthesize-doc` so the serif paper look never leaks into the NASA-blue app
+   chrome. Keep these rules in lockstep with PAPER_CSS in App/Servers/Paper_Builder.py.
+   ========================================================================== */
+.synthesize-doc { --ink:#1a1a1a; --muted:#5b6472; --rule:#d9dde3; --accent:#1c4e80;
+                  --danger:#b91c1c; --soft:#f5f7fa; --green:#15803d;
+                  background:#ffffff; color:var(--ink);
+                  font-family: Georgia, Charter, "Times New Roman", serif;
+                  font-size:17px; line-height:1.66; -webkit-font-smoothing:antialiased; }
+.synthesize-doc * { box-sizing:border-box; }
+.synthesize-doc .page { max-width:860px; margin:0 auto; padding:60px 32px 120px; }
+.synthesize-doc h1, .synthesize-doc h2, .synthesize-doc h3, .synthesize-doc h4,
+.synthesize-doc .byline, .synthesize-doc .abstract-h, .synthesize-doc figcaption,
+.synthesize-doc .tag, .synthesize-doc thead th, .synthesize-doc .callout-h {
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.synthesize-doc h1 { font-size:31px; line-height:1.22; letter-spacing:-0.2px; margin:0 0 14px; }
+.synthesize-doc .subtitle { font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:17px; color:var(--muted); font-weight:500; margin:0 0 22px; line-height:1.4; }
+.synthesize-doc .byline { font-size:13.5px; color:var(--muted); border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule); padding:12px 0; margin:0 0 24px;
+  display:flex; flex-wrap:wrap; gap:6px 22px; }
+.synthesize-doc .byline b { color:var(--ink); font-weight:600; }
+.synthesize-doc h2 { font-size:22px; margin:52px 0 6px; padding-top:14px; border-top:2px solid var(--ink); }
+.synthesize-doc h2 .num { color:var(--accent); margin-right:12px; }
+.synthesize-doc h3 { font-size:17.5px; margin:30px 0 4px; color:#222; }
+.synthesize-doc h3 .num { color:var(--accent); margin-right:9px; font-weight:600; }
+.synthesize-doc p { margin:12px 0; }
+.synthesize-doc a { color:var(--accent); }
+.synthesize-doc .lead { font-size:18px; }
+.synthesize-doc .abstract { background:var(--soft); border:1px solid var(--rule); border-radius:8px;
+  padding:22px 26px; margin:6px 0 10px; }
+.synthesize-doc .abstract-h { font-size:12.5px; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--accent); font-weight:700; margin:0 0 8px; }
+.synthesize-doc .abstract p { margin:8px 0; font-size:16px; line-height:1.6; }
+.synthesize-doc .kw { font-size:14px; color:var(--muted); margin:14px 0 0; }
+.synthesize-doc .kw b { font-family:-apple-system,"Segoe UI",sans-serif; color:var(--ink); }
+.synthesize-doc figure { margin:30px 0; }
+.synthesize-doc .fig-img { width:100%; height:auto; display:block; border:1px solid var(--rule);
+  border-radius:6px; background:#fff; }
+.synthesize-doc figcaption { font-size:13.5px; line-height:1.5; color:var(--muted); margin-top:10px;
+  padding-left:2px; }
+.synthesize-doc figcaption b { color:var(--ink); font-weight:600; }
+.synthesize-doc .figtag { font-family:-apple-system,"Segoe UI",sans-serif; font-size:11px;
+  letter-spacing:0.4px; text-transform:uppercase; font-weight:700; color:var(--accent); }
+.synthesize-doc table { border-collapse:collapse; width:100%; margin:22px 0; font-size:14px;
+  font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.synthesize-doc thead th { text-align:left; border-bottom:2px solid var(--ink); padding:8px 10px; font-size:13px; }
+.synthesize-doc td { border-bottom:1px solid var(--rule); padding:7px 10px; vertical-align:top; }
+.synthesize-doc tbody tr:nth-child(even){ background:#fafbfc; }
+.synthesize-doc .num-cell { text-align:right; font-variant-numeric:tabular-nums; }
+.synthesize-doc .pos { color:var(--green); font-weight:600; }
+.synthesize-doc .neg { color:var(--danger); font-weight:600; }
+.synthesize-doc .callout { border-left:4px solid var(--accent); background:var(--soft);
+  padding:14px 20px; margin:24px 0; border-radius:0 6px 6px 0; }
+.synthesize-doc .callout.danger { border-left-color:var(--danger); }
+.synthesize-doc .callout.key { border-left-color:var(--green); }
+.synthesize-doc .callout-h { font-size:12px; letter-spacing:1.2px; text-transform:uppercase;
+  font-weight:700; color:var(--accent); margin:0 0 4px; }
+.synthesize-doc .callout.danger .callout-h { color:var(--danger); }
+.synthesize-doc .callout.key .callout-h { color:var(--green); }
+.synthesize-doc .callout p { margin:4px 0; font-size:15.5px; }
+.synthesize-doc .footnote { font-size:13px; color:var(--muted); }
+.synthesize-doc hr.soft { border:0; border-top:1px solid var(--rule); margin:40px 0; }
+.synthesize-doc .tag { display:inline-block; font-size:11px; letter-spacing:0.6px; text-transform:uppercase;
+  background:#eef2f7; color:var(--accent); border-radius:4px; padding:2px 8px; font-weight:600;
+  vertical-align:middle; }
+.synthesize-doc ul.tight li { margin:5px 0; }
+.synthesize-doc .interactive { display:flex; align-items:center; gap:10px; background:#eef4fb;
+  border:1px solid #cfe0f2; border-radius:8px; padding:10px 16px; margin:0 0 30px;
+  font-family:-apple-system,"Segoe UI",sans-serif; font-size:13.5px; color:#274b6d; }
+.synthesize-doc .interactive b { color:#1c4e80; }
+.synthesize-doc .refs { font-size:13px; line-height:1.5; }
+.synthesize-doc .refs li { margin:6px 0; }
+.synthesize-doc sup.r { font-size:11px; font-family:-apple-system,sans-serif; }
+.synthesize-doc sup.r a { text-decoration:none; }
+@media (max-width:680px){ .synthesize-doc .page{ padding:40px 18px 90px; } }
+
+/* ============================================================================
+   Editor chrome (app-side, sans-serif). Layout mirrors the Studio tab.
+   ========================================================================== */
+.synthesize { display:flex; gap:16px; align-items:flex-start; padding:16px;
+  font-family: var(--font-body, "Public Sans", sans-serif); }
+.synth-side { flex:0 0 300px; display:flex; flex-direction:column; gap:14px; position:sticky; top:12px; }
+.synth-side .card { margin:0; }
+.synth-label { display:block; font-size:12px; font-weight:600; color:var(--text-muted,#5b6572);
+  margin:6px 0 3px; }
+.synth-title-input { width:100%; padding:7px 9px; border:1px solid var(--border,#dde3ea);
+  border-radius:6px; font-size:14px; font-family:inherit; }
+.synth-doc-actions { display:flex; gap:8px; margin-top:8px; }
+.synth-doc-actions select, .synth-doc-actions button { flex:1; padding:7px 8px; border-radius:6px;
+  font-size:13px; font-family:inherit; }
+.synth-doc-actions select { border:1px solid var(--border,#dde3ea); background:#fff; }
+.synth-status { font-size:12.5px; color:var(--text-muted,#5b6572); margin-top:8px; min-height:1.1em; }
+.synth-status.ok { color:#15803d; }
+.synth-status.err { color:#b91c1c; }
+
+.synth-add-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.synth-add-grid button { padding:7px 6px; border:1px solid var(--border,#dde3ea); background:#fff;
+  border-radius:6px; font-size:12.5px; font-family:inherit; cursor:pointer; text-align:left; }
+.synth-add-grid button:hover { border-color:var(--nasa-blue,#0032a0); color:var(--nasa-blue,#0032a0); }
+
+.synth-sources-card #synth-sources-list { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+.synth-source-row { border:1px solid var(--border,#dde3ea); border-radius:6px; padding:8px; font-size:12px; background:#fbfcfe; }
+.synth-source-row .synth-source-head { display:flex; justify-content:space-between; align-items:baseline; gap:6px; }
+.synth-source-row .synth-source-n { font-weight:700; color:var(--nasa-blue,#0032a0); }
+.synth-source-row .synth-source-cite { font-size:11px; color:var(--muted,#5b6472); }
+.synth-source-row input { width:100%; margin:3px 0; padding:4px 6px; border:1px solid var(--border,#dde3ea);
+  border-radius:4px; font-size:11.5px; font-family:inherit; }
+.synth-source-row .synth-src-actions { display:flex; gap:6px; margin-top:4px; }
+.synth-source-row .synth-src-actions button { font-size:11px; padding:3px 6px; }
+
+/* Canvas */
+.synth-canvas { flex:1 1 auto; min-width:0; }
+.synth-canvas-hint { font-size:12px; color:var(--text-muted,#5b6572); margin:2px 2px 10px;
+  font-family: var(--font-body, "Public Sans", sans-serif); }
+.synthesize-doc { border:1px solid var(--border,#dde3ea); border-radius:10px;
+  box-shadow:0 1px 3px rgba(16,24,40,0.04); overflow:hidden; }
+
+/* Per-block wrapper: bare (no box impact) so margins collapse exactly like the
+   built report; position:relative anchors the hover toolbar. */
+.synthesize-doc .synth-block { position:relative; }
+.synthesize-doc .synth-block.dragging { opacity:0.4; }
+.synthesize-doc .synth-block.drop-target { box-shadow:0 -2px 0 0 var(--accent) inset; }
+.synthesize-doc .synth-block-tools { position:absolute; top:0; right:0; display:flex; gap:2px;
+  background:#fff; border:1px solid var(--rule); border-radius:6px; padding:2px;
+  opacity:0; transition:opacity .12s; z-index:5; box-shadow:0 1px 4px rgba(16,24,40,0.10);
+  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc .synth-block:hover > .synth-block-tools,
+.synthesize-doc .synth-block:focus-within > .synth-block-tools { opacity:1; }
+.synthesize-doc .synth-block-tools button { border:0; background:transparent; cursor:pointer;
+  font-size:12px; line-height:1; padding:3px 5px; border-radius:4px; color:#5b6472; }
+.synthesize-doc .synth-block-tools button:hover { background:#eef2f7; color:#1c4e80; }
+.synthesize-doc .synth-block-tools button.danger:hover { background:#fef2f2; color:#b91c1c; }
+.synthesize-doc .synth-block-tools .synth-drag { cursor:grab; }
+
+/* Contenteditable affordances */
+.synthesize-doc [contenteditable="true"] { outline:none; border-radius:3px; }
+.synthesize-doc [contenteditable="true"]:hover { box-shadow:0 0 0 1px #e6ebf2; }
+.synthesize-doc [contenteditable="true"]:focus { box-shadow:0 0 0 2px #cfe0f2; background:#fbfdff; }
+.synthesize-doc [contenteditable="true"]:empty::before { content:attr(data-placeholder);
+  color:#aab3c0; pointer-events:none; }
+
+/* Figure block in the editor: chart picker + live iframe preview */
+.synthesize-doc figure .fig-picker { display:flex; gap:8px; align-items:center; margin-bottom:8px;
+  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc figure .fig-picker select { flex:1; padding:6px 8px; border:1px solid var(--rule);
+  border-radius:6px; font-size:13px; }
+.synthesize-doc figure .fig-preview { width:100%; height:var(--fig-h,500px); border:1px solid var(--rule);
+  border-radius:6px; background:#fff; display:block; }
+.synthesize-doc figure .fig-empty { width:100%; height:220px; border:1px dashed var(--rule); border-radius:6px;
+  display:flex; align-items:center; justify-content:center; color:#8a94a3; background:#fbfcfe;
+  font-family:-apple-system,"Segoe UI",sans-serif; font-size:13px; }
+
+/* Table editor helpers */
+.synthesize-doc table .synth-cell { min-width:24px; }
+.synthesize-doc .synth-table-tools { display:flex; gap:6px; margin:4px 0 0;
+  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc .synth-table-tools button { font-size:11px; padding:3px 7px; border:1px solid var(--rule);
+  background:#fff; border-radius:4px; cursor:pointer; color:#5b6472; }
+
+/* Floating inline-formatting toolbar */
+.synth-inline-toolbar { position:fixed; z-index:60; display:flex; gap:2px; background:#1b2430;
+  border-radius:8px; padding:4px; box-shadow:0 6px 20px rgba(16,24,40,0.28);
+  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synth-inline-toolbar[hidden] { display:none; }
+.synth-inline-toolbar button { border:0; background:transparent; color:#e6ebf2; cursor:pointer;
+  font-size:13px; padding:4px 9px; border-radius:5px; }
+.synth-inline-toolbar button:hover { background:#33415a; color:#fff; }
+
+/* Small popover (cite / tag / figure pickers) */
+.synth-popover { position:fixed; z-index:70; background:#fff; border:1px solid var(--border,#dde3ea);
+  border-radius:8px; box-shadow:0 8px 28px rgba(16,24,40,0.18); padding:8px; min-width:240px;
+  max-height:320px; overflow:auto; font-family:-apple-system,"Segoe UI",sans-serif; font-size:13px; }
+.synth-popover[hidden] { display:none; }
+.synth-popover .synth-pop-item { padding:6px 8px; border-radius:5px; cursor:pointer; }
+.synth-popover .synth-pop-item:hover { background:#eef2f7; }
+.synth-popover input { width:100%; padding:6px 8px; border:1px solid var(--border,#dde3ea);
+  border-radius:5px; font-size:13px; margin-bottom:6px; }

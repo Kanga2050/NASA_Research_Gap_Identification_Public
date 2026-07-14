@@ -16,16 +16,19 @@ def combine_csvs(source_csvs: str, output_csv: str, source_column: str = "source
     output_path = resolve_csv_path(output_csv, csv_root)
 
     frames = []
-    for name in names:
+    total_rows = 0
+    for i, name in enumerate(names, start=1):
         source_path = resolve_csv_path(name, csv_root)
-        print(f"Loading '{name}'...")
         part = pd.read_csv(source_path)
         part[source_column] = name
         frames.append(part)
+        total_rows += len(part)
+        print(f"Loaded {i}/{len(names)}: '{name}' ({len(part):,} rows, {total_rows:,} rows stacked so far)...")
 
+    print(f"Concatenating {len(names)} files (outer-union of columns) and writing '{output_csv}.csv'...")
     combined = pd.concat(frames, ignore_index=True, sort=False)
     combined.to_csv(output_path, index=False)
-    print(f"Success! Combined {len(names)} files into '{output_csv}' ({len(combined)} rows), tagged by '{source_column}'.")
+    print(f"Success! Stacked {len(names)} files into '{output_csv}.csv' ({len(combined):,} rows), origin tagged in column '{source_column}'.")
 
 
 if __name__ == "__main__":

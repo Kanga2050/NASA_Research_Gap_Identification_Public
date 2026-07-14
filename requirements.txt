@@ -13,3 +13,4 @@ spacy
 sentence-transformers
 umap-learn
 hdbscan
+PyMuPDF

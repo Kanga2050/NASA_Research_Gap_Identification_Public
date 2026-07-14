@@ -25,7 +25,7 @@ def histogram(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a histogram of '{value_column}'...")
     df = pd.read_csv(csv_path)
     if value_column not in df.columns:
         raise ValueError(f"Column '{value_column}' was not found in the CSV.")
@@ -37,6 +37,9 @@ def histogram(
             raise ValueError(f"Column '{color}' was not found in the CSV.")
         df[color] = df[color].astype(str)
 
+    valid = int(df[value_column].notna().sum())
+    axes = (" (log-x)" if log_x else "") + (" (log-y)" if log_y else "")
+    print(f"Binning {valid:,} values of '{value_column}' into {int(bins)} bins" + (f", overlaid by '{color}'" if color else "") + axes + "...")
     fig = px.histogram(
         df, x=value_column, color=color, nbins=int(bins),
         log_x=bool(log_x), log_y=bool(log_y),
@@ -46,7 +49,7 @@ def histogram(
     if color:
         fig.update_traces(opacity=0.7)
     fig.write_html(output_html)
-    print(f"Success! Histogram saved to {output_html}")
+    print(f"Success! Histogram of {valid:,} values ({int(bins)} bins) saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

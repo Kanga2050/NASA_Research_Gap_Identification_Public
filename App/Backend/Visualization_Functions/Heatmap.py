@@ -22,7 +22,8 @@ def heatmap(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    mode = f"mean of '{value_column}'" if value_column else "count density"
+    print(f"Loading '{csv_name}.csv' to build a heatmap ({mode}) of '{x_column}' × '{y_column}'...")
     df = pd.read_csv(csv_path)
     for column in (x_column, y_column):
         if column not in df.columns:
@@ -31,6 +32,7 @@ def heatmap(
     if value_column:
         if value_column not in df.columns:
             raise ValueError(f"Value column '{value_column}' was not found in the CSV.")
+        print(f"Pivoting {len(df):,} rows into a '{y_column}' × '{x_column}' grid of mean '{value_column}'...")
         pivot = df.pivot_table(index=y_column, columns=x_column, values=value_column, aggfunc="mean")
         fig = px.imshow(
             pivot, aspect="auto", text_auto=False,
@@ -38,12 +40,13 @@ def heatmap(
             labels={"x": x_column, "y": y_column, "color": value_column},
         )
     else:
+        print(f"Binning {len(df):,} rows into a '{x_column}' × '{y_column}' density grid...")
         fig = px.density_heatmap(
             df, x=x_column, y=y_column,
             title=title or f"Density of {x_column} vs {y_column}",
         )
     fig.write_html(output_html)
-    print(f"Success! Heatmap saved to {output_html}")
+    print(f"Success! Heatmap ({mode}) of '{x_column}' × '{y_column}' saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from Backend.backend_utils import ProgressReporter
 from Servers.storage_paths import resolve_csv_path
 
 
@@ -30,15 +31,18 @@ def aggregate_dictionary(source_csv: str, output_csv: str, dict_column: str, csv
     source_path = resolve_csv_path(source_csv, csv_root)
     output_path = resolve_csv_path(output_csv, csv_root)
 
-    print(f"Aggregating dictionaries from column '{dict_column}' in '{source_csv}'...")
+    print(f"Loading '{source_csv}.csv' to sum the per-row dictionaries in column '{dict_column}'...")
     df = pd.read_csv(source_path)
 
     if dict_column not in df.columns:
         raise ValueError(f"Column '{dict_column}' was not found in the source dataset.")
 
+    cells = df[dict_column].dropna()
+    reporter = ProgressReporter(f"Summing {len(cells):,} dictionaries", len(cells))
     totals: Counter = Counter()
-    for cell in df[dict_column].dropna():
+    for i, cell in enumerate(cells, start=1):
         parsed = _parse_dict(cell)
+        reporter.update(i)
         if not parsed:
             continue
         for key, value in parsed.items():
@@ -53,7 +57,7 @@ def aggregate_dictionary(source_csv: str, output_csv: str, dict_column: str, csv
         result["sum"] = result["sum"].astype(int)
 
     result.to_csv(output_path, index=False)
-    print(f"Success! Aggregated {len(result)} distinct keys into '{output_csv}'.")
+    print(f"Success! Rolled {len(cells):,} rows up into {len(result):,} distinct keys (sorted by total) → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

@@ -12,18 +12,20 @@ def extract_year(csv_name: str, date_column: str, new_column_name: str = "year",
     values pandas can't parse. Unlocks temporal charts (e.g. publications per year)."""
     csv_path = resolve_csv_path(csv_name, csv_root)
 
-    print(f"Extracting year from '{date_column}' in '{csv_name}'...")
+    print(f"Loading '{csv_name}.csv' to extract the year from column '{date_column}'...")
     df = pd.read_csv(csv_path)
 
     if date_column not in df.columns:
         raise ValueError(f"Column '{date_column}' was not found in the CSV.")
 
+    print(f"Parsing dates for {len(df):,} rows...")
     parsed = pd.to_datetime(df[date_column], errors="coerce")
     years = parsed.dt.year
 
     # Fallback for values pandas couldn't parse: grab the first 4-digit run.
     unparsed = years.isna()
     if unparsed.any():
+        print(f"Salvaging {int(unparsed.sum()):,} unparseable values with a 4-digit-year fallback...")
         extracted = df.loc[unparsed, date_column].astype(str).str.extract(r"(\d{4})")[0]
         years.loc[unparsed] = pd.to_numeric(extracted, errors="coerce")
 
@@ -31,7 +33,7 @@ def extract_year(csv_name: str, date_column: str, new_column_name: str = "year",
 
     atomic_write_csv(df, csv_path)
     filled = int(df[new_column_name].notna().sum())
-    print(f"Success! Extracted a year for {filled}/{len(df)} rows into column '{new_column_name}'.")
+    print(f"Success! Extracted a year for {filled:,}/{len(df):,} rows into column '{new_column_name}'.")
 
 
 if __name__ == "__main__":

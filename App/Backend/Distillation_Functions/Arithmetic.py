@@ -27,10 +27,12 @@ def arithmetic(source_csv: str, output_csv: str, column_a: str, operation: str, 
     if op not in OPERATIONS:
         raise ValueError(f"Unsupported operation '{operation}'. Choose one of {sorted(OPERATIONS)}.")
 
-    print(f"Computing '{new_column}' = {column_a} {op} {operand}" + (f" (per {group_by} group)" if group_by else "") + "...")
+    print(f"Loading '{source_csv}.csv' to compute '{new_column}' = {column_a} {op} {operand}" + (f" (operand summed per '{group_by}' group)" if group_by else "") + "...")
     df = pd.read_csv(source_path)
     if column_a not in df.columns:
         raise ValueError(f"Column '{column_a}' was not found in the source dataset.")
+
+    print(f"Applying the {op} across {len(df):,} rows...")
 
     left = pd.to_numeric(df[column_a], errors="coerce")
 
@@ -53,7 +55,7 @@ def arithmetic(source_csv: str, output_csv: str, column_a: str, operation: str, 
 
     df[new_column] = result
     df.to_csv(output_path, index=False)
-    print(f"Success! Wrote column '{new_column}' into '{output_csv}'.")
+    print(f"Success! Computed '{new_column}' = {column_a} {op} {operand} for {len(df):,} rows → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

@@ -13,16 +13,17 @@ def cross_tab(source_csv: str, output_csv: str, row_column: str, column_column: 
     source_path = resolve_csv_path(source_csv, csv_root)
     output_path = resolve_csv_path(output_csv, csv_root)
 
-    print(f"Cross-tabulating '{row_column}' against '{column_column}' in '{source_csv}'...")
+    print(f"Loading '{source_csv}.csv' to cross-tabulate '{row_column}' (rows) against '{column_column}' (columns)...")
     df = pd.read_csv(source_path)
 
     for column in (row_column, column_column):
         if column not in df.columns:
             raise ValueError(f"Column '{column}' was not found in the source dataset.")
 
+    print(f"Counting {len(df):,} rows into a contingency matrix...")
     table = pd.crosstab(df[row_column], df[column_column])
     table.reset_index().to_csv(output_path, index=False)
-    print(f"Success! Wrote a {table.shape[0]}x{table.shape[1]} count matrix into '{output_csv}'.")
+    print(f"Success! Wrote a {table.shape[0]}×{table.shape[1]} count matrix ('{row_column}' vs '{column_column}') → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

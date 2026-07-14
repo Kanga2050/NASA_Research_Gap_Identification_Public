@@ -25,12 +25,14 @@ def pie_chart(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a pie chart of '{category_column}' shares...")
     df = pd.read_csv(csv_path)
     if category_column not in df.columns:
         raise ValueError(f"Column '{category_column}' was not found in the CSV.")
 
     df = drop_excluded(df, category_column, exclude)
+    measure = f"summed '{value_column}'" if value_column else "row counts"
+    print(f"Aggregating {len(df):,} rows into per-'{category_column}' {measure}...")
     if value_column:
         if value_column not in df.columns:
             raise ValueError(f"Value column '{value_column}' was not found in the CSV.")
@@ -45,12 +47,14 @@ def pie_chart(
     if top_n and int(top_n) > 0:
         data = data.head(int(top_n))
 
+    slices = len(data)
+    print(f"Rendering pie chart of {slices} slices...")
     fig = px.pie(
         data, names=category_column, values=values,
         title=title or f"{values} share by {category_column}",
     )
     fig.write_html(output_html)
-    print(f"Success! Pie chart saved to {output_html}")
+    print(f"Success! Pie chart of {slices} slices saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

@@ -22,10 +22,14 @@ from .data_lookups import (
     list_csv_columns,
     list_csv_columns_typed,
     list_public,
+    list_public_pdf_folders,
     list_user_csv_names,
     list_user_files,
     list_user_html_names,
+    list_user_paper_names,
+    list_user_pdf_folders,
     list_user_template_names,
+    pdf_folder_choices,
 )
 from .file_meta import DESCRIPTIONS_FILE, get_description, remove_description, set_description
 from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
@@ -35,12 +39,17 @@ from .output_preview import build_named_preview, build_output_preview, get_lates
 from .services import create_api_key, resolve_api_key
 from .task_engine import get_task_history, get_task_status, queue_user_task
 from App.Frontend.webapp.storage import (
+    public_pdf_root,
     rename_user_storage,
     storage_folder_name,
     user_csv_root,
     user_html_root,
+    user_paper_root,
+    user_pdf_root,
     user_template_root,
 )
+from App.Servers.Paper_Builder import build_paper_html
+from App.Servers.storage_paths import resolve_html_path
 
 # Keep the persisted chat transcript bounded so the session (and each model
 # request) stays small; this holds ~AGENT_HISTORY_LIMIT/2 turns.
@@ -114,6 +123,8 @@ def _dashboard_context(request):
         "html_files": list_user_files(request.user, "html"),
         "template_files": list_user_files(request.user, "template"),
         "template_names": list_user_template_names(request.user),
+        "pdf_folders": list_user_pdf_folders(request.user),
+        "pdf_folder_choices": pdf_folder_choices(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
         "tasks": tasks,
         "active_tasks": active_tasks,
@@ -138,7 +149,12 @@ def _studio_context(request):
 
 @login_required
 def dashboard(request):
-    context = {**_dashboard_context(request), **_studio_context(request), "active_tab": "dashboard"}
+    context = {
+        **_dashboard_context(request),
+        **_studio_context(request),
+        **_synthesize_context(request),
+        "active_tab": "dashboard",
+    }
     return render(request, "portal/workspace.html", context)
 
 
@@ -352,6 +368,92 @@ def delete_file(request):
     return redirect("dashboard")
 
 
+# --- PDF collections (folders of PDFs uploaded/pulled for chunk_pdfs) ----------
+def _safe_collection_name(raw: str) -> str:
+    """A single filesystem-safe path segment for a PDF collection folder, or ''."""
+    name = os.path.basename((raw or "").strip().rstrip("/\\"))
+    name = re.sub(r"[^\w.@+-]", "_", name).strip(". ")
+    return "" if name in {"", ".", ".."} else name
+
+
+@login_required
+def pdf_folders(request):
+    """JSON list of the user's PDF collections and the shared public ones, for the
+    task-form picker and the library UI."""
+    return JsonResponse({
+        "user": list_user_pdf_folders(request.user),
+        "public": list_public_pdf_folders(),
+    })
+
+
+@login_required
+@require_POST
+def upload_pdfs(request):
+    """Upload one or more PDFs into a named collection folder in the user's PDF area."""
+    collection = _safe_collection_name(request.POST.get("collection", ""))
+    if not collection:
+        messages.error(request, "Provide a valid collection name.")
+        return redirect("dashboard")
+
+    uploads = request.FILES.getlist("pdfs")
+    if not uploads:
+        messages.error(request, "Choose at least one PDF to upload.")
+        return redirect("dashboard")
+
+    destination = user_pdf_root(request.user) / collection
+    destination.mkdir(parents=True, exist_ok=True)
+    saved = 0
+    for upload in uploads:
+        safe_name = os.path.basename(upload.name)
+        if not safe_name.lower().endswith(".pdf"):
+            continue
+        with (destination / safe_name).open("wb") as out:
+            for chunk in upload.chunks():
+                out.write(chunk)
+        saved += 1
+
+    if saved:
+        messages.success(request, f"Uploaded {saved} PDF(s) into collection '{collection}'.")
+    else:
+        messages.error(request, "No PDF files were uploaded (only .pdf is accepted).")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def delete_pdf_folder(request):
+    """Delete one of the user's own PDF collections."""
+    collection = _safe_collection_name(request.POST.get("name", ""))
+    target = user_pdf_root(request.user) / collection
+    if not collection or not target.is_dir():
+        messages.error(request, "Collection not found.")
+        return redirect("dashboard")
+    shutil.rmtree(target)
+    messages.success(request, f"Deleted PDF collection '{collection}'.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def import_pdf_folder_from_public(request):
+    """Copy a public PDF collection into the user's own PDF area (non-clobbering)."""
+    collection = _safe_collection_name(request.POST.get("name", ""))
+    source = public_pdf_root() / collection
+    if not collection or not source.is_dir():
+        messages.error(request, "Public collection not found.")
+        return redirect("dashboard")
+
+    dest_root = user_pdf_root(request.user)
+    dest = dest_root / collection
+    index = 2
+    while dest.exists():
+        dest = dest_root / f"{collection}_{index}"
+        index += 1
+    shutil.copytree(source, dest)
+    messages.success(request, f"Imported PDF collection '{dest.name}' from the public library.")
+    return redirect("dashboard")
+
+
 @login_required
 @require_POST
 def issue_api_key(request):
@@ -374,15 +476,16 @@ def issue_api_key(request):
 #            truthy, falling back to `default` (which may be a callable taking
 #            the cleaned form data, for defaults computed from other fields).
 TASK_SPECS = {
-    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("output_column", "abstract_embedding"), ("model_name", "allenai/specter2_base")]},
-    "reduce_dimensionality": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "abstract_embedding"), ("output_column", "2d"), ("n_components", 2)]},
+    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("output_column", "text_embedding"), ("model_name", "allenai/specter2_base")]},
+    "reduce_dimensionality": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "text_embedding"), ("output_column", "2d"), ("n_components", 2)]},
     "cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "5d"), ("output_column", "topic_id"), ("min_cluster_size", 32), ("min_samples", 8)]},
-    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics"), ("chart_title", "")]},
-    "keyword_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("text_column", "abstract"), ("output_column", "kw")]},
-    "semantic_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("embedding_column", "abstract_embedding"), ("output_column", "sem")]},
+    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics"), ("chart_title", "")]},
+    "keyword_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("text_column", "text"), ("output_column", "kw")]},
+    "semantic_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("embedding_column", "text_embedding"), ("output_column", "sem")]},
     "hybrid_score": {"roots": ["csv"], "args": [("csv_name", ""), ("keyword_col", "kw"), ("semantic_col", "sem"), ("output_column", "hybrid")]},
     "numerical_filter": {"roots": ["csv"], "args": [("source_csv", lambda c: c["csv_name"]), ("output_csv", "Filtered_Output"), ("target_score_column", "hybrid"), ("threshold", 0.7)]},
     "openalex_scraper": {"roots": ["csv"], "args": [("topic", "space biology"), ("csv_name", "scraped"), ("limit", 10000)]},
+    "chunk_pdfs": {"roots": ["csv", "pdf"], "args": [("folders", ""), ("csv_name", "pdf_chunks"), ("source_label", ""), ("chunk_words", 250), ("overlap_words", 40), ("enrich", True)]},
     # Distillation
     "categorical_filter": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Filtered_Output"), ("target_column", ""), ("expected_value", "")]},
     "combine_csvs": {"roots": ["csv"], "args": [("source_csvs", ""), ("output_csv", "Combined_Corpus"), ("source_column", "source")]},
@@ -394,12 +497,13 @@ TASK_SPECS = {
     "cross_tab": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Cross_Tab_Output"), ("row_column", ""), ("column_column", "")]},
     "arithmetic": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Arithmetic_Output"), ("column_a", ""), ("operation", "divide"), ("operand", ""), ("new_column_name", "result"), ("group_by", "")]},
     # Annotation
-    "word_frequency": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("new_column_name", "word_freq"), ("ngram", 1)]},
-    "label_topics": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "abstract"), ("new_column_name", "Topic_Label")]},
-    "text_length": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "abstract"), ("new_column_name", "length"), ("unit", "words")]},
+    "word_frequency": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("new_column_name", "word_freq"), ("ngram", 1)]},
+    "label_topics": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("new_column_name", "Topic_Label")]},
+    "text_length": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("new_column_name", "length"), ("unit", "words")]},
     "extract_year": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "year")]},
     "to_date": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "date")]},
     "normalize_column": {"roots": ["csv"], "args": [("csv_name", ""), ("value_column", ""), ("new_column_name", "")]},
+    "hierarchical_cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("embedding_column", "5d"), ("output_column", "hcluster"), ("n_clusters", 10)]},
     # Visualization
     "bar_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("series_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_bar_chart"), ("top_n", 25), ("exclude", "")]},
     "scatter_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("color_column", ""), ("size_column", ""), ("coord_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_scatter")]},
@@ -408,9 +512,10 @@ TASK_SPECS = {
     "box_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("value_column", ""), ("category_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_box_plot"), ("exclude", ""), ("log_y", False)]},
     "heatmap": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_heatmap")]},
     "pie_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_pie_chart"), ("top_n", 10), ("exclude", "")]},
+    "hierarchical_dendrogram": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("embedding_column", "5d"), ("output_name", lambda c: f"{c['csv_name']}_Dendrogram"), ("chart_title", ""), ("top_n", 30), ("orientation", "left")]},
 }
 
-ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root}
+ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root, "pdf": user_pdf_root}
 
 
 def _resolve_arg(cleaned: dict, field, default):
@@ -448,7 +553,33 @@ def submit_task(request):
 
 @login_required
 def studio(request):
-    context = {**_dashboard_context(request), **_studio_context(request), "active_tab": "studio"}
+    context = {
+        **_dashboard_context(request),
+        **_studio_context(request),
+        **_synthesize_context(request),
+        "active_tab": "studio",
+    }
+    return render(request, "portal/workspace.html", context)
+
+
+def _synthesize_context(request):
+    """The Synthesize tab: a block editor for authoring research papers from the
+    user's own charts/data. Ships the paper list plus the chart & CSV names the
+    figure/reference pickers draw from."""
+    return {
+        "paper_files": list_user_files(request.user, "paper"),
+        "paper_names": list_user_paper_names(request.user),
+    }
+
+
+@login_required
+def synthesize(request):
+    context = {
+        **_dashboard_context(request),
+        **_studio_context(request),
+        **_synthesize_context(request),
+        "active_tab": "synthesize",
+    }
     return render(request, "portal/workspace.html", context)
 
 
@@ -634,6 +765,104 @@ def load_template(request, name):
     except (ValueError, OSError):
         return JsonResponse({"error": "Template is corrupt."}, status=400)
     return JsonResponse({"name": name, "graph": graph, "description": get_description(root, name)})
+
+
+# --- Synthesize: research-paper documents (block-model JSON) -------------------
+def _safe_paper_name(raw: str) -> str:
+    """Sanitize a user-supplied paper name to a filesystem-safe stem."""
+    safe = re.sub(r"[^\w.\-]", "_", (raw or "").strip()).strip("._ ")
+    if safe == Path(DESCRIPTIONS_FILE).stem:
+        return ""
+    return safe
+
+
+@login_required
+def list_papers(request):
+    """The user's saved papers (name + description) for the open/library UI."""
+    return JsonResponse({"papers": list_user_files(request.user, "paper")})
+
+
+@login_required
+@require_POST
+def save_paper(request):
+    """Persist a Synthesize paper (its block-model JSON `doc`) as a named file on
+    the user's account, so it can be reopened, exported, published, or built."""
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    name = _safe_paper_name(payload.get("name", ""))
+    if not name:
+        return JsonResponse({"error": "Enter a valid paper name."}, status=400)
+
+    doc = payload.get("doc")
+    if not isinstance(doc, dict):
+        return JsonResponse({"error": "Missing document data."}, status=400)
+
+    root = user_paper_root(request.user)
+    path = resolve_safe_path(root, name, ".json")
+    if path is None:
+        return JsonResponse({"error": "Invalid paper name."}, status=400)
+
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    set_description(root, name, payload.get("description", ""))
+    return JsonResponse({"ok": True, "name": name})
+
+
+@login_required
+def load_paper(request, name):
+    """Return a saved paper's block-model JSON so the editor can reopen it."""
+    root = user_paper_root(request.user)
+    path = resolve_safe_path(root, name, ".json")
+    if path is None or not path.exists():
+        raise Http404("Paper not found.")
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return JsonResponse({"error": "Paper is corrupt."}, status=400)
+    return JsonResponse({"name": name, "doc": doc, "description": get_description(root, name)})
+
+
+@login_required
+@require_POST
+def build_paper(request):
+    """Render a paper's block model into a self-contained, interactive HTML file
+    and write it into the user's Visualizations (html/) area so it can be viewed,
+    published, downloaded — or embedded as a figure in another paper. Builds from
+    the posted `doc` (the live editor state) so the user need not save first."""
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    doc = payload.get("doc")
+    if not isinstance(doc, dict):
+        # Fall back to a saved paper by name.
+        name = _safe_paper_name(payload.get("name", ""))
+        root = user_paper_root(request.user)
+        path = resolve_safe_path(root, name, ".json") if name else None
+        if path is None or not path.exists():
+            return JsonResponse({"error": "Missing document data."}, status=400)
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            return JsonResponse({"error": "Paper is corrupt."}, status=400)
+
+    output_name = _safe_paper_name(payload.get("output_name") or payload.get("name") or doc.get("title") or "")
+    if not output_name:
+        return JsonResponse({"error": "Give the built report a valid name."}, status=400)
+
+    html_root = user_html_root(request.user)
+    try:
+        html = build_paper_html(doc, str(html_root))
+    except Exception as exc:  # keep a bad doc from 500ing the whole request
+        return JsonResponse({"error": f"Build failed: {exc}"}, status=400)
+
+    out_path = resolve_html_path(output_name, str(html_root))
+    out_path.write_text(html, encoding="utf-8")
+    set_description(html_root, output_name, payload.get("description", "") or f"Built from paper “{output_name}”.")
+    return JsonResponse({"ok": True, "name": output_name})
 
 
 @login_required

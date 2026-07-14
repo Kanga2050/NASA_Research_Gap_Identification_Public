@@ -78,3 +78,7 @@ DATA_ROOT = BASE_DIR / "App" / "UserData"
 CSV_ROOT = DATA_ROOT / "csvs"
 HTML_ROOT = DATA_ROOT / "html"
 TASK_ROOT = DATA_ROOT / "tasks"
+
+# Allow uploading a whole PDF collection at once (Django defaults to 100 files per
+# request); large individual PDFs already stream to a temp file past 2.5 MB.
+DATA_UPLOAD_MAX_NUMBER_FILES = 1000

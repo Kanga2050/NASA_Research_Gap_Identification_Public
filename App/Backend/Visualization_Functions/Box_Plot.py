@@ -24,7 +24,7 @@ def box_plot(
     csv_path = resolve_csv_path(csv_name, csv_root)
     output_html = resolve_html_path(output_name, html_root)
 
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to build a box plot of '{value_column}'...")
     df = pd.read_csv(csv_path)
     if value_column not in df.columns:
         raise ValueError(f"Column '{value_column}' was not found in the CSV.")
@@ -37,12 +37,15 @@ def box_plot(
         df = drop_excluded(df, category, exclude)
         df[category] = df[category].astype(str)
 
+    boxes = df[category].nunique() if category else 1
+    split = f"one box per '{category}' ({boxes} boxes)" if category else "a single box"
+    print(f"Rendering box plot of {len(df):,} values as {split}" + (" (log-y)" if log_y else "") + "...")
     fig = px.box(
         df, x=category, y=value_column, log_y=bool(log_y),
         title=title or (f"{value_column} by {category}" if category else f"Distribution of {value_column}"),
     )
     fig.write_html(output_html)
-    print(f"Success! Box plot saved to {output_html}")
+    print(f"Success! Box plot ({boxes} box(es), {len(df):,} values) saved to '{output_name}.html'.")
 
 
 if __name__ == "__main__":

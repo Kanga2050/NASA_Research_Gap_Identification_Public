@@ -5,9 +5,13 @@ import pandas as pd
 import time
 from pathlib import Path
 
+from Backend.backend_utils import progress_line
 from Servers.storage_paths import resolve_csv_path
 
-def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Path | None = None):
+def openalex_scraper(topic, csv_name="scraped", limit = 10000, csv_root: str | Path | None = None):
+    """Fetch up to `limit` works matching `topic` (that have an abstract) from the
+    OpenAlex API into a brand new CSV. Rows are streamed to disk in pages of 200 as
+    they arrive, so partial progress survives an interruption."""
     headers = {
         'User-Agent': 'shauryachauhan2050@gmail.com'
     }
@@ -26,26 +30,28 @@ def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Pa
     if api_key:
         params['api_key'] = api_key
 
+    # The abstract text lands in a `text` column (the canonical raw-text column
+    # name shared with the PDF corpora, so combine_csvs unions them cleanly).
     columns = [
-        'openalex_id', 'title', 'doi', 'abstract', 'publish_time',
+        'openalex_id', 'title', 'doi', 'text', 'publish_time',
         'authors', 'journal', 'pmcid', 'pubmed_id'
     ]
 
     output_filename = resolve_csv_path(csv_name, csv_root)
     pd.DataFrame(columns = columns).to_csv(output_filename, index=False)
-    print(f"Initialized clean file: {output_filename}")
+    print(f"Searching OpenAlex for '{topic}' (abstracts only); target up to {limit:,} papers → '{csv_name}.csv'.")
     total_collected = 0
 
     while params['cursor'] and total_collected < limit:
         try:
-            print(f"Progress: Fetching next batch... Total saved so far: {total_collected} / {limit}")
+            print(progress_line(f"Downloading '{topic}' papers", total_collected, limit))
             response = requests.get(base_url, params = params, headers = headers)
             response.raise_for_status()
             data = response.json()
-            
+
             results = data.get('results', [])
             if not results:
-                print("no more results available.")
+                print(f"OpenAlex returned no more results; stopping at {total_collected:,} papers.")
                 break
             
             batch_data = []
@@ -77,7 +83,7 @@ def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Pa
                     'openalex_id': paper.get('id', ''),
                     'title': paper.get('title', ''),
                     'doi': paper.get('doi', ''),
-                    'abstract': abstract,
+                    'text': abstract,
                     'publish_time': paper.get('publication_date', ''),
                     'authors': '; '.join(authors),
                         'journal': journal,
@@ -97,10 +103,11 @@ def openalex_scraper(topic, csv_name="scaped", limit = 10000, csv_root: str | Pa
             time.sleep(0.1)
 
         except Exception as e:
-            print(f"\nAn error occurred: {e}")
+            print(f"Stopped early after an error ({e}); {total_collected:,} papers already saved.")
             break
-    
-    print(f"\nSuccess! Process finished. {total_collected} rows saved in total.")
+
+    print(progress_line(f"Downloading '{topic}' papers", total_collected, min(limit, max(total_collected, 1))))
+    print(f"Success! Saved {total_collected:,} '{topic}' papers (with abstracts) to new file '{csv_name}.csv'.")
 
 
 if __name__ == "__main__":

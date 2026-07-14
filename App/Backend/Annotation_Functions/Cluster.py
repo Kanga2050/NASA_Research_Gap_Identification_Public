@@ -32,38 +32,39 @@ def cluster(
     if new_column_name is None:
         new_column_name = f"{embedding_column}_topic"
         
-    print(f"Loading data from '{csv_path}'...")
+    print(f"Loading '{csv_name}.csv' to cluster coordinates in column '{embedding_column}'...")
     df = pd.read_csv(csv_path)
-    
+
     if embedding_column not in df.columns:
         raise ValueError(f"Column '{embedding_column}' not found in the CSV.")
 
-    print(f"Parsing coordinates from '{embedding_column}'...")
     valid_rows = df[embedding_column].dropna().index
+    print(f"Parsing {len(valid_rows):,} coordinate vectors from '{embedding_column}'...")
     parsed_embeddings = df.loc[valid_rows, embedding_column].apply(ast.literal_eval)
-    
+
     X = np.vstack(parsed_embeddings.values)
-    
-    print(f"Running HDBSCAN clustering (min_cluster_size={min_cluster_size})...")
+
+    print(f"Running HDBSCAN on {X.shape[0]:,} points (min_cluster_size={min_cluster_size}, min_samples={min_samples})...")
+    print("Density clustering runs as one pass with no incremental progress; please wait...")
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=min_cluster_size, 
+        min_cluster_size=min_cluster_size,
         min_samples=min_samples,
         metric='euclidean'
     )
-    
+
     cluster_labels = clusterer.fit_predict(X)
-    
-    print(f"Found {len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)} distinct topics.")
-    
+
+    n_topics = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    n_noise = int((cluster_labels == -1).sum())
+    print(f"Found {n_topics} distinct topics; {n_noise:,} points ({n_noise / len(cluster_labels) * 100:.1f}%) fell into noise (-1).")
+
     df[new_column_name] = None
-    
+
     df.loc[valid_rows, new_column_name] = cluster_labels
 
-    print(f"Writing updated dataset safely to '{csv_path}'...")
     atomic_write_csv(df, csv_path)
 
-    print(f"Success! Topic labels added to column '{new_column_name}'.")
-    print("Note: A label of '-1' means the entry is 'noise' and doesn't fit into a dense topic.")
+    print(f"Success! Assigned {n_topics} topic ids to column '{new_column_name}' in '{csv_name}.csv' (label -1 = noise, not a topic).")
 
 if __name__ == "__main__":
     

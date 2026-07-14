@@ -24,7 +24,8 @@ def select_columns(source_csv: str, output_csv: str, columns: str, drop=False, c
         raise ValueError("Provide at least one column name.")
 
     drop_mode = _as_bool(drop)
-    print(f"{'Dropping' if drop_mode else 'Keeping'} columns {wanted} from '{source_csv}'...")
+    verb = "drop" if drop_mode else "keep only"
+    print(f"Loading '{source_csv}.csv' to {verb} columns {wanted}...")
     df = pd.read_csv(source_path)
 
     missing = [col for col in wanted if col not in df.columns]
@@ -32,8 +33,9 @@ def select_columns(source_csv: str, output_csv: str, columns: str, drop=False, c
         raise ValueError(f"Columns not found in the source dataset: {missing}")
 
     result = df.drop(columns=wanted) if drop_mode else df[wanted]
+    print(f"Reshaping {len(df):,} rows from {len(df.columns)} → {len(result.columns)} columns...")
     result.to_csv(output_path, index=False)
-    print(f"Success! Wrote '{output_csv}' with {len(result.columns)} columns.")
+    print(f"Success! Wrote {len(result.columns)} columns × {len(result):,} rows → new file '{output_csv}.csv'.")
 
 
 if __name__ == "__main__":

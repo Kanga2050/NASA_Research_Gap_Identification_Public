@@ -8,9 +8,13 @@ import pandas as pd
 from App.Frontend.webapp.storage import (
     public_csv_root,
     public_html_root,
+    public_paper_root,
+    public_pdf_root,
     public_template_root,
     user_csv_root,
     user_html_root,
+    user_paper_root,
+    user_pdf_root,
     user_template_root,
 )
 from .file_meta import DESCRIPTIONS_FILE, read_descriptions
@@ -22,9 +26,19 @@ TYPE_SAMPLE_ROWS = 50
 # Per import/export "kind": the dotted suffix, the per-user root accessor, and
 # the shared public-library root accessor. Shared by the listing helpers below
 # and the import/export/publish views.
-KIND_SUFFIX = {"csv": ".csv", "html": ".html", "template": ".json"}
-USER_ROOTS = {"csv": user_csv_root, "html": user_html_root, "template": user_template_root}
-PUBLIC_ROOTS = {"csv": public_csv_root, "html": public_html_root, "template": public_template_root}
+KIND_SUFFIX = {"csv": ".csv", "html": ".html", "template": ".json", "paper": ".json"}
+USER_ROOTS = {
+    "csv": user_csv_root,
+    "html": user_html_root,
+    "template": user_template_root,
+    "paper": user_paper_root,
+}
+PUBLIC_ROOTS = {
+    "csv": public_csv_root,
+    "html": public_html_root,
+    "template": public_template_root,
+    "paper": public_paper_root,
+}
 
 
 def _list_names(folder, suffix: str) -> list[str]:
@@ -54,6 +68,10 @@ def list_user_template_names(user) -> list[str]:
     return _list_names(user_template_root(user), ".json")
 
 
+def list_user_paper_names(user) -> list[str]:
+    return _list_names(user_paper_root(user), ".json")
+
+
 def list_user_files(user, kind: str) -> list[dict[str, str]]:
     """[{"name","description"}] for the signed-in user's files of a given kind."""
     return _list_with_descriptions(USER_ROOTS[kind](user), KIND_SUFFIX[kind])
@@ -62,6 +80,35 @@ def list_user_files(user, kind: str) -> list[dict[str, str]]:
 def list_public(kind: str) -> list[dict[str, str]]:
     """[{"name","description"}] for the shared public library of a given kind."""
     return _list_with_descriptions(PUBLIC_ROOTS[kind](), KIND_SUFFIX[kind])
+
+
+# --- PDF collections (folders of PDFs, unlike the flat-file kinds above) -------
+def _list_pdf_folders_in(base) -> list[dict]:
+    """[{"name","count"}] for each subfolder of `base`, with its PDF count."""
+    if not base.is_dir():
+        return []
+    return [
+        {"name": child.name, "count": len(list(child.glob("*.pdf")))}
+        for child in sorted(base.iterdir())
+        if child.is_dir()
+    ]
+
+
+def list_user_pdf_folders(user) -> list[dict]:
+    return _list_pdf_folders_in(user_pdf_root(user))
+
+
+def list_public_pdf_folders() -> list[dict]:
+    return _list_pdf_folders_in(public_pdf_root())
+
+
+def pdf_folder_choices(user) -> list[str]:
+    """Collection names the user can chunk (their own first, then any public ones
+    they don't already have a same-named folder for) -- for the task-form picker."""
+    user_names = [f["name"] for f in list_user_pdf_folders(user)]
+    seen = set(user_names)
+    public_names = [f["name"] for f in list_public_pdf_folders() if f["name"] not in seen]
+    return user_names + public_names
 
 
 def list_csv_columns(user, csv_name: str) -> list[str]:

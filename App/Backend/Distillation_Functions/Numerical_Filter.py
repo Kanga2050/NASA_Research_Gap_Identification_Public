@@ -9,11 +9,13 @@ def numerical_filter(source_csv: str, output_csv: str, target_score_column: str,
     source_path = resolve_csv_path(source_csv, csv_root)
     output_path = resolve_csv_path(output_csv, csv_root)
 
-    print(f"Filtering dataset on '{target_score_column}' with a minimum threshold of {threshold}...")
+    print(f"Loading '{source_csv}.csv' to filter rows where '{target_score_column}' >= {threshold}...")
     df = pd.read_csv(source_path)
 
     if target_score_column not in df.columns:
         raise ValueError(f"Score column '{target_score_column}' was not found in the source dataset.")
+
+    print(f"Applying threshold to {len(df):,} rows...")
 
     column = df[target_score_column]
     # Prefer a numeric comparison when both the column and the threshold are numeric
@@ -32,9 +34,10 @@ def numerical_filter(source_csv: str, output_csv: str, target_score_column: str,
 
     filtered_df = df[mask.fillna(False)]
     filtered_df = filtered_df.sort_values(by=target_score_column, ascending=False)
-    
+
     filtered_df.to_csv(output_path, index=False)
-    print(f"Search complete! Extracted {len(filtered_df)} target items into a brand new file: '{output_path}'")
+    kept = len(filtered_df)
+    print(f"Success! Kept {kept:,} of {len(df):,} rows ({kept / max(len(df), 1) * 100:.1f}%) meeting '{target_score_column}' >= {threshold} → new file '{output_csv}.csv'.")
 
 if __name__ == "__main__":
     numerical_filter(
