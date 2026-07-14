@@ -21,6 +21,10 @@ from __future__ import annotations
 
 import json
 
+from django.core.exceptions import ImproperlyConfigured
+
+from App.Backend import registry
+
 ANY = ["text", "number", "date", "embedding"]
 CATEGORICAL = ["text", "number", "date"]
 AXIS = ["number", "date", "text"]
@@ -252,3 +256,41 @@ PALETTE = [
 
 def manifest_json() -> str:
     return json.dumps({"nodes": MANIFEST, "palette": PALETTE})
+
+
+def _check_against_registry() -> None:
+    """Every port and parameter a node exposes must be a real argument of the backend
+    function it runs, or the Run compiler would hand that function a keyword it does
+    not take. This module names those arguments by hand (it also carries the wire types
+    and widgets, which the registry has no opinion about), so the two are checked
+    against each other here, at import, rather than at Run time.
+
+    Node names beginning with "__" are the canvas's own source/bridge nodes (__csv__,
+    __column__) and the multi-CSV ports of combine_csvs; they run no backend function.
+    """
+    problems = []
+    for action, node in MANIFEST.items():
+        if action.startswith("__"):
+            continue
+        try:
+            fn = registry.get(action)
+        except KeyError:
+            problems.append(f"node {action!r} has no registry entry")
+            continue
+
+        fields = set(fn.form_fields)
+        params = [inp["param"] for inp in node["inputs"]] + [pref["param"] for pref in node["prefs"]]
+        if node["output"].get("param"):
+            params.append(node["output"]["param"])
+        if node["table_param"]:
+            params.append(node["table_param"])
+
+        for param in params:
+            if not param.startswith("__") and param not in fields:
+                problems.append(f"node {action!r}: param {param!r} is not a form field of {action}")
+
+    if problems:
+        raise ImproperlyConfigured("Studio manifest disagrees with the function registry: " + "; ".join(problems))
+
+
+_check_against_registry()

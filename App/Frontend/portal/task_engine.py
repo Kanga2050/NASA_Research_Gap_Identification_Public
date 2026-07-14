@@ -22,6 +22,8 @@ django.setup()
 
 from django.utils import timezone as django_timezone
 
+from App.Backend import registry
+
 from .models import TaskRecord
 
 shared_task_registry: dict[str, dict[str, Any]] = {}
@@ -118,54 +120,14 @@ def _dispatcher_loop() -> None:
             pending_tasks.task_done()
 
 
-# Maps a queued function name to its "module.path:attribute". Kept as strings
-# so the (often heavy, ML-laden) backend module is only imported when a task of
-# that type actually runs, not when this module is loaded.
-CALLABLE_PATHS = {
-    "embed_text": "App.Backend.Annotation_Functions.Embed_Text:embed_text",
-    "reduce_dimensionality": "App.Backend.Annotation_Functions.Reduce_Dimensionality:reduce_dimensionality",
-    "cluster": "App.Backend.Annotation_Functions.Cluster:cluster",
-    "distance_map": "App.Backend.Visualization_Functions.Distance_Map:distance_map",
-    "keyword_score": "App.Backend.Annotation_Functions.Keyword_Score:keyword_score",
-    "semantic_score": "App.Backend.Annotation_Functions.Semantic_Score:semantic_score",
-    "hybrid_score": "App.Backend.Annotation_Functions.Hybrid_Score:hybrid_score",
-    "numerical_filter": "App.Backend.Distillation_Functions.Numerical_Filter:numerical_filter",
-    "openalex_scraper": "App.Backend.Import_Data.OpenAlex_Scraper:openalex_scraper",
-    "chunk_pdfs": "App.Backend.Import_Data.PDF_Chunker:chunk_pdfs",
-    # Distillation
-    "categorical_filter": "App.Backend.Distillation_Functions.Categorical_Filter:categorical_filter",
-    "combine_csvs": "App.Backend.Distillation_Functions.Combine_Csvs:combine_csvs",
-    "aggregate_dictionary": "App.Backend.Distillation_Functions.Aggregate_Dictionary:aggregate_dictionary",
-    "group_aggregate": "App.Backend.Distillation_Functions.Group_Aggregate:group_aggregate",
-    "top_n_by_column": "App.Backend.Distillation_Functions.Top_N_By_Column:top_n_by_column",
-    "deduplicate": "App.Backend.Distillation_Functions.Deduplicate:deduplicate",
-    "select_columns": "App.Backend.Distillation_Functions.Select_Columns:select_columns",
-    "cross_tab": "App.Backend.Distillation_Functions.Cross_Tab:cross_tab",
-    "arithmetic": "App.Backend.Distillation_Functions.Arithmetic:arithmetic",
-    # Annotation
-    "word_frequency": "App.Backend.Annotation_Functions.Word_Frequency:word_frequency",
-    "label_topics": "App.Backend.Annotation_Functions.Label_Topics:label_topics",
-    "text_length": "App.Backend.Annotation_Functions.Text_Length:text_length",
-    "extract_year": "App.Backend.Annotation_Functions.Extract_Year:extract_year",
-    "to_date": "App.Backend.Annotation_Functions.To_Date:to_date",
-    "normalize_column": "App.Backend.Annotation_Functions.Normalize_Column:normalize_column",
-    "hierarchical_cluster": "App.Backend.Annotation_Functions.Hierarchical_Cluster:hierarchical_cluster",
-    # Visualization
-    "bar_chart": "App.Backend.Visualization_Functions.Bar_Chart:bar_chart",
-    "scatter_plot": "App.Backend.Visualization_Functions.Scatter_Plot:scatter_plot",
-    "histogram": "App.Backend.Visualization_Functions.Histogram:histogram",
-    "line_chart": "App.Backend.Visualization_Functions.Line_Chart:line_chart",
-    "box_plot": "App.Backend.Visualization_Functions.Box_Plot:box_plot",
-    "heatmap": "App.Backend.Visualization_Functions.Heatmap:heatmap",
-    "pie_chart": "App.Backend.Visualization_Functions.Pie_Chart:pie_chart",
-    "hierarchical_dendrogram": "App.Backend.Visualization_Functions.Hierarchical_Dendrogram:hierarchical_dendrogram",
-}
-
-
 def _deserialize_callable(function_name: str) -> Callable[..., Any]:
-    if function_name not in CALLABLE_PATHS:
-        raise KeyError(function_name)
-    module_path, attribute = CALLABLE_PATHS[function_name].split(":")
+    """Resolve a queued function name to the backend callable that runs it.
+
+    The registry stores the target as a "module.path:attribute" string and we import
+    it here, at call time -- so a task only pays for the (often heavy, ML-laden)
+    module it actually needs, and merely queueing work imports nothing.
+    """
+    module_path, attribute = registry.get(function_name).impl.split(":")
     return getattr(importlib.import_module(module_path), attribute)
 
 

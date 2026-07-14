@@ -18,7 +18,6 @@ from .data_lookups import (
     KIND_SUFFIX,
     PUBLIC_ROOTS,
     USER_ROOTS,
-    list_csv_columns,
     list_csv_columns_typed,
     list_public,
     list_public_pdf_folders,
@@ -35,9 +34,11 @@ from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitFo
 from .graph_manifest import MANIFEST, PALETTE
 from .models import AgentSettings, ApiKey, TaskRecord
 from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
+from .paper_ops import safe_name
 from .services import create_api_key, resolve_api_key
 from .studio_ops import StudioError, queue_graph
 from .task_engine import get_task_history, get_task_status, queue_user_task
+from App.Backend import registry
 from App.Frontend.webapp.storage import (
     public_pdf_root,
     rename_user_storage,
@@ -74,6 +75,19 @@ COLUMN_FIELD_NAMES = [
     "column_column",
     "date_column",
 ]
+
+# Everything the dashboard's task form needs to know about each action, derived from
+# the registry and handed to the page as JSON: which fields to show, which of those are
+# CSV-column dropdowns (so they can be repopulated when the chosen CSV changes), and
+# which field -- if any -- picks the source CSV.
+ACTION_SPEC = {
+    fn.name: {
+        "fields": list(fn.form_fields),
+        "columnFields": [f for f in fn.form_fields if f in COLUMN_FIELD_NAMES],
+        "csvSource": fn.source_csv_field,
+    }
+    for fn in registry.ALL_FUNCTIONS
+}
 
 # Maps an import/export "kind" to the per-user storage-root accessor and dotted
 # suffix for that file type. Shared by import_file/export_file/publish/describe.
@@ -139,6 +153,7 @@ def _dashboard_context(request):
         "pdf_folders": list_user_pdf_folders(request.user),
         "pdf_folder_choices": pdf_folder_choices(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
+        "action_spec": ACTION_SPEC,
         "tasks": tasks,
         "active_tasks": active_tasks,
         "latest_task": latest_task,
@@ -217,12 +232,12 @@ def import_file(request):
         messages.error(request, "Choose a file to import.")
         return redirect("dashboard")
 
-    safe_name = os.path.basename(upload.name)
-    if not safe_name or safe_name in {".", ".."} or safe_name == DESCRIPTIONS_FILE:
+    filename = os.path.basename(upload.name)
+    if not filename or filename in {".", ".."} or filename == DESCRIPTIONS_FILE:
         messages.error(request, "Invalid file name.")
         return redirect("dashboard")
 
-    ext = Path(safe_name).suffix.lower().lstrip(".")
+    ext = Path(filename).suffix.lower().lstrip(".")
     kind = EXT_TO_KIND.get(ext)
     if kind is None:
         messages.error(request, "Only .csv, .html, and .json (template or paper) files can be imported.")
@@ -235,7 +250,7 @@ def import_file(request):
         kind = _json_kind(payload)
 
     root = USER_ROOTS[kind](request.user)
-    destination = root / safe_name
+    destination = root / filename
     if payload is not None:
         destination.write_bytes(payload)
     else:
@@ -245,9 +260,9 @@ def import_file(request):
 
     description = request.POST.get("description", "")
     if description.strip():
-        set_description(root, Path(safe_name).stem, description)
+        set_description(root, Path(filename).stem, description)
 
-    messages.success(request, f"Imported {safe_name}.")
+    messages.success(request, f"Imported {filename}.")
     return redirect("dashboard")
 
 
@@ -295,50 +310,49 @@ def _copy_between_libraries(src_root: Path, dst_root: Path, kind: str, name: str
     return final_stem
 
 
-@login_required
-@require_POST
-def publish_file(request):
-    """Copy one of the user's files into the shared public library (open commons)."""
+def _transfer_file(request, *, to_public: bool):
+    """Copy a file between the user's storage and the shared public library.
+
+    Publishing and pulling are the same operation with the two roots swapped, so they
+    share one path; only the direction and the wording of the messages differ.
+    """
     kind = request.POST.get("kind")
     name = request.POST.get("name", "")
     if kind not in KIND_SUFFIX:
         messages.error(request, "Unknown file kind.")
         return redirect("dashboard")
 
+    user_root, public_root = USER_ROOTS[kind](request.user), PUBLIC_ROOTS[kind]()
+    source, destination = (user_root, public_root) if to_public else (public_root, user_root)
+    verb = "publish" if to_public else "import"
+
     try:
-        final_stem = _copy_between_libraries(USER_ROOTS[kind](request.user), PUBLIC_ROOTS[kind](), kind, name)
+        final_stem = _copy_between_libraries(source, destination, kind, name)
     except OSError as exc:
-        messages.error(request, f"Could not publish: {exc}")
+        messages.error(request, f"Could not {verb}: {exc}")
         return redirect("dashboard")
 
     if final_stem is None:
-        messages.error(request, "File not found.")
-    else:
+        messages.error(request, "File not found." if to_public else "Public file not found.")
+    elif to_public:
         messages.success(request, f"Published {final_stem}{KIND_SUFFIX[kind]} to the public library.")
+    else:
+        messages.success(request, f"Imported {final_stem}{KIND_SUFFIX[kind]} from the public library.")
     return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def publish_file(request):
+    """Copy one of the user's files into the shared public library (open commons)."""
+    return _transfer_file(request, to_public=True)
 
 
 @login_required
 @require_POST
 def import_from_public(request):
     """Copy a chosen file from the public library into the user's own storage."""
-    kind = request.POST.get("kind")
-    name = request.POST.get("name", "")
-    if kind not in KIND_SUFFIX:
-        messages.error(request, "Unknown file kind.")
-        return redirect("dashboard")
-
-    try:
-        final_stem = _copy_between_libraries(PUBLIC_ROOTS[kind](), USER_ROOTS[kind](request.user), kind, name)
-    except OSError as exc:
-        messages.error(request, f"Could not import: {exc}")
-        return redirect("dashboard")
-
-    if final_stem is None:
-        messages.error(request, "Public file not found.")
-    else:
-        messages.success(request, f"Imported {final_stem}{KIND_SUFFIX[kind]} from the public library.")
-    return redirect("dashboard")
+    return _transfer_file(request, to_public=False)
 
 
 @login_required
@@ -490,68 +504,33 @@ def issue_api_key(request):
     return redirect("dashboard")
 
 
-# Declarative spec for each task action, replacing a long if/elif ladder.
-#   "roots": which storage roots the backend function receives as *_root kwargs.
-#   "args":  the positional args passed to queue_user_task, each a
-#            (form_field, default) pair. A None field means `default` is a
-#            literal constant; otherwise the submitted value is used when
-#            truthy, falling back to `default` (which may be a callable taking
-#            the cleaned form data, for defaults computed from other fields).
-TASK_SPECS = {
-    "embed_text": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("output_column", "text_embedding"), ("model_name", "allenai/specter2_base")]},
-    "reduce_dimensionality": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "text_embedding"), ("output_column", "2d"), ("n_components", 2)]},
-    "cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("embedding_column", "5d"), ("output_column", "topic_id"), ("min_cluster_size", 32), ("min_samples", 8)]},
-    "distance_map": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("embedding_column", "2d"), ("output_name", lambda c: f"{c['csv_name']}_Topics"), ("chart_title", "")]},
-    "keyword_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("text_column", "text"), ("output_column", "kw")]},
-    "semantic_score": {"roots": ["csv"], "args": [("csv_name", ""), ("query", ""), ("embedding_column", "text_embedding"), ("output_column", "sem")]},
-    "hybrid_score": {"roots": ["csv"], "args": [("csv_name", ""), ("keyword_col", "kw"), ("semantic_col", "sem"), ("output_column", "hybrid")]},
-    "numerical_filter": {"roots": ["csv"], "args": [("source_csv", lambda c: c["csv_name"]), ("output_csv", "Filtered_Output"), ("target_score_column", "hybrid"), ("threshold", 0.7)]},
-    "openalex_scraper": {"roots": ["csv"], "args": [("topic", "space biology"), ("csv_name", "scraped"), ("limit", 10000)]},
-    "chunk_pdfs": {"roots": ["csv", "pdf"], "args": [("folders", ""), ("csv_name", "pdf_chunks"), ("source_label", ""), ("chunk_words", 250), ("overlap_words", 40), ("enrich", True)]},
-    # Distillation
-    "categorical_filter": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Filtered_Output"), ("target_column", ""), ("expected_value", "")]},
-    "combine_csvs": {"roots": ["csv"], "args": [("source_csvs", ""), ("output_csv", "Combined_Corpus"), ("source_column", "source")]},
-    "aggregate_dictionary": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Aggregated_Counts"), ("dict_column", "word_freq")]},
-    "group_aggregate": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Grouped_Output"), ("group_column", ""), ("value_column", ""), ("agg", "count"), ("exclude", "")]},
-    "top_n_by_column": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Top_N_Output"), ("sort_column", ""), ("n", 100), ("ascending", False)]},
-    "deduplicate": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Deduplicated_Output"), ("subset_column", "")]},
-    "select_columns": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Selected_Columns_Output"), ("columns", ""), ("drop", False)]},
-    "cross_tab": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Cross_Tab_Output"), ("row_column", ""), ("column_column", "")]},
-    "arithmetic": {"roots": ["csv"], "args": [("source_csv", ""), ("output_csv", "Arithmetic_Output"), ("column_a", ""), ("operation", "divide"), ("operand", ""), ("new_column_name", "result"), ("group_by", "")]},
-    # Annotation
-    "word_frequency": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("new_column_name", "word_freq"), ("ngram", 1)]},
-    "label_topics": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("new_column_name", "Topic_Label")]},
-    "text_length": {"roots": ["csv"], "args": [("csv_name", ""), ("text_column", "text"), ("new_column_name", "length"), ("unit", "words")]},
-    "extract_year": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "year")]},
-    "to_date": {"roots": ["csv"], "args": [("csv_name", ""), ("date_column", "publish_time"), ("new_column_name", "date")]},
-    "normalize_column": {"roots": ["csv"], "args": [("csv_name", ""), ("value_column", ""), ("new_column_name", "")]},
-    "hierarchical_cluster": {"roots": ["csv"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("embedding_column", "5d"), ("output_column", "hcluster"), ("n_clusters", 10)]},
-    # Visualization
-    "bar_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("series_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_bar_chart"), ("top_n", 25), ("exclude", "")]},
-    "scatter_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("color_column", ""), ("size_column", ""), ("coord_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_scatter")]},
-    "histogram": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("value_column", ""), ("bins", 30), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_histogram"), ("color_column", ""), ("log_x", False), ("log_y", False)]},
-    "line_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("color_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_line_chart")]},
-    "box_plot": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("value_column", ""), ("category_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_box_plot"), ("exclude", ""), ("log_y", False)]},
-    "heatmap": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("x_column", ""), ("y_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_heatmap")]},
-    "pie_chart": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("category_column", ""), ("value_column", ""), ("chart_title", ""), ("output_name", lambda c: f"{c['csv_name']}_pie_chart"), ("top_n", 10), ("exclude", "")]},
-    "hierarchical_dendrogram": {"roots": ["csv", "html"], "args": [("csv_name", ""), ("topic_column", "topic_id"), ("text_column", "text"), ("embedding_column", "5d"), ("output_name", lambda c: f"{c['csv_name']}_Dendrogram"), ("chart_title", ""), ("top_n", 30), ("orientation", "left")]},
-}
-
 ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root, "pdf": user_pdf_root}
 
 
-def _resolve_arg(cleaned: dict, field, default):
-    if field is not None and cleaned.get(field):
+def _resolve_arg(cleaned: dict, param: registry.Param):
+    """One positional argument for a queued task, from the submitted form data.
+
+    A submitted value wins when it is truthy; otherwise the param's registry default
+    applies. That default may be a callable taking the whole cleaned form, for the
+    few defaults computed from a sibling field (e.g. a chart's output_name, which
+    defaults to "<the chosen CSV>_bar_chart").
+    """
+    field = param.form_field
+    if field and cleaned.get(field):
         return cleaned[field]
-    return default(cleaned) if callable(default) else default
+    return param.default(cleaned) if callable(param.default) else param.default
 
 
 def _queue_task_for_user(user, action: str, cleaned: dict):
-    spec = TASK_SPECS.get(action)
-    if spec is None:
-        raise ValueError("Unknown action")
-    args = [_resolve_arg(cleaned, field, default) for field, default in spec["args"]]
-    root_kwargs = {f"{name}_root": str(ROOT_BUILDERS[name](user)) for name in spec["roots"]}
+    """Queue any pipeline function from cleaned form data.
+
+    The positional argument order and the storage roots come straight from the
+    registry, so this one path serves the dashboard form, the Studio's Run button and
+    the agent -- and none of them can drift out of step with the backend signature.
+    """
+    fn = registry.get(action)
+    args = [_resolve_arg(cleaned, param) for param in fn.params]
+    root_kwargs = {f"{name}_root": str(ROOT_BUILDERS[name](user)) for name in fn.roots}
     return queue_user_task(user, action, *args, **root_kwargs)
 
 
@@ -628,14 +607,6 @@ def studio_run(request):
     return JsonResponse({"tasks": queued})
 
 
-def _safe_template_name(raw: str) -> str:
-    """Sanitize a user-supplied template name to a filesystem-safe stem."""
-    safe = re.sub(r"[^\w.\-]", "_", (raw or "").strip()).strip("._ ")
-    if safe == Path(DESCRIPTIONS_FILE).stem:
-        return ""
-    return safe
-
-
 @login_required
 def list_templates(request):
     """The user's saved Studio templates (name + description) for the load dropdown."""
@@ -652,7 +623,7 @@ def save_template(request):
     except (ValueError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
-    name = _safe_template_name(payload.get("name", ""))
+    name = safe_name(payload.get("name", ""))
     if not name:
         return JsonResponse({"error": "Enter a valid template name."}, status=400)
 
@@ -685,14 +656,6 @@ def load_template(request, name):
 
 
 # --- Synthesize: research-paper documents (block-model JSON) -------------------
-def _safe_paper_name(raw: str) -> str:
-    """Sanitize a user-supplied paper name to a filesystem-safe stem."""
-    safe = re.sub(r"[^\w.\-]", "_", (raw or "").strip()).strip("._ ")
-    if safe == Path(DESCRIPTIONS_FILE).stem:
-        return ""
-    return safe
-
-
 @login_required
 def list_papers(request):
     """The user's saved papers (name + description) for the open/library UI."""
@@ -709,7 +672,7 @@ def save_paper(request):
     except (ValueError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
-    name = _safe_paper_name(payload.get("name", ""))
+    name = safe_name(payload.get("name", ""))
     if not name:
         return JsonResponse({"error": "Enter a valid paper name."}, status=400)
 
@@ -756,7 +719,7 @@ def build_paper(request):
     doc = payload.get("doc")
     if not isinstance(doc, dict):
         # Fall back to a saved paper by name.
-        name = _safe_paper_name(payload.get("name", ""))
+        name = safe_name(payload.get("name", ""))
         root = user_paper_root(request.user)
         path = resolve_safe_path(root, name, ".json") if name else None
         if path is None or not path.exists():
@@ -766,7 +729,7 @@ def build_paper(request):
         except (ValueError, OSError):
             return JsonResponse({"error": "Paper is corrupt."}, status=400)
 
-    output_name = _safe_paper_name(payload.get("output_name") or payload.get("name") or doc.get("title") or "")
+    output_name = safe_name(payload.get("output_name") or payload.get("name") or doc.get("title") or "")
     if not output_name:
         return JsonResponse({"error": "Give the built report a valid name."}, status=400)
 

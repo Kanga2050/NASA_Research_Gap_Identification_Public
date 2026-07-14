@@ -11,6 +11,7 @@
   {{ csv_names|json_script:"studio-csvs" }}
   {{ html_names|json_script:"synthesize-charts" }}
   {{ paper_files|json_script:"synthesize-papers" }}
+  {{ action_spec|json_script:"task-action-spec" }}
 
   <div class="tab-panel{% if active_tab == 'dashboard' %} active{% endif %}" data-tab="dashboard">
   <div class="layout">
@@ -313,7 +314,6 @@
                 <small class="placeholder">Ctrl/Cmd-click to pick one or more collections.</small>
                 <input type="hidden" name="folders" data-role="pdf-folders-value">
               {% elif field.name in column_field_names %}
-              {% elif field.name in column_field_names %}
                 <select name="{{ field.name }}" data-role="column-select" data-initial="{{ field.initial|default:'' }}">
                   <option value="">Select a CSV first&hellip;</option>
                 </select>
@@ -328,114 +328,13 @@
       </div>
       <script>
         (function () {
-          var ACTION_FIELDS = {
-            embed_text: ["csv_name", "text_column", "model_name"],
-            reduce_dimensionality: ["csv_name", "embedding_column", "output_column", "n_components"],
-            cluster: ["csv_name", "embedding_column", "output_column", "min_cluster_size", "min_samples"],
-            keyword_score: ["csv_name", "query", "text_column", "output_column"],
-            semantic_score: ["csv_name", "query", "embedding_column", "output_column"],
-            hybrid_score: ["csv_name", "keyword_col", "semantic_col", "output_column"],
-            word_frequency: ["csv_name", "text_column", "new_column_name", "ngram"],
-            label_topics: ["csv_name", "topic_column", "text_column", "new_column_name"],
-            text_length: ["csv_name", "text_column", "new_column_name", "unit"],
-            extract_year: ["csv_name", "date_column", "new_column_name"],
-            to_date: ["csv_name", "date_column", "new_column_name"],
-            normalize_column: ["csv_name", "value_column", "new_column_name"],
-            hierarchical_cluster: ["csv_name", "topic_column", "embedding_column", "output_column", "n_clusters"],
-            numerical_filter: ["source_csv", "output_csv", "target_score_column", "threshold"],
-            categorical_filter: ["source_csv", "output_csv", "target_column", "expected_value"],
-            top_n_by_column: ["source_csv", "output_csv", "sort_column", "n", "ascending"],
-            deduplicate: ["source_csv", "output_csv", "subset_column"],
-            select_columns: ["source_csv", "output_csv", "columns", "drop"],
-            group_aggregate: ["source_csv", "output_csv", "group_column", "value_column", "agg", "exclude"],
-            aggregate_dictionary: ["source_csv", "output_csv", "dict_column"],
-            cross_tab: ["source_csv", "output_csv", "row_column", "column_column"],
-            arithmetic: ["source_csv", "output_csv", "column_a", "operation", "operand", "new_column_name", "group_by"],
-            combine_csvs: ["source_csvs", "output_csv", "source_column"],
-            bar_chart: ["csv_name", "category_column", "value_column", "series_column", "chart_title", "output_name", "top_n", "exclude"],
-            scatter_plot: ["csv_name", "x_column", "y_column", "color_column", "size_column", "coord_column", "chart_title", "output_name"],
-            histogram: ["csv_name", "value_column", "bins", "chart_title", "output_name", "color_column", "log_x", "log_y"],
-            line_chart: ["csv_name", "x_column", "y_column", "color_column", "chart_title", "output_name"],
-            box_plot: ["csv_name", "value_column", "category_column", "chart_title", "output_name", "exclude", "log_y"],
-            heatmap: ["csv_name", "x_column", "y_column", "value_column", "chart_title", "output_name"],
-            pie_chart: ["csv_name", "category_column", "value_column", "chart_title", "output_name", "top_n", "exclude"],
-            distance_map: ["csv_name", "topic_column", "text_column", "embedding_column", "output_name", "chart_title"],
-            hierarchical_dendrogram: ["csv_name", "topic_column", "text_column", "embedding_column", "output_name", "chart_title", "top_n", "orientation"],
-            openalex_scraper: ["topic", "csv_name", "limit"],
-            chunk_pdfs: ["folders", "csv_name", "source_label", "chunk_words", "overlap_words", "enrich"],
-          };
-          var ACTION_COLUMN_FIELDS = {
-            embed_text: ["text_column"],
-            reduce_dimensionality: ["embedding_column"],
-            cluster: ["embedding_column"],
-            keyword_score: ["text_column"],
-            semantic_score: ["embedding_column"],
-            hybrid_score: ["keyword_col", "semantic_col"],
-            word_frequency: ["text_column"],
-            label_topics: ["topic_column", "text_column"],
-            text_length: ["text_column"],
-            extract_year: ["date_column"],
-            to_date: ["date_column"],
-            normalize_column: [],
-            hierarchical_cluster: ["topic_column", "embedding_column"],
-            numerical_filter: ["target_score_column"],
-            categorical_filter: ["target_column"],
-            top_n_by_column: ["sort_column"],
-            deduplicate: ["subset_column"],
-            select_columns: [],
-            group_aggregate: ["group_column"],
-            aggregate_dictionary: ["dict_column"],
-            cross_tab: ["row_column", "column_column"],
-            arithmetic: [],
-            combine_csvs: [],
-            bar_chart: [],
-            scatter_plot: [],
-            histogram: [],
-            line_chart: [],
-            box_plot: [],
-            heatmap: [],
-            pie_chart: [],
-            distance_map: ["topic_column", "text_column", "embedding_column"],
-            hierarchical_dendrogram: ["topic_column", "text_column", "embedding_column"],
-            openalex_scraper: [],
-            chunk_pdfs: [],
-          };
-          var ACTION_CSV_SOURCE = {
-            embed_text: "csv_name",
-            reduce_dimensionality: "csv_name",
-            cluster: "csv_name",
-            keyword_score: "csv_name",
-            semantic_score: "csv_name",
-            hybrid_score: "csv_name",
-            word_frequency: "csv_name",
-            label_topics: "csv_name",
-            text_length: "csv_name",
-            extract_year: "csv_name",
-            to_date: "csv_name",
-            normalize_column: "csv_name",
-            hierarchical_cluster: "csv_name",
-            numerical_filter: "source_csv",
-            categorical_filter: "source_csv",
-            top_n_by_column: "source_csv",
-            deduplicate: "source_csv",
-            select_columns: "source_csv",
-            group_aggregate: "source_csv",
-            aggregate_dictionary: "source_csv",
-            cross_tab: "source_csv",
-            arithmetic: "source_csv",
-            combine_csvs: null,
-            bar_chart: "csv_name",
-            scatter_plot: "csv_name",
-            histogram: "csv_name",
-            line_chart: "csv_name",
-            box_plot: "csv_name",
-            heatmap: "csv_name",
-            pie_chart: "csv_name",
-            distance_map: "csv_name",
-            hierarchical_dendrogram: "csv_name",
-            openalex_scraper: null,
-            chunk_pdfs: null,
-          };
+          // Which fields each action shows, which of them are CSV-column dropdowns, and
+          // which one picks its source CSV -- all derived from the backend function
+          // registry (see App/Backend/registry.py), so this page can never offer an
+          // argument the function does not take.
+          var ACTION_SPEC = JSON.parse(document.getElementById("task-action-spec").textContent);
+          var EMPTY_SPEC = { fields: [], columnFields: [], csvSource: null };
+          function specFor(action) { return ACTION_SPEC[action] || EMPTY_SPEC; }
 
           var form = document.getElementById("task-form");
           var actionSelect = form.querySelector("[data-field='action'] select, [data-field='action'] input");
@@ -446,7 +345,7 @@
           var columnSelects = form.querySelectorAll("[data-role='column-select']");
 
           function updateVisibility() {
-            var visible = ACTION_FIELDS[actionSelect.value] || [];
+            var visible = specFor(actionSelect.value).fields;
             fieldRows.forEach(function (row) {
               var name = row.getAttribute("data-field");
               if (name === "action" || visible.indexOf(name) !== -1) {
@@ -458,10 +357,10 @@
           }
 
           function updateCsvNameMode() {
-            // Actions that produce a brand-new CSV (ACTION_CSV_SOURCE === null, e.g.
-            // openalex_scraper, chunk_pdfs) name their output via the free-text box;
-            // everything else picks an existing CSV from the dropdown.
-            var producesNewCsv = ACTION_CSV_SOURCE[actionSelect.value] === null;
+            // Actions that produce a brand-new CSV (no csvSource -- e.g. openalex_scraper,
+            // chunk_pdfs) name their output via the free-text box; everything else picks
+            // an existing CSV from the dropdown.
+            var producesNewCsv = !specFor(actionSelect.value).csvSource;
             csvSelect.disabled = producesNewCsv;
             csvSelect.style.display = producesNewCsv ? "none" : "";
             csvText.disabled = !producesNewCsv;
@@ -469,7 +368,7 @@
           }
 
           function populateColumns(columns) {
-            var relevant = ACTION_COLUMN_FIELDS[actionSelect.value] || [];
+            var relevant = specFor(actionSelect.value).columnFields;
             columnSelects.forEach(function (select) {
               var fieldRow = select.closest("[data-field]");
               if (relevant.indexOf(fieldRow.getAttribute("data-field")) === -1) {
@@ -500,7 +399,7 @@
           }
 
           function refreshColumns() {
-            var source = ACTION_CSV_SOURCE[actionSelect.value];
+            var source = specFor(actionSelect.value).csvSource;
             var csvName = source === "csv_name" ? csvSelect.value : source === "source_csv" ? sourceCsvSelect.value : null;
             if (!csvName) {
               populateColumns([]);

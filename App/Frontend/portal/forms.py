@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
+from django.core.exceptions import ImproperlyConfigured
+
+from App.Backend import registry
 
 from .models import AgentSettings
 
@@ -34,45 +37,25 @@ class ApiKeyCreateForm(forms.Form):
 
 
 class TaskSubmitForm(forms.Form):
+    """The dashboard's "run a function" form.
+
+    The fields below are the flat union of every argument any pipeline function takes
+    -- the template shows only the ones the selected action uses. Which fields an
+    action actually consumes, and in what order they reach the backend, is the
+    registry's business, not this form's; the form only has to offer a widget for each
+    of the registry's `form_field` names, which `_check_form_covers_registry` (below)
+    enforces at import time.
+    """
+
     AGG_CHOICES = [("count", "count"), ("mean", "mean"), ("sum", "sum"), ("min", "min"), ("max", "max")]
     UNIT_CHOICES = [("words", "words"), ("chars", "chars")]
     OPERATION_CHOICES = [("add", "add"), ("subtract", "subtract"), ("multiply", "multiply"), ("divide", "divide")]
 
+    # Grouped by family so the dropdown reads in pipeline order (import -> annotate ->
+    # distill -> visualize) rather than in whatever order the registry lists them.
     ACTION_CHOICES = [
-        ("embed_text", "Embed text"),
-        ("reduce_dimensionality", "Reduce dimensionality"),
-        ("cluster", "Cluster"),
-        ("keyword_score", "Keyword score"),
-        ("semantic_score", "Semantic score"),
-        ("hybrid_score", "Hybrid score"),
-        ("word_frequency", "Word frequency (per row)"),
-        ("label_topics", "Label topics"),
-        ("text_length", "Text length"),
-        ("extract_year", "Extract year"),
-        ("to_date", "To date (ISO-8601)"),
-        ("normalize_column", "Normalize column"),
-        ("hierarchical_cluster", "Hierarchical cluster"),
-        ("numerical_filter", "Numerical filter"),
-        ("categorical_filter", "Categorical filter"),
-        ("top_n_by_column", "Top N by column"),
-        ("deduplicate", "Deduplicate"),
-        ("select_columns", "Select columns"),
-        ("group_aggregate", "Group aggregate"),
-        ("aggregate_dictionary", "Aggregate dictionary"),
-        ("cross_tab", "Cross tab"),
-        ("arithmetic", "Arithmetic"),
-        ("combine_csvs", "Combine CSVs"),
-        ("bar_chart", "Bar chart"),
-        ("scatter_plot", "Scatter plot"),
-        ("histogram", "Histogram"),
-        ("line_chart", "Line chart"),
-        ("box_plot", "Box plot"),
-        ("heatmap", "Heatmap"),
-        ("pie_chart", "Pie chart"),
-        ("distance_map", "Distance map"),
-        ("hierarchical_dendrogram", "Hierarchical dendrogram"),
-        ("openalex_scraper", "OpenAlex scrape"),
-        ("chunk_pdfs", "Chunk PDFs"),
+        (category.title(), [(fn.name, fn.label) for fn in registry.by_category(category)])
+        for category in ("annotation", "distillation", "visualization", "import")
     ]
 
     action = forms.ChoiceField(choices=ACTION_CHOICES)
@@ -150,3 +133,26 @@ class TaskSubmitForm(forms.Form):
         choices=[("left", "left"), ("right", "right"), ("bottom", "bottom"), ("top", "top")],
         required=False, initial="left",
     )
+
+
+def _check_form_covers_registry() -> None:
+    """Fail loudly, at import, if a registry function needs a form field this form does
+    not declare -- otherwise that argument would silently submit as blank and the task
+    would run with a wrong default. This is the guard that lets the registry and the
+    form be edited independently without them quietly drifting apart.
+    """
+    declared = set(TaskSubmitForm.base_fields)
+    missing = {
+        f"{fn.name}.{field}"
+        for fn in registry.ALL_FUNCTIONS
+        for field in fn.form_fields
+        if field not in declared
+    }
+    if missing:
+        raise ImproperlyConfigured(
+            "TaskSubmitForm is missing a field for these registry params: "
+            + ", ".join(sorted(missing))
+        )
+
+
+_check_form_covers_registry()

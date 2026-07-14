@@ -111,13 +111,6 @@ def pdf_folder_choices(user) -> list[str]:
     return user_names + public_names
 
 
-def list_csv_columns(user, csv_name: str) -> list[str]:
-    csv_path = resolve_safe_path(user_csv_root(user), csv_name, ".csv")
-    if csv_path is None or not csv_path.exists():
-        return []
-    return list(pd.read_csv(csv_path, nrows=0).columns)
-
-
 def _is_embedding_cell(value) -> bool:
     """A cell holds a (multi-dimensional) embedding when it stringifies a Python
     list with more than one element -- how Embed_Text/Reduce_Dimensionality store
