@@ -190,11 +190,45 @@ def _render_table(block: dict) -> str:
     return "".join(out)
 
 
+def assign_numbers(doc: dict) -> dict:
+    """Auto-number the document's headings, in place.
+
+    Headings count 1, 2, 3…; each sub-heading is numbered within its parent
+    heading (2.1, 2.2, …) and the sub-counter resets at every new heading. A block
+    with ``"unnumbered": true`` is skipped and takes no number (and, for a heading,
+    does not advance the counter). Sub-headings before the first heading are left
+    unnumbered. The stored ``num`` is always overwritten, so the numbering can never
+    drift from the document order — insert or delete a section and everything after
+    it renumbers itself. The editor (synthesize.js ``assignNumbers``) applies the
+    identical rule, so the canvas and the built report always agree.
+    """
+    heading_n = 0
+    sub_n = 0
+    for block in (doc.get("blocks") or []):
+        kind = block.get("type")
+        if kind == "heading":
+            if block.get("unnumbered"):
+                block["num"] = ""
+                continue
+            heading_n += 1
+            sub_n = 0
+            block["num"] = str(heading_n)
+        elif kind == "subheading":
+            if block.get("unnumbered") or heading_n == 0:
+                block["num"] = ""
+                continue
+            sub_n += 1
+            block["num"] = f"{heading_n}.{sub_n}"
+    return doc
+
+
 def render_fragment(doc: dict) -> str:
     """Render the whole document to the ``<div class="page">…</div>`` fragment.
     Figures are emitted as ``<img class="fig-img" data-shot="NAME">`` placeholders
-    that ``build_paper_html`` later swaps for live charts. Figures are auto-numbered
-    and the References block is auto-generated from ``doc['sources']``."""
+    that ``build_paper_html`` later swaps for live charts. Figures are auto-numbered,
+    headings/sub-headings are numbered by ``assign_numbers``, and the References
+    block is auto-generated from ``doc['sources']``."""
+    assign_numbers(doc)
     blocks = doc.get("blocks") or []
     sources = doc.get("sources") or []
     out = ["<div class=\"page\">"]

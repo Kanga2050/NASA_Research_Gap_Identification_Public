@@ -97,6 +97,24 @@
             <li class="placeholder">No templates yet. Save one in the Studio.</li>
           {% endfor %}
         </ul>
+        <h3>Papers <span class="info-icon" tabindex="0" data-tip="Research papers written in the Synthesize tab. Build one to turn it into an interactive report in Visualizations.">i</span></h3>
+        <ul class="file-list">
+          {% for f in paper_files %}
+            <li class="file-row" data-kind="paper" data-name="{{ f.name }}">
+              <div class="file-main">
+                <span class="file-name">{{ f.name }}.json</span>
+                <span class="file-actions">
+                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
+                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
+                  <button type="button" class="file-delete" title="Delete">Delete</button>
+                </span>
+              </div>
+              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
+            </li>
+          {% empty %}
+            <li class="placeholder">No papers yet. Write one in the Synthesize tab.</li>
+          {% endfor %}
+        </ul>
       </div>
       <script>
         (function () {
@@ -145,8 +163,8 @@
           var lib = document.getElementById("public-library");
           if (lib) {
             var IMPORT_URL = lib.getAttribute("data-import-url");
-            var SUFFIX = { csv: ".csv", html: ".html", template: ".json" };
-            var LABELS = { csv: "Data", html: "Visualizations", template: "Templates" };
+            var SUFFIX = { csv: ".csv", html: ".html", template: ".json", paper: ".json" };
+            var LABELS = { csv: "Data", html: "Visualizations", template: "Templates", paper: "Papers" };
             function group(kind, items) {
               if (!items.length) return "";
               var rows = items.map(function (it) {
@@ -160,7 +178,7 @@
             fetch(lib.getAttribute("data-url"), { credentials: "same-origin" })
               .then(function (r) { return r.json(); })
               .then(function (d) {
-                var html = ["csv", "html", "template"].map(function (k) { return group(k, d[k] || []); }).join("");
+                var html = ["csv", "html", "template", "paper"].map(function (k) { return group(k, d[k] || []); }).join("");
                 lib.innerHTML = html || '<p class="placeholder">The public library is empty.</p>';
               })
               .catch(function () { lib.innerHTML = '<p class="placeholder">Could not load the public library.</p>'; });
@@ -766,116 +784,6 @@
       </div>
     </div>
 
-    <div class="agent-panel">
-      <div class="agent-header">
-        <h2>Assistant <span class="info-icon" tabindex="0" data-tip="A chat assistant that can answer questions about your data and queue pipeline steps for you.">i</span></h2>
-        <button type="button" id="agent-reset" class="agent-reset" title="Clear conversation">Clear</button>
-      </div>
-      <div class="agent-log" id="agent-log">
-        {% for message in agent_history %}
-          <div class="agent-msg {{ message.role }}">{{ message.content }}</div>
-        {% endfor %}
-        <p class="placeholder agent-empty" id="agent-empty"{% if agent_history %} style="display:none"{% endif %}>
-          Ask the assistant about your CSV and HTML files, or have it queue a pipeline step. It's powered by Gemini and connected to your data through the platform's MCP server.
-        </p>
-      </div>
-      {% if not agent_ready %}
-        <div class="message error">Assistant unavailable: the <code>google-genai</code> package is not installed on the server.</div>
-      {% elif not agent_has_key %}
-        <div class="message">Add your Gemini API key in <a href="{% url 'account_settings' %}">Settings</a> to use the assistant.</div>
-      {% endif %}
-      <form class="agent-form" id="agent-form">
-        <textarea id="agent-input" name="message" rows="2" placeholder="Message the assistant…" {% if not agent_ready or not agent_has_key %}disabled{% endif %}></textarea>
-        <button type="submit" id="agent-send" {% if not agent_ready or not agent_has_key %}disabled{% endif %}>Send</button>
-      </form>
-      <script>
-        (function () {
-          var CSRF = "{{ csrf_token }}";
-          var form = document.getElementById("agent-form");
-          var input = document.getElementById("agent-input");
-          var sendBtn = document.getElementById("agent-send");
-          var log = document.getElementById("agent-log");
-          var empty = document.getElementById("agent-empty");
-          var resetBtn = document.getElementById("agent-reset");
-
-          function scrollToBottom() { log.scrollTop = log.scrollHeight; }
-
-          function addMessage(role, text) {
-            if (empty) empty.style.display = "none";
-            var el = document.createElement("div");
-            el.className = "agent-msg " + role;
-            el.textContent = text;
-            log.appendChild(el);
-            scrollToBottom();
-            return el;
-          }
-
-          function setBusy(busy) {
-            input.disabled = busy;
-            sendBtn.disabled = busy;
-          }
-
-          scrollToBottom();
-
-          form.addEventListener("submit", function (e) {
-            e.preventDefault();
-            var text = input.value.trim();
-            if (!text) return;
-
-            addMessage("user", text);
-            input.value = "";
-            setBusy(true);
-            var pending = addMessage("assistant pending", "Thinking…");
-
-            fetch("{% url 'agent_chat' %}", {
-              method: "POST",
-              headers: {
-                "X-CSRFToken": CSRF,
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: "message=" + encodeURIComponent(text),
-            })
-              .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-              .then(function (res) {
-                pending.classList.remove("pending");
-                if (res.ok && res.data.reply) {
-                  pending.textContent = res.data.reply;
-                } else {
-                  pending.classList.add("error-msg");
-                  pending.textContent = res.data.error || "The assistant could not respond.";
-                }
-                scrollToBottom();
-              })
-              .catch(function () {
-                pending.classList.remove("pending");
-                pending.classList.add("error-msg");
-                pending.textContent = "Network error. Please try again.";
-              })
-              .finally(function () {
-                setBusy(false);
-                input.focus();
-              });
-          });
-
-          input.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              form.requestSubmit();
-            }
-          });
-
-          resetBtn.addEventListener("click", function () {
-            fetch("{% url 'agent_reset' %}", {
-              method: "POST",
-              headers: { "X-CSRFToken": CSRF },
-            }).then(function () {
-              log.querySelectorAll(".agent-msg").forEach(function (n) { n.remove(); });
-              if (empty) empty.style.display = "";
-            });
-          });
-        })();
-      </script>
-    </div>
   </div>
   </div>
 
@@ -961,11 +869,6 @@
         <div class="synth-status" id="synth-status"></div>
       </div>
 
-      <div class="card synth-insert-card">
-        <h2>Add section <span class="info-icon" tabindex="0" data-tip="Insert a new block at the end of the paper. Hover any block to drag-reorder or delete it.">i</span></h2>
-        <div class="synth-add-grid" id="synth-add-grid"></div>
-      </div>
-
       <div class="card synth-sources-card">
         <h2>Sources <span class="info-icon" tabindex="0" data-tip="Add a source once; cite it inline from the selection toolbar. References are numbered and formatted automatically.">i</span></h2>
         <div id="synth-sources-list"></div>
@@ -974,7 +877,7 @@
     </aside>
 
     <div class="synth-canvas">
-      <div class="synth-canvas-hint">Click any text to edit · select text for <b>B</b>/<i>I</i>/cite · hover a block for drag &amp; delete</div>
+      <div class="synth-canvas-hint">Click any text to edit · <b>hover between sections for +</b> to insert · select text for <b>B</b>/<i>I</i>/cite · hover a block to drag or delete</div>
       <div class="synthesize-doc" id="synthesize-doc">
         <div class="page" id="synth-page"></div>
       </div>
@@ -991,7 +894,49 @@
   </div>
   </div>
 
+  {# The assistant floats ABOVE every tab (it lives outside all .tab-panel wrappers),
+     because it can work on all three: your data and charts, the Studio's pipelines,
+     and the paper open in Synthesize. #}
+  <button type="button" class="agent-fab" id="agent-fab" aria-expanded="false"
+          title="Assistant (works across all three tabs)">
+    <span class="agent-fab-icon">✦</span><span>Assistant</span>
+  </button>
+
+  <div class="agent-dock" id="agent-dock" data-csrf="{{ csrf_token }}"
+       data-chat-url="{% url 'agent_chat' %}" data-reset-url="{% url 'agent_reset' %}" hidden>
+    <div class="agent-panel">
+      <div class="agent-header">
+        <h2>Assistant <span class="info-icon" tabindex="0" data-tip="A chat assistant with tools for all three tabs: it can inspect your data and queue pipeline steps, read and run Studio pipelines, and read, edit and build the paper open in Synthesize.">i</span></h2>
+        <div class="agent-header-actions">
+          <button type="button" id="agent-reset" class="agent-reset" title="Clear conversation">Clear</button>
+          <button type="button" id="agent-close" class="agent-reset" title="Hide the assistant">✕</button>
+        </div>
+      </div>
+      <div class="agent-context" id="agent-context"></div>
+      <div class="agent-log" id="agent-log">
+        {% for message in agent_history %}
+          <div class="agent-msg {{ message.role }}">{{ message.content }}</div>
+        {% endfor %}
+        <p class="placeholder agent-empty" id="agent-empty"{% if agent_history %} style="display:none"{% endif %}>
+          Ask about your CSVs and charts, have it queue a pipeline step or run a Studio
+          pipeline, or ask it to write, edit and build the paper you have open in Synthesize.
+          It's powered by Gemini and connected to your account through the platform's MCP server.
+        </p>
+      </div>
+      {% if not agent_ready %}
+        <div class="message error">Assistant unavailable: the <code>google-genai</code> package is not installed on the server.</div>
+      {% elif not agent_has_key %}
+        <div class="message">Add your Gemini API key in <a href="{% url 'account_settings' %}">Settings</a> to use the assistant.</div>
+      {% endif %}
+      <form class="agent-form" id="agent-form">
+        <textarea id="agent-input" name="message" rows="2" placeholder="Message the assistant…" {% if not agent_ready or not agent_has_key %}disabled{% endif %}></textarea>
+        <button type="submit" id="agent-send" {% if not agent_ready or not agent_has_key %}disabled{% endif %}>Send</button>
+      </form>
+    </div>
+  </div>
+
   <script src="{% static_versioned 'portal/vendor/drawflow.min.js' %}"></script>
   <script src="{% static_versioned 'portal/js/studio.js' %}"></script>
   <script src="{% static_versioned 'portal/js/synthesize.js' %}"></script>
+  <script src="{% static_versioned 'portal/js/agent.js' %}"></script>
 {% endblock %}

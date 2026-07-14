@@ -38,7 +38,6 @@
   var titleInput = document.getElementById("synth-title-input");
   var openSel = document.getElementById("synth-open");
   var statusEl = document.getElementById("synth-status");
-  var addGrid = document.getElementById("synth-add-grid");
   var sourcesList = document.getElementById("synth-sources-list");
   var inlineBar = document.getElementById("synth-inline-toolbar");
 
@@ -88,6 +87,9 @@
     node.childNodes.forEach(function (ch) {
       if (ch.nodeType === 3) { out += escText(ch.nodeValue); return; }
       if (ch.nodeType !== 1) return;
+      // Editor chrome living inside an editable (the ✕ handles, the figure picker)
+      // is not part of the text — drop the whole subtree rather than its letters.
+      if (ch.getAttribute("contenteditable") === "false") return;
       var tag = ch.tagName;
       if (tag === "STRONG") tag = "B";
       if (tag === "EM") tag = "I";
@@ -147,6 +149,38 @@
       + '>' + (html || "") + '</' + (cls === "b" ? "b" : "span") + '>';
   }
 
+  /* Heading numbers are derived, never typed: headings count 1, 2, 3… and each
+     sub-heading is numbered inside its parent (2.1, 2.2, …), with the sub-counter
+     resetting at every heading. Insert or delete a section and everything after it
+     renumbers itself. Mirrors Paper_Builder.assign_numbers so the canvas and the
+     built report always show the same numbers. `unnumbered: true` opts a heading out. */
+  function assignNumbers() {
+    var h = 0, s = 0;
+    doc.blocks.forEach(function (b) {
+      if (b.type === "heading") {
+        if (b.unnumbered) { b.num = ""; return; }
+        h += 1; s = 0; b.num = String(h);
+      } else if (b.type === "subheading") {
+        if (b.unnumbered || h === 0) { b.num = ""; return; }
+        s += 1; b.num = h + "." + s;
+      }
+    });
+  }
+  /* A delete handle for one item *inside* a block — a list item, a paragraph of an
+     abstract/callout, a byline field, a table row or column — the small-scale twin of
+     the section 🗑. `path` is where the item lives in the model ("items:2", "paras:0",
+     "rows:3", "cols:1"). It renders inside the item's own editable element, so it must
+     be contenteditable="false" (cleanNode drops it on read-back) and absolutely
+     positioned (synthesize.css) — nothing in the paper may shift when it appears. */
+  function delBtn(path, title) {
+    return '<button type="button" class="synth-x" contenteditable="false" tabindex="-1"'
+      + ' data-del="' + escAttr(path) + '" title="' + escAttr(title) + '">&#10005;</button>';
+  }
+
+  function numSpan(b) {
+    return b.num ? '<span class="num" contenteditable="false">' + escText(b.num) + '</span> ' : "";
+  }
+
   function figureNumber(idx) {
     var n = 0;
     for (var i = 0; i <= idx; i++) if (doc.blocks[i] && doc.blocks[i].type === "figure") n++;
@@ -160,7 +194,8 @@
           + 'data-placeholder="Subtitle / deck">' + (b.html || "") + '</div>';
       case "byline": {
         var items = (b.items || []).map(function (it, i) {
-          return '<span><b>' + ed("items:" + i + ":label", "s", "Label", escText(it.label))
+          return '<span>' + delBtn("items:" + i, "Delete this field")
+            + '<b>' + ed("items:" + i + ":label", "s", "Label", escText(it.label))
             + ':</b> ' + ed("items:" + i + ":value", "s", "value", it.value || "") + '</span>';
         }).join("");
         return '<div class="byline">' + items + '</div>'
@@ -173,7 +208,8 @@
       case "abstract": {
         var paras = (b.paras || []).map(function (p, i) {
           return '<p contenteditable="true" data-field="paras:' + i + '" '
-            + 'data-placeholder="Abstract paragraph">' + (p || "") + '</p>';
+            + 'data-placeholder="Abstract paragraph">'
+            + delBtn("paras:" + i, "Delete this paragraph") + (p || "") + '</p>';
         }).join("");
         return '<div class="abstract"><div class="abstract-h">Abstract</div>' + paras + '</div>'
           + editRow('<button data-act="abstract-add">+ paragraph</button>');
@@ -182,15 +218,22 @@
         return '<p class="kw"><b>Keywords:</b> '
           + '<span contenteditable="true" data-field="html" data-placeholder="kw · kw · kw">'
           + (b.html || "") + '</span></p>';
+      // Headings: the number is derived from document order (see assignNumbers) and is
+      // NOT editable; the title is its own box, so you edit the words without ever
+      // touching the numbering.
       case "heading":
-        return '<h2>' + ed("num", "s", "#", escText(b.num)) + ' '
-          + '<span contenteditable="true" data-field="text" data-placeholder="Section heading">'
-          + escText(b.text) + '</span></h2>';
+        return '<h2>' + numSpan(b)
+          + '<span class="synth-h-title" contenteditable="true" data-field="text" '
+          + 'data-placeholder="Section heading">' + escText(b.text) + '</span></h2>';
       case "subheading":
-        return '<h3>' + ed("num", "s", "#", escText(b.num)) + ' '
-          + '<span contenteditable="true" data-field="text" data-placeholder="Sub-section heading">'
-          + escText(b.text) + '</span>'
-          + (b.tag ? ' <span class="tag">' + escText(b.tag) + '</span>' : '') + '</h3>';
+        return '<h3>' + numSpan(b)
+          + '<span class="synth-h-title" contenteditable="true" data-field="text" '
+          + 'data-placeholder="Sub-section heading">' + escText(b.text) + '</span>'
+          + (b.tag
+            ? ' <span class="tag synth-h-tag" contenteditable="true" data-field="tag">'
+              + escText(b.tag) + '</span>'
+            : '')
+          + '</h3>';
       case "paragraph":
         return '<p' + (b.variant === "lead" ? ' class="lead"' : '') + ' contenteditable="true" '
           + 'data-field="html" data-placeholder="Write a paragraph… (select text for bold / italic / cite)">'
@@ -215,25 +258,34 @@
           + ed("headline", "b", "Headline.", b.headline || "") + ' '
           + '<span contenteditable="true" data-field="caption" data-placeholder="Caption text">'
           + (b.caption || "") + '</span></figcaption>';
-        return '<figure>' + picker + preview + cap + '</figure>';
+        return '<figure' + (b.chart ? '' : ' class="no-chart"') + '>' + picker + preview + cap + '</figure>';
       }
       case "callout": {
         var vcls = (b.variant === "key" || b.variant === "danger") ? " " + b.variant : "";
+        // A callout's body is `paras` (one string per paragraph), like the builder's.
+        var cbody = (b.paras || []).map(function (p, i) {
+          return '<p contenteditable="true" data-field="paras:' + i + '" '
+            + 'data-placeholder="Callout body">'
+            + delBtn("paras:" + i, "Delete this paragraph") + (p || "") + '</p>';
+        }).join("");
         return '<div class="callout' + vcls + '">'
           + '<div class="callout-h" contenteditable="true" data-field="title" data-placeholder="Callout title">'
-          + escText(b.title) + '</div>'
-          + '<p contenteditable="true" data-field="html" data-placeholder="Callout body">'
-          + (b.html || "") + '</p></div>';
+          + escText(b.title) + '</div>' + cbody + '</div>'
+          + editRow('<button data-act="paras-add">+ paragraph</button>');
       }
       case "table": {
+        // Each header cell carries the handle that deletes its whole column; the first
+        // cell of each row carries the handle that deletes the row.
         var head = (b.head || []).map(function (h, c) {
-          return '<th contenteditable="true" data-field="head:' + c + '">' + escText(h) + '</th>';
+          return '<th contenteditable="true" data-field="head:' + c + '">'
+            + delBtn("cols:" + c, "Delete this column") + escText(h) + '</th>';
         }).join("");
         var rows = (b.rows || []).map(function (row, r) {
           var cells = row.map(function (cell, c) {
             var val = (cell && typeof cell === "object") ? (cell.html || "") : escText(cell);
             var cls = (cell && typeof cell === "object" && cell.cls) ? ' class="' + escAttr(cell.cls) + '"' : "";
-            return '<td' + cls + ' contenteditable="true" data-field="rows:' + r + ':' + c + '">' + val + '</td>';
+            return '<td' + cls + ' contenteditable="true" data-field="rows:' + r + ':' + c + '">'
+              + (c === 0 ? delBtn("rows:" + r, "Delete this row") : "") + val + '</td>';
           }).join("");
           return '<tr>' + cells + '</tr>';
         }).join("");
@@ -243,7 +295,7 @@
       case "list": {
         var items = (b.items || []).map(function (it, i) {
           return '<li contenteditable="true" data-field="items:' + i + '" data-placeholder="List item">'
-            + (it || "") + '</li>';
+            + delBtn("items:" + i, "Delete this item") + (it || "") + '</li>';
         }).join("");
         return '<ul class="tight">' + items + '</ul>'
           + editRow('<button data-act="li-add">+ item</button>');
@@ -284,22 +336,54 @@
   }
 
   function render() {
+    assignNumbers();
     titleInput.value = doc.title || "";
     page.innerHTML = "";
+    // The paper's <h1>, editable in place (the builder emits it from doc.title too).
+    var h1 = document.createElement("h1");
+    h1.setAttribute("contenteditable", "true");
+    h1.setAttribute("data-doc-title", "");
+    h1.setAttribute("data-placeholder", "Paper title");
+    h1.textContent = doc.title || "";
+    page.appendChild(h1);
     doc.blocks.forEach(function (b, idx) {
+      page.appendChild(gapEl(idx));
       var wrap = document.createElement("div");
       wrap.className = "synth-block";
       wrap.setAttribute("data-idx", idx);
-      wrap.innerHTML = blockInner(b, idx) + blockTools();
+      wrap.innerHTML = blockInner(b, idx) + blockTools(b);
       page.appendChild(wrap);
     });
+    page.appendChild(gapEl(doc.blocks.length));   // trailing gap, so you can append at the end
+    markAllEmpty();
     renderSources();
     autosave();
   }
 
-  function blockTools() {
+  /* An insertion point between two sections. The gap is a zero-height,
+     self-collapsing box, so adjacent block margins still collapse through it and
+     the page keeps the exact spacing of the built report. Its affordance (rule +
+     "+" button) is absolutely positioned and transparent until hovered — so at
+     rest the gap is plain white and the canvas looks exactly like the paper. */
+  function gapEl(i) {
+    var g = document.createElement("div");
+    g.className = "synth-gap";
+    g.setAttribute("data-gap", i);
+    g.innerHTML = '<div class="synth-gap-inner">'
+      + '<span class="synth-gap-line"></span>'
+      + '<button type="button" class="synth-gap-btn" title="Add a section here">+</button>'
+      + '<span class="synth-gap-line"></span></div>';
+    return g;
+  }
+
+  function blockTools(b) {
+    // A sub-heading with no pill yet gets an "add tag" button here rather than an
+    // empty inline pill, so an untagged sub-heading looks exactly like the paper's.
+    var tagBtn = (b && b.type === "subheading" && !b.tag)
+      ? '<button data-tool="tag" title="Add a tag pill">＋tag</button>' : "";
     return '<div class="synth-block-tools" contenteditable="false">'
       + '<button class="synth-drag" data-tool="drag" title="Drag to reorder" draggable="true">⠿</button>'
+      + tagBtn
       + '<button data-tool="up" title="Move up">↑</button>'
       + '<button data-tool="down" title="Move down">↓</button>'
       + '<button class="danger" data-tool="del" title="Delete section">🗑</button>'
@@ -313,18 +397,25 @@
     if (!doc.sources) doc.sources = [];
     sourcesList.innerHTML = "";
     doc.sources.forEach(function (s, i) {
+      var hasText = !!(s.text && s.text.trim());
       var row = document.createElement("div");
       row.className = "synth-source-row";
       row.setAttribute("data-si", i);
       row.innerHTML =
         '<div class="synth-source-head"><span class="synth-source-n">[' + (i + 1) + ']</span>'
         + '<span class="synth-source-cite">cite → sup ' + (i + 1) + '</span></div>'
+        + '<textarea data-src-field="text" rows="3" placeholder="Full citation — HTML allowed '
+        + '(&lt;i&gt;, &lt;a href&gt;). Leave empty to compose from the fields below.">'
+        + escText(s.text || "") + '</textarea>'
+        + '<details class="synth-src-fields"' + (hasText ? "" : " open") + '>'
+        + '<summary>Compose from fields' + (hasText ? " (ignored — full citation is set)" : "") + '</summary>'
         + srcInput(i, "authors", "Authors", s.authors)
         + srcInput(i, "title", "Title", s.title)
         + srcInput(i, "journal", "Journal", s.journal)
         + srcInput(i, "year", "Year", s.year)
         + srcInput(i, "url", "URL", s.url)
         + srcInput(i, "doi", "DOI", s.doi)
+        + '</details>'
         + '<div class="synth-src-actions">'
         + '<button class="btn-secondary" data-src-up>↑</button>'
         + '<button class="btn-secondary" data-src-down>↓</button>'
@@ -341,14 +432,14 @@
   //  Add-section palette
   // ========================================================================
   var ADD_ITEMS = [
-    ["heading", "Header", function () { return { type: "heading", num: "", text: "New section" }; }],
-    ["subheading", "Sub-header", function () { return { type: "subheading", num: "", text: "New subsection", tag: "" }; }],
+    ["heading", "Header", function () { return { type: "heading", text: "New section" }; }],
+    ["subheading", "Sub-header", function () { return { type: "subheading", text: "New subsection", tag: "" }; }],
     ["paragraph", "Paragraph", function () { return { type: "paragraph", variant: "normal", html: "" }; }],
     ["lead", "Lead ¶", function () { return { type: "paragraph", variant: "lead", html: "" }; }],
     ["figure", "Figure", function () { return { type: "figure", chart: "", alt: "", headline: "", caption: "", height: 500, new: false }; }],
-    ["callout", "Callout", function () { return { type: "callout", variant: "", title: "Note", html: "" }; }],
-    ["key", "Key box", function () { return { type: "callout", variant: "key", title: "Why this matters", html: "" }; }],
-    ["danger", "Danger box", function () { return { type: "callout", variant: "danger", title: "The key point", html: "" }; }],
+    ["callout", "Callout", function () { return { type: "callout", variant: "", title: "Note", paras: [""] }; }],
+    ["key", "Key box", function () { return { type: "callout", variant: "key", title: "Why this matters", paras: [""] }; }],
+    ["danger", "Danger box", function () { return { type: "callout", variant: "danger", title: "The key point", paras: [""] }; }],
     ["table", "Table", function () { return { type: "table", head: ["Column A", "Column B"], rows: [["", ""], ["", ""]] }; }],
     ["list", "List", function () { return { type: "list", items: [""] }; }],
     ["divider", "Divider", function () { return { type: "divider" }; }],
@@ -360,25 +451,51 @@
     ["banner", "Banner", function () { return { type: "interactive", html: "Every figure in this report is a <b>live, interactive Plotly chart</b> — hover, zoom, pan." }; }],
     ["footnote", "Footnote", function () { return { type: "footnote", html: "" }; }]
   ];
-  function buildAddGrid() {
-    addGrid.innerHTML = ADD_ITEMS.map(function (it) {
-      return '<button data-add="' + it[0] + '">+ ' + escText(it[1]) + '</button>';
-    }).join("");
-  }
-  function addBlock(key) {
+  // Insert a new block AT `at` (the gap index the "+" was clicked on).
+  function addBlock(key, at) {
     for (var i = 0; i < ADD_ITEMS.length; i++) {
-      if (ADD_ITEMS[i][0] === key) {
-        doc.blocks.push(ADD_ITEMS[i][2]());
-        render();
-        var last = page.lastElementChild;
-        if (last) {
-          last.scrollIntoView({ behavior: "smooth", block: "center" });
-          var editable = last.querySelector('[contenteditable="true"]');
-          if (editable) editable.focus();
-        }
-        return;
+      if (ADD_ITEMS[i][0] !== key) continue;
+      syncFromDom();
+      if (at == null || at < 0 || at > doc.blocks.length) at = doc.blocks.length;
+      doc.blocks.splice(at, 0, ADD_ITEMS[i][2]());
+      render();
+      var wrap = page.querySelector('.synth-block[data-idx="' + at + '"]');
+      if (wrap) {
+        wrap.scrollIntoView({ behavior: "smooth", block: "center" });
+        var editable = wrap.querySelector('[contenteditable="true"]');
+        if (editable) editable.focus();
       }
+      return;
     }
+  }
+
+  // The "+" between sections opens this menu of section types.
+  function openAddMenu(at, anchor) {
+    closePopover();
+    var gap = anchor.closest(".synth-gap");
+    if (gap) gap.classList.add("open");
+    popover = document.createElement("div");
+    popover.className = "synth-popover synth-add-pop";
+    popover.innerHTML = '<div class="synth-add-menu">' + ADD_ITEMS.map(function (it) {
+      return '<button type="button" data-add="' + it[0] + '">' + escText(it[1]) + '</button>';
+    }).join("") + '</div>';
+    document.body.appendChild(popover);
+    var r = anchor.getBoundingClientRect();
+    var top = r.bottom + 6;
+    var left = Math.max(8, Math.min(r.left - 110, window.innerWidth - 280));
+    popover.style.left = left + "px";
+    popover.style.top = top + "px";
+    // Flip above if it would overflow the viewport bottom.
+    var pr = popover.getBoundingClientRect();
+    if (pr.bottom > window.innerHeight - 8) {
+      popover.style.top = Math.max(8, r.top - pr.height - 6) + "px";
+    }
+    popover.addEventListener("click", function (e) {
+      var key = e.target.getAttribute && e.target.getAttribute("data-add");
+      if (!key) return;
+      closePopover();
+      addBlock(key, at);
+    });
   }
 
   // ========================================================================
@@ -393,11 +510,18 @@
   page.addEventListener("input", function (e) {
     var el = e.target;
     if (!el.getAttribute) return;
+    if (el.hasAttribute("data-doc-title")) {      // the in-canvas <h1>
+      doc.title = el.textContent;
+      titleInput.value = doc.title;
+      autosave();
+      return;
+    }
     var field = el.getAttribute("data-field");
     var idx = blockIndexOf(el);
     if (field == null || idx < 0) return;
     var val = isRichEl(el) ? cleanInline(el.innerHTML) : el.textContent;
     setField(doc.blocks[idx], field, val);
+    markEmpty(el);
     autosave();
   });
 
@@ -414,21 +538,59 @@
     if (e.key !== "Enter" || e.shiftKey) return;
     var el = e.target;
     if (el.getAttribute && el.getAttribute("contenteditable") === "true") {
-      // In list items / abstract paras, Enter adds a sibling; elsewhere ignore.
+      // In a list item / a paragraph of an abstract or callout, Enter opens a fresh one
+      // right below the one you're in; everywhere else it does nothing (a block is a
+      // block — you split the paper with the "+" between sections).
       var idx = blockIndexOf(el);
-      var field = el.getAttribute("data-field") || "";
-      if (idx >= 0 && el.tagName === "LI") {
-        e.preventDefault(); syncFromDom(); doc.blocks[idx].items.push(""); render(); focusField(idx, "items:" + (doc.blocks[idx].items.length - 1));
-      } else if (idx >= 0 && /^paras:/.test(field)) {
-        e.preventDefault(); syncFromDom(); doc.blocks[idx].paras.push(""); render(); focusField(idx, "paras:" + (doc.blocks[idx].paras.length - 1));
-      } else {
-        e.preventDefault();
-      }
+      var m = /^(items|paras):(\d+)$/.exec(el.getAttribute("data-field") || "");
+      e.preventDefault();
+      if (idx < 0 || !m) return;
+      var key = m[1], at = +m[2] + 1;
+      syncFromDom();
+      doc.blocks[idx][key].splice(at, 0, "");
+      render();
+      focusField(idx, key + ":" + at);
     }
   });
 
+  // Backspace in an already-empty list item / paragraph removes it and joins the caret
+  // to the one above — the keyboard twin of its ✕ handle. The last remaining item stays
+  // (delete the section itself with its 🗑), so you can never backspace a block away.
+  page.addEventListener("keydown", function (e) {
+    if (e.key !== "Backspace") return;
+    var el = e.target;
+    if (!el.getAttribute || el.getAttribute("contenteditable") !== "true") return;
+    var m = /^(items|paras):(\d+)$/.exec(el.getAttribute("data-field") || "");
+    if (!m || plainText(el)) return;
+    var idx = blockIndexOf(el);
+    if (idx < 0) return;
+    var arr = doc.blocks[idx][m[1]];
+    if (!arr || arr.length <= 1) return;
+    e.preventDefault();
+    syncFromDom();
+    var n = +m[2];
+    arr.splice(n, 1);
+    render();
+    focusEnd(idx, m[1] + ":" + Math.max(0, n - 1));
+  });
+
+  // The editable's text with the editor chrome (its ✕ handle) excluded.
+  function plainText(el) {
+    return cleanInline(el.innerHTML).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  }
+  // An item holding a ✕ handle is never CSS-:empty, so its placeholder is driven by a
+  // class instead. Keep it in step with the text.
+  function markEmpty(el) {
+    if (el.hasAttribute("data-placeholder")) el.classList.toggle("is-empty", !plainText(el));
+  }
+  function markAllEmpty() {
+    page.querySelectorAll('[contenteditable="true"][data-placeholder]').forEach(markEmpty);
+  }
+
   // Pull every editable's current value into the model (before a structural re-render).
   function syncFromDom() {
+    var titleEl = page.querySelector("[data-doc-title]");
+    if (titleEl) doc.title = titleEl.textContent;
     page.querySelectorAll('[data-field]').forEach(function (el) {
       var idx = blockIndexOf(el);
       var field = el.getAttribute("data-field");
@@ -436,14 +598,54 @@
       setField(doc.blocks[idx], field, isRichEl(el) ? cleanInline(el.innerHTML) : el.textContent);
     });
   }
+  function fieldEl(idx, field) {
+    return page.querySelector('.synth-block[data-idx="' + idx + '"] [data-field="' + CSS.escape(field) + '"]');
+  }
   function focusField(idx, field) {
-    var sel = page.querySelector('.synth-block[data-idx="' + idx + '"] [data-field="' + CSS.escape(field) + '"]');
-    if (sel) sel.focus();
+    var el = fieldEl(idx, field);
+    if (el) el.focus();
+  }
+  function focusEnd(idx, field) {
+    var el = fieldEl(idx, field);
+    if (!el) return;
+    el.focus();
+    var r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    var s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
   }
 
   // Clicks: block tools, figure picker, per-block add buttons
   page.addEventListener("click", function (e) {
     var t = e.target;
+    // "+" between sections -> open the add-section menu at that insertion point
+    var gapBtn = t.closest ? t.closest(".synth-gap-btn") : null;
+    if (gapBtn) {
+      var gap = gapBtn.closest(".synth-gap");
+      openAddMenu(+gap.getAttribute("data-gap"), gapBtn);
+      return;
+    }
+    // ✕ on an item inside a block: a list item, a paragraph, a byline field, a table
+    // row or column. Deleting the last one leaves the block empty (its "+" tool adds
+    // another) — to remove the block itself, use the section 🗑.
+    var del = t.getAttribute && t.getAttribute("data-del");
+    if (del) {
+      var di = blockIndexOf(t);
+      if (di < 0) return;
+      syncFromDom();
+      var blk = doc.blocks[di];
+      var kind = del.split(":")[0], n = +del.split(":")[1];
+      if (itemText(blk, kind, n) && !confirm("Delete this " + itemNoun(blk, kind) + "?")) return;
+      if (kind === "cols") { blk.head.splice(n, 1); (blk.rows || []).forEach(function (r) { r.splice(n, 1); }); }
+      else if (kind === "rows") blk.rows.splice(n, 1);
+      else if (kind === "paras") blk.paras.splice(n, 1);
+      else if (kind === "items") blk.items.splice(n, 1);
+      render();
+      return;
+    }
+
     var tool = t.getAttribute && t.getAttribute("data-tool");
     if (tool) {
       var idx = blockIndexOf(t);
@@ -452,6 +654,10 @@
       if (tool === "up" && idx > 0) { swap(idx, idx - 1); }
       else if (tool === "down" && idx < doc.blocks.length - 1) { swap(idx, idx + 1); }
       else if (tool === "del") { if (confirm("Delete this section?")) { doc.blocks.splice(idx, 1); render(); } }
+      else if (tool === "tag") {
+        var tag = (prompt("Tag pill (e.g. “new capability”):", "") || "").trim();
+        if (tag) { doc.blocks[idx].tag = tag; render(); }
+      }
       return;
     }
     var act = t.getAttribute && t.getAttribute("data-act");
@@ -461,7 +667,7 @@
       syncFromDom();
       var b = doc.blocks[bi];
       if (act === "li-add") b.items.push("");
-      else if (act === "abstract-add") b.paras.push("");
+      else if (act === "abstract-add" || act === "paras-add") b.paras.push("");
       else if (act === "byline-add") b.items.push({ label: "Label", value: "" });
       else if (act === "row-add") b.rows.push(b.head.map(function () { return ""; }));
       else if (act === "col-add") { b.head.push("Column"); b.rows.forEach(function (r) { r.push(""); }); }
@@ -481,6 +687,30 @@
       syncFromDom(); doc.blocks[idx].height = +t.value || 500; render();
     }
   });
+
+  // What an item currently holds (so an empty one is deleted without a confirm prompt)
+  // and what to call it in that prompt.
+  function cellText(c) { return (c && typeof c === "object") ? (c.html || "") : String(c == null ? "" : c); }
+  function itemText(blk, kind, n) {
+    var parts;
+    if (kind === "cols") {
+      parts = [(blk.head || [])[n]].concat((blk.rows || []).map(function (r) { return cellText(r[n]); }));
+    } else if (kind === "rows") {
+      parts = ((blk.rows || [])[n] || []).map(cellText);
+    } else if (kind === "paras") {
+      parts = [(blk.paras || [])[n]];
+    } else {
+      var it = (blk.items || [])[n];
+      parts = (it && typeof it === "object") ? [it.label, it.value] : [it];
+    }
+    return parts.join("").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  }
+  function itemNoun(blk, kind) {
+    if (kind === "cols") return "column";
+    if (kind === "rows") return "row";
+    if (kind === "paras") return "paragraph";
+    return blk.type === "byline" ? "field" : "item";
+  }
 
   function swap(a, b) {
     var tmp = doc.blocks[a]; doc.blocks[a] = doc.blocks[b]; doc.blocks[b] = tmp; render();
@@ -517,8 +747,13 @@
     dragIdx = -1;
   });
 
-  // Title
-  titleInput.addEventListener("input", function () { doc.title = titleInput.value; autosave(); });
+  // Title: the sidebar field and the in-canvas <h1> are two views of doc.title.
+  titleInput.addEventListener("input", function () {
+    doc.title = titleInput.value;
+    var h1 = page.querySelector("[data-doc-title]");
+    if (h1 && document.activeElement !== h1) h1.textContent = doc.title;
+    autosave();
+  });
 
   // Sources panel edits
   sourcesList.addEventListener("input", function (e) {
@@ -557,12 +792,6 @@
     });
   }
 
-  // Add-section palette
-  buildAddGrid();
-  addGrid.addEventListener("click", function (e) {
-    var key = e.target.getAttribute && e.target.getAttribute("data-add");
-    if (key) { syncFromDom(); addBlock(key); }
-  });
 
   // ========================================================================
   //  Inline formatting toolbar (bold / italic / tag / cite)
@@ -616,7 +845,10 @@
 
   // Cite popover
   var popover = null;
-  function closePopover() { if (popover) { popover.remove(); popover = null; } }
+  function closePopover() {
+    if (popover) { popover.remove(); popover = null; }
+    page.querySelectorAll(".synth-gap.open").forEach(function (g) { g.classList.remove("open"); });
+  }
   document.addEventListener("mousedown", function (e) {
     if (popover && !popover.contains(e.target) && !inlineBar.contains(e.target)) closePopover();
   });
@@ -688,16 +920,19 @@
     }).catch(function () {});
   }
 
-  openSel.addEventListener("change", function () {
-    var name = openSel.value;
-    if (!name) return;
+  function openPaper(name, note) {
     setStatus("Opening…");
-    fetchJSON(nameTmpl(LOAD_TMPL, name), { credentials: "same-origin" }).then(function (j) {
+    return fetchJSON(nameTmpl(LOAD_TMPL, name), { credentials: "same-origin" }).then(function (j) {
       doc = normalize(j.doc || starterDoc());
       currentName = j.name;
       render();
-      setStatus("Opened “" + j.name + "”.", "ok");
+      openSel.value = j.name;
+      setStatus(note || "Opened “" + j.name + "”.", "ok");
     }).catch(function (err) { setStatus("Open failed: " + err.message, "err"); });
+  }
+
+  openSel.addEventListener("change", function () {
+    if (openSel.value) openPaper(openSel.value);
   });
 
   document.getElementById("synth-new").addEventListener("click", function () {
@@ -740,6 +975,12 @@
     d.blocks = d.blocks || [];
     d.sources = d.sources || [];
     d.blocks.forEach(function (b) {
+      if (b.type === "callout" && !b.paras) {
+        // A callout's body is a list of paragraphs; lift a legacy single `html` body
+        // into it (the builder accepts either, the editor only edits `paras`).
+        b.paras = b.html ? [b.html] : [""];
+        delete b.html;
+      }
       if (b.type === "table") {
         b.head = b.head || [];
         b.rows = (b.rows || []).map(function (row) {
@@ -751,6 +992,20 @@
     });
     return d;
   }
+
+  // ========================================================================
+  //  Assistant bridge — the agent edits papers server-side (via the same
+  //  paper_ops the editor's own Save uses), so after a turn that touched one we
+  //  reopen it from disk and the user sees the change land in the canvas.
+  // ========================================================================
+  window.Synthesize = {
+    openName: function () { return currentName; },
+    refresh: function () {
+      refreshPaperList(currentName);
+      if (!currentName) return Promise.resolve(false);
+      return openPaper(currentName, "Updated by the assistant.").then(function () { return true; });
+    }
+  };
 
   // ========================================================================
   //  Init

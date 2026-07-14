@@ -32,14 +32,25 @@ MAX_TOOL_ITERATIONS = 8
 
 SYSTEM_PROMPT = (
     "You are the research assistant embedded in the Research Gap Identification "
-    "dashboard. You help the signed-in user run and inspect their NLP analysis "
-    "pipeline -- embedding, dimensionality reduction, clustering, keyword and "
-    "semantic scoring, filtering, and OpenAlex scraping -- and browse the CSV "
-    "and HTML files they own.\n\n"
-    "Use the provided tools to look up the user's actual data and queue tasks "
-    "instead of guessing. Pipeline tasks run asynchronously and return a "
-    "task_id; when you queue one, tell the user it was queued and that they can "
-    "watch its progress in the dashboard. Keep answers concise."
+    "platform. You work alongside the user across all three of its tabs, and you "
+    "have tools for each:\n\n"
+    "* DASHBOARD -- their CSV datasets and rendered visualizations. Run and inspect "
+    "the NLP pipeline: embedding, dimensionality reduction, clustering, keyword and "
+    "semantic scoring, filtering, OpenAlex scraping, PDF chunking, charts.\n"
+    "* STUDIO -- a visual pipeline of wired-up nodes. You can read their saved "
+    "pipelines, author new ones (get_studio_manifest tells you every node, its "
+    "input ports and its parameters) and run them.\n"
+    "* SYNTHESIZE -- a block-model research-paper editor whose figures are the "
+    "user's own live charts. You can read a paper's outline, write and patch its "
+    "blocks, manage its sources, and build it into a self-contained interactive "
+    "report. Call get_paper_schema BEFORE writing or patching blocks so you emit "
+    "valid ones; heading numbers are automatic, so never write a `num`.\n\n"
+    "Use the tools to look up the user's actual data instead of guessing. Prefer "
+    "get_paper_outline (cheap, indexed) over get_paper when you only need to find "
+    "where something is, and prefer edit_paper (surgical ops) over save_paper "
+    "(whole-document overwrite) when changing an existing paper. Pipeline tasks run "
+    "asynchronously and return a task_id; when you queue one, say so and mention "
+    "they can watch its progress in the dashboard. Keep answers concise."
 )
 
 
@@ -62,24 +73,30 @@ def run_agent_turn(
     user_api_key: str,
     history: list[dict],
     user_message: str,
-) -> str:
-    """Run one user turn and return Gemini's final text reply.
+    context: str = "",
+) -> dict:
+    """Run one user turn. Returns ``{"reply": str, "tools": [tool names called]}``.
 
     ``history`` is the prior conversation as a list of ``{"role", "content"}``
-    text messages (roles are ``"user"``/``"assistant"``); the returned reply
-    should be appended to it by the caller.
+    text messages (roles are ``"user"``/``"assistant"``); the returned reply should
+    be appended to it by the caller. ``context`` describes what the user is looking
+    at (active tab, open paper) and is prepended to this turn only -- it is never
+    stored in the history, so it can't go stale. ``tools`` lets the caller refresh
+    whatever the agent touched.
     """
     if not gemini_api_key:
         raise AgentError("Add your Gemini API key in Settings to use the assistant.")
     try:
-        return asyncio.run(_run_turn(gemini_api_key, model, user_api_key, history, user_message))
+        return asyncio.run(
+            _run_turn(gemini_api_key, model, user_api_key, history, user_message, context)
+        )
     except AgentError:
         raise
     except Exception as exc:  # SDK/MCP/network failures -> a clean chat error
         raise AgentError(str(exc) or exc.__class__.__name__) from exc
 
 
-async def _run_turn(gemini_api_key, model, user_api_key, history, user_message) -> str:
+async def _run_turn(gemini_api_key, model, user_api_key, history, user_message, context="") -> dict:
     from google import genai
     from google.genai import types
 
@@ -89,7 +106,9 @@ async def _run_turn(gemini_api_key, model, user_api_key, history, user_message) 
 
     client = genai.Client(api_key=gemini_api_key)
     contents = _history_to_contents(history, types)
-    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+    turn = f"[Context: {context}]\n\n{user_message}" if context else user_message
+    contents.append(types.Content(role="user", parts=[types.Part(text=turn)]))
+    used: list[str] = []
 
     async with Client(mcp) as mcp_client:
         config = types.GenerateContentConfig(
@@ -108,24 +127,25 @@ async def _run_turn(gemini_api_key, model, user_api_key, history, user_message) 
 
             calls = _function_calls(response)
             if not calls:
-                return _text_of(response)
+                return {"reply": _text_of(response), "tools": used}
 
             # Echo the model turn back, then answer every function call.
             contents.append(response.candidates[0].content)
-            response_parts = [
-                types.Part.from_function_response(
-                    name=call.name,
-                    response={"result": await _call_tool(mcp_client, call.name, dict(call.args or {}), user_api_key)},
+            response_parts = []
+            for call in calls:
+                used.append(call.name)
+                result = await _call_tool(mcp_client, call.name, dict(call.args or {}), user_api_key)
+                response_parts.append(
+                    types.Part.from_function_response(name=call.name, response={"result": result})
                 )
-                for call in calls
-            ]
             contents.append(types.Content(role="user", parts=response_parts))
 
         # Exhausted the tool budget without a final answer.
-        return _text_of(response) or (
+        reply = _text_of(response) or (
             "I wasn't able to finish that request within the tool limit. "
             "Please try rephrasing or breaking it into smaller steps."
         )
+        return {"reply": reply, "tools": used}
 
 
 def _history_to_contents(history: list[dict], types) -> list:

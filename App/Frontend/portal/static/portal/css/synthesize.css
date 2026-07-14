@@ -15,6 +15,13 @@
 .synthesize-doc .byline, .synthesize-doc .abstract-h, .synthesize-doc figcaption,
 .synthesize-doc .tag, .synthesize-doc thead th, .synthesize-doc .callout-h {
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+/* Neutralise the app chrome's bare `h1,h2,h3 {color:nasa-blue}` and
+   `h3 {text-transform:uppercase}` rules. The built report loads none of the app
+   stylesheet, so without this reset the canvas would diverge from the paper.
+   Must stay ABOVE the per-heading rules below, which re-apply the report's own
+   colour/letter-spacing. */
+.synthesize-doc h1, .synthesize-doc h2, .synthesize-doc h3, .synthesize-doc h4 {
+  color: var(--ink); font-weight:700; text-transform:none; letter-spacing:normal; }
 .synthesize-doc h1 { font-size:31px; line-height:1.22; letter-spacing:-0.2px; margin:0 0 14px; }
 .synthesize-doc .subtitle { font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:17px; color:var(--muted); font-weight:500; margin:0 0 22px; line-height:1.4; }
@@ -96,10 +103,13 @@
 .synth-status.ok { color:#15803d; }
 .synth-status.err { color:#b91c1c; }
 
-.synth-add-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-.synth-add-grid button { padding:7px 6px; border:1px solid var(--border,#dde3ea); background:#fff;
-  border-radius:6px; font-size:12.5px; font-family:inherit; cursor:pointer; text-align:left; }
-.synth-add-grid button:hover { border-color:var(--nasa-blue,#0032a0); color:var(--nasa-blue,#0032a0); }
+/* Add-section menu, opened from the "+" between sections */
+.synth-add-menu { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.synth-add-menu button { padding:7px 8px; border:1px solid var(--border,#dde3ea); background:#fff;
+  border-radius:6px; font-size:12.5px; font-family:inherit; cursor:pointer; text-align:left; color:#1b2430; }
+.synth-add-menu button:hover { border-color:var(--nasa-blue,#0032a0); color:var(--nasa-blue,#0032a0);
+  background:#f4f7fc; }
+.synth-add-pop { min-width:268px; }
 
 .synth-sources-card #synth-sources-list { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
 .synth-source-row { border:1px solid var(--border,#dde3ea); border-radius:6px; padding:8px; font-size:12px; background:#fbfcfe; }
@@ -108,6 +118,13 @@
 .synth-source-row .synth-source-cite { font-size:11px; color:var(--muted,#5b6472); }
 .synth-source-row input { width:100%; margin:3px 0; padding:4px 6px; border:1px solid var(--border,#dde3ea);
   border-radius:4px; font-size:11.5px; font-family:inherit; }
+.synth-source-row textarea { width:100%; margin:4px 0; padding:5px 6px; border:1px solid var(--border,#dde3ea);
+  border-radius:4px; font-size:11.5px; font-family:inherit; line-height:1.45; resize:vertical; }
+.synth-source-row textarea:focus { outline:none; border-color:var(--nasa-blue,#0032a0); }
+.synth-src-fields { margin:2px 0 4px; }
+.synth-src-fields summary { cursor:pointer; font-size:11px; color:var(--text-muted,#5b6572);
+  padding:2px 0; user-select:none; }
+.synth-src-fields summary:hover { color:var(--nasa-blue,#0032a0); }
 .synth-source-row .synth-src-actions { display:flex; gap:6px; margin-top:4px; }
 .synth-source-row .synth-src-actions button { font-size:11px; padding:3px 6px; }
 
@@ -117,6 +134,24 @@
   font-family: var(--font-body, "Public Sans", sans-serif); }
 .synthesize-doc { border:1px solid var(--border,#dde3ea); border-radius:10px;
   box-shadow:0 1px 3px rgba(16,24,40,0.04); overflow:hidden; }
+
+/* Insertion point between sections (notebook-style "+").
+   The gap is a ZERO-HEIGHT, self-collapsing box: no border, no padding, height 0,
+   and its only child is absolutely positioned — so adjacent block margins collapse
+   straight through it and the page keeps the exact spacing of the built report.
+   At rest the affordance is fully transparent, so the gap is plain white and the
+   canvas looks exactly like the paper. */
+.synthesize-doc .synth-gap { position:relative; height:0; }
+.synthesize-doc .synth-gap-inner { position:absolute; left:0; right:0; top:-11px; height:22px;
+  display:flex; align-items:center; gap:8px; opacity:0; transition:opacity .12s; z-index:4; }
+.synthesize-doc .synth-gap:hover .synth-gap-inner,
+.synthesize-doc .synth-gap.open .synth-gap-inner { opacity:1; }
+.synthesize-doc .synth-gap-line { flex:1; height:1px; background:#cfe0f2; }
+.synthesize-doc .synth-gap-btn { flex:0 0 auto; width:22px; height:22px; border-radius:50%;
+  border:1px solid #cfe0f2; background:#fff; color:var(--accent); font-size:15px; line-height:1;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc .synth-gap-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
 
 /* Per-block wrapper: bare (no box impact) so margins collapse exactly like the
    built report; position:relative anchors the hover toolbar. */
@@ -139,12 +174,35 @@
 .synthesize-doc [contenteditable="true"] { outline:none; border-radius:3px; }
 .synthesize-doc [contenteditable="true"]:hover { box-shadow:0 0 0 1px #e6ebf2; }
 .synthesize-doc [contenteditable="true"]:focus { box-shadow:0 0 0 2px #cfe0f2; background:#fbfdff; }
-.synthesize-doc [contenteditable="true"]:empty::before { content:attr(data-placeholder);
+/* An item that carries a ✕ handle is never :empty (the button is a child of it), so
+   emptiness is marked explicitly — synthesize.js keeps .is-empty in step with the text. */
+.synthesize-doc [contenteditable="true"]:empty::before,
+.synthesize-doc [contenteditable="true"].is-empty::before { content:attr(data-placeholder);
   color:#aab3c0; pointer-events:none; }
 
-/* Figure block in the editor: chart picker + live iframe preview */
-.synthesize-doc figure .fig-picker { display:flex; gap:8px; align-items:center; margin-bottom:8px;
+/* Headings: the number is derived from document order, so it is not editable — the
+   title is its own box, and the tag pill another. The boxes are drawn with box-shadow
+   (which takes no space) rather than a border/padding, so a heading still sits exactly
+   where the paper puts it. They stay inline (never inline-block) so a long heading
+   still wraps across lines. */
+.synthesize-doc h2 .num, .synthesize-doc h3 .num { user-select:none; cursor:default; }
+.synthesize-doc .synth-h-title:hover { box-shadow:0 0 0 2px #e6ebf2; background:#fbfdff; }
+.synthesize-doc .synth-h-title:focus { box-shadow:0 0 0 2px #cfe0f2; background:#fbfdff; }
+.synthesize-doc .synth-h-tag:focus { box-shadow:0 0 0 2px #cfe0f2; }
+
+/* Figure block: the chart picker is editor-only chrome, so it is taken OUT of the
+   layout (absolute) and hidden until you hover the figure — at rest the figure is
+   exactly the chart + caption, as in the paper. A figure with no chart chosen yet
+   keeps its picker visible and in-flow so it stays discoverable. */
+.synthesize-doc figure { position:relative; }
+.synthesize-doc figure .fig-picker { position:absolute; top:6px; left:6px; right:6px; z-index:5;
+  display:flex; gap:8px; align-items:center; margin:0; opacity:0; transition:opacity .12s;
+  background:rgba(255,255,255,0.96); border:1px solid var(--rule); border-radius:6px; padding:6px 8px;
   font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc .synth-block:hover figure .fig-picker,
+.synthesize-doc figure:focus-within .fig-picker { opacity:1; }
+.synthesize-doc figure.no-chart .fig-picker { position:static; opacity:1; background:transparent;
+  border:0; padding:0; margin-bottom:8px; }
 .synthesize-doc figure .fig-picker select { flex:1; padding:6px 8px; border:1px solid var(--rule);
   border-radius:6px; font-size:13px; }
 .synthesize-doc figure .fig-preview { width:100%; height:var(--fig-h,500px); border:1px solid var(--rule);
@@ -153,12 +211,51 @@
   display:flex; align-items:center; justify-content:center; color:#8a94a3; background:#fbfcfe;
   font-family:-apple-system,"Segoe UI",sans-serif; font-size:13px; }
 
-/* Table editor helpers */
+/* Per-block "+ row / + column / + item / + field" controls: editor-only chrome, so
+   they are absolutely positioned (no layout impact) and revealed only on hover —
+   at rest the block is exactly what the paper shows. */
 .synthesize-doc table .synth-cell { min-width:24px; }
-.synthesize-doc .synth-table-tools { display:flex; gap:6px; margin:4px 0 0;
-  font-family:-apple-system,"Segoe UI",sans-serif; }
+.synthesize-doc .synth-table-tools { position:absolute; left:0; bottom:-7px; z-index:4;
+  display:flex; gap:6px; align-items:center; margin:0; opacity:0; transition:opacity .12s;
+  font-family:-apple-system,"Segoe UI",sans-serif; font-size:11px; }
+.synthesize-doc .synth-block:hover > .synth-table-tools,
+.synthesize-doc .synth-block:focus-within > .synth-table-tools { opacity:1; }
 .synthesize-doc .synth-table-tools button { font-size:11px; padding:3px 7px; border:1px solid var(--rule);
   background:#fff; border-radius:4px; cursor:pointer; color:#5b6472; }
+.synthesize-doc .synth-table-tools button:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Per-item ✕ handles — the small-scale twin of the section 🗑: delete one list item,
+   one paragraph of an abstract/callout, one byline field, one table row or column.
+   Same rule as every other piece of editor chrome: absolutely positioned (so the paper
+   never shifts when one appears) and transparent until you hover the item it deletes,
+   so at rest the canvas is pure paper. They sit inside their item's editable element,
+   hence contenteditable="false" — synthesize.js drops such subtrees when it reads the
+   text back, so the ✕ can never leak into the document. */
+.synthesize-doc .abstract p, .synthesize-doc .callout p,
+.synthesize-doc li, .synthesize-doc .byline span,
+.synthesize-doc th, .synthesize-doc td { position:relative; }
+.synthesize-doc .synth-x { position:absolute; width:17px; height:17px; padding:0; z-index:6;
+  border:1px solid var(--rule); border-radius:50%; background:#fff; color:#8a94a3;
+  font-size:9px; line-height:1; cursor:pointer; opacity:0; transition:opacity .12s;
+  display:flex; align-items:center; justify-content:center;
+  font-family:-apple-system,"Segoe UI",sans-serif; user-select:none; }
+.synthesize-doc .synth-x:hover { border-color:#fca5a5; background:#fef2f2; color:#b91c1c; }
+
+/* In the left margin, beside the item it removes. A callout's handle clears the block's
+   coloured accent bar (its paragraphs are indented past it), so it must reach further
+   left than an abstract's or a list's. */
+.synthesize-doc .abstract p > .synth-x, .synthesize-doc li > .synth-x { left:-25px; top:3px; }
+.synthesize-doc .callout p > .synth-x { left:-44px; top:2px; }
+.synthesize-doc td > .synth-x { left:-25px; top:50%; margin-top:-8px; }
+.synthesize-doc .abstract p:hover > .synth-x, .synthesize-doc .callout p:hover > .synth-x,
+.synthesize-doc li:hover > .synth-x, .synthesize-doc tr:hover td > .synth-x { opacity:1; }
+
+/* A column's ✕ is centred above its own header cell, so it is never mistaken for the
+   next column's; a byline field's sits in the gap that already separates the fields. */
+.synthesize-doc th > .synth-x { left:50%; margin-left:-8px; top:-11px; }
+.synthesize-doc .byline span > .synth-x { right:-16px; top:50%; margin-top:-8px; }
+.synthesize-doc th:hover > .synth-x,
+.synthesize-doc .byline span:hover > .synth-x { opacity:1; }
 
 /* Floating inline-formatting toolbar */
 .synth-inline-toolbar { position:fixed; z-index:60; display:flex; gap:2px; background:#1b2430;

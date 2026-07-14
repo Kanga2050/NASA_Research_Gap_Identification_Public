@@ -443,14 +443,79 @@ table.output-table tr:nth-child(even) td {
   color: #fff;
 }
 
-/* Agent column */
+/* Assistant — a dock that floats above all three tabs (it can work on each of
+   them), with a launcher button that takes its place when it is closed. */
+.agent-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nasa-blue);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(16, 24, 40, 0.22);
+}
+
+.agent-fab:hover {
+  filter: brightness(1.08);
+}
+
+.agent-fab.hidden {
+  display: none;
+}
+
+.agent-fab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.agent-dock {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 56;
+  width: 400px;
+  max-width: calc(100vw - 2rem);
+  height: min(620px, calc(100vh - 140px));
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 44px rgba(16, 24, 40, 0.24);
+}
+
+.agent-dock[hidden] {
+  display: none;
+}
+
+.agent-context {
+  padding: 0.45rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.agent-header-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
 .agent-panel {
-  flex: 0 0 380px;
-  max-width: 380px;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-left: 1px solid var(--border);
   overflow: hidden;
 }
 

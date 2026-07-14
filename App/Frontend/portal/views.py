@@ -2,7 +2,6 @@ import json
 import os
 import re
 import shutil
-from collections import deque
 from pathlib import Path
 
 from django.contrib import messages
@@ -37,6 +36,7 @@ from .graph_manifest import MANIFEST, PALETTE
 from .models import AgentSettings, ApiKey, TaskRecord
 from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
 from .services import create_api_key, resolve_api_key
+from .studio_ops import StudioError, queue_graph
 from .task_engine import get_task_history, get_task_status, queue_user_task
 from App.Frontend.webapp.storage import (
     public_pdf_root,
@@ -79,8 +79,21 @@ COLUMN_FIELD_NAMES = [
 # suffix for that file type. Shared by import_file/export_file/publish/describe.
 KIND_ROOTS = {kind: (USER_ROOTS[kind], KIND_SUFFIX[kind]) for kind in KIND_SUFFIX}
 
-# Uploaded file extension -> import kind. Templates arrive as .json.
+# Uploaded file extension -> import kind. Both Studio templates and Synthesize
+# papers arrive as .json, so the .json kind is resolved by content (_json_kind).
 EXT_TO_KIND = {"csv": "csv", "html": "html", "json": "template"}
+
+
+def _json_kind(raw: bytes) -> str:
+    """Disambiguate the two .json kinds by content: a Synthesize paper is a block
+    model (has a `blocks` list); anything else is a Studio graph template."""
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return "template"
+    if isinstance(payload, dict) and isinstance(payload.get("blocks"), list):
+        return "paper"
+    return "template"
 
 
 def signup(request):
@@ -212,14 +225,23 @@ def import_file(request):
     ext = Path(safe_name).suffix.lower().lstrip(".")
     kind = EXT_TO_KIND.get(ext)
     if kind is None:
-        messages.error(request, "Only .csv, .html, and .json (template) files can be imported.")
+        messages.error(request, "Only .csv, .html, and .json (template or paper) files can be imported.")
         return redirect("dashboard")
+
+    # .json is ambiguous (Studio template vs Synthesize paper) -- decide by content.
+    payload = None
+    if ext == "json":
+        payload = upload.read()
+        kind = _json_kind(payload)
 
     root = USER_ROOTS[kind](request.user)
     destination = root / safe_name
-    with destination.open("wb") as out:
-        for chunk in upload.chunks():
-            out.write(chunk)
+    if payload is not None:
+        destination.write_bytes(payload)
+    else:
+        with destination.open("wb") as out:
+            for chunk in upload.chunks():
+                out.write(chunk)
 
     description = request.POST.get("description", "")
     if description.strip():
@@ -583,130 +605,25 @@ def synthesize(request):
     return render(request, "portal/workspace.html", context)
 
 
-def _topo_sort(node_ids, edges):
-    """Kahn topological sort over the table edges. Returns an ordered list of node
-    ids, or None if the graph contains a cycle."""
-    indeg = {nid: 0 for nid in node_ids}
-    adj = {nid: [] for nid in node_ids}
-    for edge in edges:
-        src, dst = str(edge.get("from")), str(edge.get("to"))
-        if src in indeg and dst in indeg:
-            adj[src].append(dst)
-            indeg[dst] += 1
-    queue = deque(nid for nid in node_ids if indeg[nid] == 0)
-    order = []
-    while queue:
-        nid = queue.popleft()
-        order.append(nid)
-        for nxt in adj[nid]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                queue.append(nxt)
-    return order if len(order) == len(node_ids) else None
-
-
-def _coerce_number(value):
-    """Studio sends form values as strings; turn numeric-widget values back into
-    int/float so backend functions (e.g. bins, top_n) get real numbers."""
-    text = str(value).strip()
-    if text == "":
-        return value
-    try:
-        return float(text) if ("." in text or "e" in text.lower()) else int(text)
-    except ValueError:
-        return value
-
-
 @login_required
 @require_POST
 def studio_run(request):
-    """Compile the node graph into queued tasks, in dependency (topological) order.
+    """Compile the canvas's node graph into queued tasks, in dependency order.
 
-    Wires carry "carriage": a csv wire carries a table name, a column wire carries
-    {csv, column}. We propagate carriage through the graph in topological order to
-    resolve each function's source CSV (from its input wires) and column args, then
-    queue via TASK_SPECS. Per-user FIFO execution in the task engine means enqueuing
-    in topological order is sufficient for correct execution order -- no dependency
-    machinery needed. Source/bridge nodes (__csv__, __column__) queue nothing.
+    The compiler itself lives in `studio_ops.queue_graph`, so the Run button, the
+    REST API and the agent's `run_studio_pipeline` tool all queue work the same way.
     """
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
-    nodes = {str(n.get("id")): n for n in payload.get("nodes", [])}
-    edges = payload.get("edges", [])
-
-    order = _topo_sort(list(nodes), edges)
-    if order is None:
-        return JsonResponse({"error": "The pipeline has a cycle -- remove a connection."}, status=400)
-
-    # incoming[node] = list of (source_node, target_input_port_index)
-    incoming = {nid: [] for nid in nodes}
-    for edge in edges:
-        src, dst = str(edge.get("from")), str(edge.get("to"))
-        if dst in incoming and src in nodes:
-            incoming[dst].append((src, int(edge.get("toPort", 0))))
-
-    carry = {}  # node id -> its output carriage: {"wire","csv"[,"column"]}
-    queued = []
     try:
-        for nid in order:
-            node = nodes[nid]
-            entry = MANIFEST.get(node.get("action"))
-            if entry is None:
-                continue
-            in_by_port = {port: carry.get(src) for src, port in incoming.get(nid, [])}
-
-            if entry["special"] == "csv_input":
-                carry[nid] = {"wire": "csv", "csv": node.get("csv", "")}
-                continue
-            if entry["special"] == "select_column":
-                src = in_by_port.get(0) or {}
-                carry[nid] = {"wire": "column", "csv": src.get("csv", ""), "column": node.get("column", "")}
-                continue
-
-            cleaned = dict(node.get("fields") or {})
-            for pref in entry["prefs"]:
-                if pref["widget"] == "number" and pref["param"] in cleaned:
-                    cleaned[pref["param"]] = _coerce_number(cleaned[pref["param"]])
-
-            source_csv, csv_inputs = "", []
-            for i, inp in enumerate(entry["inputs"]):
-                wire = in_by_port.get(i)
-                if not wire:
-                    continue
-                if inp["wire"] == "csv":
-                    csv_inputs.append(wire.get("csv", ""))
-                    source_csv = source_csv or wire.get("csv", "")
-                else:  # column wire -> its column name is the arg; its CSV seeds the source
-                    cleaned[inp["param"]] = wire.get("column", "")
-                    source_csv = source_csv or wire.get("csv", "")
-
-            if entry["table_param"]:
-                cleaned[entry["table_param"]] = source_csv or cleaned.get(entry["table_param"], "")
-            if node.get("action") == "combine_csvs":
-                cleaned["source_csvs"] = ",".join(c for c in csv_inputs if c)
-
-            result = _queue_task_for_user(request.user, node["action"], cleaned)
-
-            out = entry["output"]
-            out_name = cleaned.get(out["param"]) or out.get("default", "")
-            if entry["category"] == "annotation":
-                carry[nid] = {"wire": "column", "csv": source_csv, "column": out_name}
-            elif entry["category"] == "distillation":
-                carry[nid] = {"wire": "csv", "csv": out_name}
-            else:
-                carry[nid] = {"wire": "none"}
-
-            queued.append({
-                "task_id": result["task_id"],
-                "action": node["action"],
-                "category": entry["category"],
-                "output_name": out_name,
-            })
+        queued = queue_graph(request.user, payload.get("nodes", []), payload.get("edges", []))
+    except StudioError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:  # surface a bad graph without 500-ing
-        return JsonResponse({"error": f"Could not queue pipeline: {exc}", "tasks": queued}, status=400)
+        return JsonResponse({"error": f"Could not queue pipeline: {exc}"}, status=400)
 
     return JsonResponse({"tasks": queued})
 
@@ -919,22 +836,42 @@ def agent_chat(request):
 
     history = request.session.get("agent_history", [])
     try:
-        reply = run_agent_turn(
+        turn = run_agent_turn(
             settings.gemini_api_key,
             settings.model,
             _ensure_agent_api_key(request),
             history,
             message,
+            context=_agent_context(request),
         )
     except AgentError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 
     history = history + [
         {"role": "user", "content": message},
-        {"role": "assistant", "content": reply},
+        {"role": "assistant", "content": turn["reply"]},
     ]
     request.session["agent_history"] = history[-AGENT_HISTORY_LIMIT:]
-    return JsonResponse({"reply": reply})
+    # `tools` lets the front end refresh whatever the agent just changed (reopen the
+    # paper it edited, reload the pipeline list) instead of the user hitting reload.
+    return JsonResponse({"reply": turn["reply"], "tools": turn["tools"]})
+
+
+def _agent_context(request) -> str:
+    """What the user is looking at right now, handed to the model each turn so
+    "add a conclusion section" resolves to the paper that is actually open."""
+    tab = (request.POST.get("tab") or "").strip()
+    paper = (request.POST.get("paper") or "").strip()
+    bits = []
+    if tab:
+        bits.append(f"The user is on the {tab} tab.")
+    if paper:
+        bits.append(f'The paper open in the Synthesize editor is "{paper}" '
+                    "-- when they say “the paper”/“this paper”, they mean that one. "
+                    "Edits you make to it appear in their editor as soon as you finish.")
+    elif tab == "synthesize":
+        bits.append("No saved paper is open in the editor yet (it holds an unsaved draft).")
+    return " ".join(bits)
 
 
 @login_required

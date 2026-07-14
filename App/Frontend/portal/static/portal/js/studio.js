@@ -189,20 +189,25 @@
   }
 
   // ------------------------------------------------------------ node render
-  function widgetHtml(id, pref) {
+  // `f` is the node's saved fields: a widget shows the node's own value and falls
+  // back to the manifest default only when the node has none. (Rendering the default
+  // unconditionally would silently show the wrong parameters for every imported
+  // graph -- a template, a restored canvas, or a pipeline the assistant wrote.)
+  function widgetHtml(id, pref, f) {
     var name = "f-" + id + "-" + pref.param;
+    var val = (f && f[pref.param] != null) ? f[pref.param] : pref.default;
     if (pref.widget === "select") {
       var opts = (pref.options || []).map(function (o) {
-        return '<option value="' + esc(o) + '"' + (String(pref.default) === String(o) ? " selected" : "") + ">" + esc(o) + "</option>";
+        return '<option value="' + esc(o) + '"' + (String(val) === String(o) ? " selected" : "") + ">" + esc(o) + "</option>";
       }).join("");
       return '<select id="' + name + '" data-field="' + esc(pref.param) + '">' + opts + "</select>";
     }
     if (pref.widget === "checkbox") {
-      return '<input type="checkbox" id="' + name + '" data-field="' + esc(pref.param) + '"' + (pref.default ? " checked" : "") + ">";
+      return '<input type="checkbox" id="' + name + '" data-field="' + esc(pref.param) + '"' + (val ? " checked" : "") + ">";
     }
     var type = pref.widget === "number" ? "number" : "text";
     return '<input type="' + type + '" id="' + name + '" data-field="' + esc(pref.param) +
-      '" value="' + esc(pref.default == null ? "" : pref.default) + '" placeholder="' + esc(pref.placeholder || "") + '">';
+      '" value="' + esc(val == null ? "" : val) + '" placeholder="' + esc(pref.placeholder || "") + '">';
   }
 
   function renderNode(id) {
@@ -234,7 +239,7 @@
       html += '<div class="port-in">' + badge + " " + esc(inp.label) + (inp.optional ? " <em>(opt)</em>" : "") + "</div>";
     });
 
-    e.prefs.forEach(function (pref) { html += "<label>" + esc(pref.label) + "</label>" + widgetHtml(id, pref); });
+    e.prefs.forEach(function (pref) { html += "<label>" + esc(pref.label) + "</label>" + widgetHtml(id, pref, f); });
 
     // Output-name field (annotation new column / distillation csv / viz html)
     if (e.output && e.output.param && e.special !== "csv_input" && e.special !== "select_column") {
@@ -568,6 +573,21 @@
       .catch(function () { flash("Network error loading template."); })
       .then(function () { templateSelect.value = ""; });
   });
+
+  // Assistant bridge: the agent can save a pipeline server-side, so let it refresh
+  // the Templates dropdown (and open a graph it just wrote) without a page reload.
+  window.Studio = {
+    refreshTemplates: refreshTemplateList,
+    loadTemplate: function (name) {
+      return fetch(TEMPLATE_LOAD_URL.replace("__NAME__", encodeURIComponent(name)), { credentials: "same-origin" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.error || !d.graph) throw new Error(d.error || "Could not load pipeline.");
+          importGraph(d.graph);
+          refreshTemplateList();
+        });
+    }
+  };
 
   if (clearBtn) clearBtn.addEventListener("click", function () {
     if (!confirm("Clear the canvas? This removes all nodes.")) return;
