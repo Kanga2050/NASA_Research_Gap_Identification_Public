@@ -7,6 +7,34 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;600;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Set the theme before the stylesheet paints to avoid a flash. Uses the
+      // saved preference, else the OS setting. Wiring for the toggle lives at
+      // the bottom of this script tag (runs on DOMContentLoaded).
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (t !== "dark" && t !== "light") {
+            t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+        document.addEventListener("DOMContentLoaded", function () {
+          var btn = document.getElementById("theme-toggle");
+          if (!btn) return;
+          function icon() {
+            btn.textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "☀" : "☾";
+          }
+          icon();
+          btn.addEventListener("click", function () {
+            var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", next);
+            try { localStorage.setItem("theme", next); } catch (e) {}
+            icon();
+          });
+        });
+      })();
+    </script>
     <link rel="stylesheet" href="{% static_versioned 'portal/css/style.css' %}">
     <title>{% block title %}Research Gap Identification{% endblock %}</title>
   </head>
@@ -25,6 +53,7 @@
           <button type="submit" class="topbar-link">Sign out</button>
         </form>
       {% endif %}
+      <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle light / dark theme" aria-label="Toggle light or dark theme">☾</button>
       <img src="{% static 'portal/img/nasa-meatball.png' %}" alt="NASA insignia">
     </header>
     {% if user.is_authenticated %}

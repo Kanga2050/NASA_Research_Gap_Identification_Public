@@ -1265,3 +1265,87 @@ body.modal-open { overflow: hidden; }
   .output-panel { padding: 1rem; }
   .agent-dock { right: 0.5rem; bottom: 0.5rem; }
 }
+
+/* ============================ Theme toggle (topbar) ============================ */
+.theme-toggle {
+  margin: 0;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.theme-toggle:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* ============================ Dark theme ============================ */
+/* Toggled via [data-theme="dark"] on <html> (set by the inline head script from
+   the saved preference or the OS setting). Only the app chrome goes dark — the
+   Synthesize paper canvas and built reports stay light on purpose, since they
+   mirror a printed report and keep their own colours in synthesize.css. */
+:root[data-theme="dark"] {
+  --bg: #0f141b;
+  --surface: #1a212b;
+  --border: #2b3440;
+  --text: #e7ecf3;
+  --text-muted: #9aa7b6;
+}
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2 { color: #6f9eff; }
+:root[data-theme="dark"] a { color: #6f9eff; }
+:root[data-theme="dark"] code { background: #0f141b; }
+
+:root[data-theme="dark"] input[type="text"],
+:root[data-theme="dark"] input[type="number"],
+:root[data-theme="dark"] input[type="password"],
+:root[data-theme="dark"] input[type="email"],
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background: #0f141b;
+  color: var(--text);
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: #6b7684; }
+:root[data-theme="dark"] input:focus,
+:root[data-theme="dark"] select:focus,
+:root[data-theme="dark"] textarea:focus { outline-color: #6f9eff; }
+
+:root[data-theme="dark"] table.output-table tr:nth-child(even) td { background: #141b24; }
+:root[data-theme="dark"] table.output-table td { color: var(--text); }
+
+:root[data-theme="dark"] .message { background: #14233a; }
+:root[data-theme="dark"] .message.success { background: #13291c; }
+:root[data-theme="dark"] .message.error { background: #2c161a; }
+
+/* Buttons whose background is --text-muted (light-grey in dark mode) would lose
+   their white label — give them a proper dark surface instead. */
+:root[data-theme="dark"] .btn-secondary,
+:root[data-theme="dark"] .file-actions .file-describe,
+:root[data-theme="dark"] .access-badge.no { background: #3a4552; }
+:root[data-theme="dark"] .btn-secondary:hover { background: #47515e; }
+
+:root[data-theme="dark"] .studio-canvas {
+  background: #121820;
+  background-image: radial-gradient(#28323f 1px, transparent 1px);
+}
+:root[data-theme="dark"] .studio-hint { background: rgba(26, 33, 43, 0.92); }
+:root[data-theme="dark"] .palette-item:hover { background: #232d3a; }
+:root[data-theme="dark"] #drawflow .drawflow-node .drawflow_content_node {
+  background: var(--surface);
+  border-color: #2b3440;
+}
+:root[data-theme="dark"] .studio-node input,
+:root[data-theme="dark"] .studio-node select { background: #0f141b; }
+
+/* Synthesize sidebar chrome (the paper canvas itself stays light). */
+:root[data-theme="dark"] .synth-title-input { background: #0f141b; color: var(--text); }
+:root[data-theme="dark"] .synth-source-row { background: #141b24; }
+:root[data-theme="dark"] .synth-source-row input,
+:root[data-theme="dark"] .synth-source-row textarea { background: #0f141b; }
