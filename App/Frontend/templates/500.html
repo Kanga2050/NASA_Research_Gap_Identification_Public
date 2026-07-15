@@ -2,8 +2,10 @@
 
 {% block title %}Server error – Research Gap Identification{% endblock %}
 
-{# Django renders 500.html without context processors, so this page avoids
-   {% url %} and request-dependent context; a hardcoded link home is safe. #}
+{% comment %}
+  Django renders 500.html without context processors, so this page avoids
+  {% url %} and request-dependent context; a hardcoded link home is safe.
+{% endcomment %}
 {% block body %}
   <div class="login-wrap">
     <div class="card login-card">
