@@ -935,6 +935,77 @@ VISUALIZATION_FUNCTIONS = [
         ),
         roots=("csv", "html"),
     ),
+    Function(
+        name="network_graph",
+        category="visualization",
+        impl="App.Backend.visualization:network_graph",
+        label="Network graph",
+        summary="Render a node-link network from an edge list",
+        description=(
+            "[Visualization] Render a node-link network (HTML) from an edge-list CSV: each row is "
+            "an edge between `source_column` and `target_column`, and `weight_column` (blank counts "
+            "1 per row) is summed over duplicate pairs to set edge thickness. Nodes use a "
+            "force-directed layout, coloured and sized by weighted degree; `top_n` keeps the "
+            "heaviest edges. Queues a background task and returns its task_id."
+        ),
+        params=(
+            CSV_NAME,
+            _p("source_column", str, "", "One endpoint of each edge.", required=True),
+            _p("target_column", str, "", "The other endpoint of each edge.", required=True),
+            _p("weight_column", str, "", "Edge weight column (blank counts 1 per row)."),
+            CHART_TITLE,
+            _out_html("network", "network_graph"),
+            _p("top_n", int, 60, "Keep only the N heaviest edges."),
+        ),
+        roots=("csv", "html"),
+    ),
+    Function(
+        name="stacked_area",
+        category="visualization",
+        impl="App.Backend.visualization:stacked_area",
+        label="Stacked area",
+        summary="Render a stacked area chart over an x-axis",
+        description=(
+            "[Visualization] Render a stacked area chart (HTML): the sum of `y_column` at each "
+            "`x_column`, split into one band per `series_column` value and stacked so the top edge "
+            "is the total. `top_n` keeps the largest series by total and folds the rest into "
+            "\"Other\". Queues a background task and returns its task_id."
+        ),
+        params=(
+            CSV_NAME,
+            _p("x_column", str, "", "The x axis column (the series is sorted by it).", required=True),
+            _p("y_column", str, "", "The numeric column summed into each band.", required=True),
+            _p("series_column", str, "", "One stacked band per value of this column.", required=True),
+            CHART_TITLE,
+            _out_html("stacked_area", "stacked_area"),
+            _p("top_n", int, 12, "Keep only the largest N series (rest become \"Other\")."),
+        ),
+        roots=("csv", "html"),
+    ),
+    Function(
+        name="trajectory_chart",
+        category="visualization",
+        impl="App.Backend.visualization:trajectory_chart",
+        label="Trajectory chart",
+        summary="Render annotated multi-series trajectories",
+        description=(
+            "[Visualization] Render annotated trajectories (HTML): one line per `series_column` "
+            "value tracing the sum of `y_column` against a sorted `x_column`, each labelled at its "
+            "right-hand end instead of in a legend so many series stay readable (e.g. theme "
+            "prominence over the years). `top_n` keeps the series with the highest peak. Queues a "
+            "background task and returns its task_id."
+        ),
+        params=(
+            CSV_NAME,
+            _p("x_column", str, "", "The x axis column (each line is sorted by it).", required=True),
+            _p("y_column", str, "", "The numeric column each line traces.", required=True),
+            _p("series_column", str, "", "One labelled line per value of this column.", required=True),
+            CHART_TITLE,
+            _out_html("trajectory", "trajectory_chart"),
+            _p("top_n", int, 15, "Keep only the N series with the highest peak."),
+        ),
+        roots=("csv", "html"),
+    ),
 ]
 
 ALL_FUNCTIONS: list[Function] = (

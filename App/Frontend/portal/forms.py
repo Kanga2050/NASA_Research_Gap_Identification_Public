@@ -120,6 +120,7 @@ class TaskSubmitForm(forms.Form):
     y_column = forms.CharField(max_length=120, required=False)
     color_column = forms.CharField(max_length=120, required=False)
     size_column = forms.CharField(max_length=120, required=False)
+    weight_column = forms.CharField(max_length=120, required=False)
     coord_column = forms.CharField(max_length=120, required=False, initial="2d")
     bins = forms.IntegerField(required=False, initial=30)
     top_n = forms.IntegerField(required=False, initial=25)

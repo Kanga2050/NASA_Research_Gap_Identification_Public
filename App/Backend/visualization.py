@@ -438,3 +438,163 @@ def hierarchical_dendrogram(
         fig.update_yaxes(title_text="Ward linkage distance (topic dissimilarity)")
 
     write_chart(fig, output_name, html_root, f"Dendrogram of {len(labels)} topics")
+
+
+def network_graph(
+    csv_name: str,
+    source_column: str,
+    target_column: str,
+    weight_column: str = "",
+    title: str = "",
+    output_name: str = "network_graph",
+    top_n: int = 60,
+    csv_root: str | Path | None = None,
+    html_root: str | Path | None = None,
+):
+    """Render a node-link network (HTML) from an edge-list CSV. Each row is an edge
+    between `source_column` and `target_column`; `weight_column` (blank counts 1 per
+    row) is summed over duplicate pairs and sets edge thickness. Nodes are placed with
+    a force-directed (spring) layout, coloured and sized by weighted degree; `top_n`
+    keeps the heaviest edges so the graph stays legible. Self-loops are dropped."""
+    import networkx as nx
+    import plotly.graph_objects as go
+
+    print(f"Loading '{csv_name}.csv' to build a network from '{source_column}'–'{target_column}' edges...")
+    df = load_csv(csv_name, csv_root, columns=(source_column, target_column, weight_column))
+    require_columns(df, source_column, target_column)
+
+    df = df.dropna(subset=[source_column, target_column]).copy()
+    df[source_column] = df[source_column].astype(str)
+    df[target_column] = df[target_column].astype(str)
+    df = df[df[source_column] != df[target_column]]  # no self-loops
+    df["_w"] = pd.to_numeric(df[weight_column], errors="coerce").fillna(0.0) if weight_column else 1.0
+
+    # Collapse duplicate undirected pairs, summing their weight.
+    df["_pair"] = [tuple(sorted(pair)) for pair in zip(df[source_column], df[target_column])]
+    edges = df.groupby("_pair", as_index=False)["_w"].sum().sort_values("_w", ascending=False)
+    if top_n and int(top_n) > 0:
+        edges = edges.head(int(top_n))
+    if edges.empty:
+        raise ValueError("No edges to draw after filtering.")
+
+    print(f"Laying out {len(edges)} edges over their nodes with a spring layout...")
+    graph = nx.Graph()
+    for (node_a, node_b), weight in zip(edges["_pair"], edges["_w"]):
+        graph.add_edge(node_a, node_b, weight=float(weight))
+    pos = nx.spring_layout(graph, weight="weight", seed=42)
+
+    edge_x: list[float | None] = []
+    edge_y: list[float | None] = []
+    for node_a, node_b in graph.edges():
+        (x0, y0), (x1, y1) = pos[node_a], pos[node_b]
+        edge_x += [x0, x1, None]
+        edge_y += [y0, y1, None]
+
+    nodes = list(graph.nodes())
+    degree = dict(graph.degree(weight="weight"))
+    deg = np.array([degree[n] for n in nodes], dtype=float)
+    span = deg.max() - deg.min()
+    sizes = 12 + 34 * (deg - deg.min()) / span if span else np.full(len(nodes), 20.0)
+
+    print(f"Rendering a network of {len(nodes)} nodes and {graph.number_of_edges()} edges...")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=edge_x, y=edge_y, mode="lines",
+        line=dict(width=1, color="#c2ccd8"), hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=[pos[n][0] for n in nodes], y=[pos[n][1] for n in nodes],
+        mode="markers+text", text=nodes, textposition="top center", textfont=dict(size=10),
+        marker=dict(size=sizes, color=deg, colorscale="Blues", showscale=False,
+                    line=dict(width=1, color="#334155")),
+        hovertext=[f"{n} — weighted degree {degree[n]:.0f}" for n in nodes], hoverinfo="text",
+    ))
+    fig.update_layout(
+        title=title or f"{source_column}–{target_column} network",
+        showlegend=False, plot_bgcolor="white",
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+    )
+
+    write_chart(fig, output_name, html_root,
+                f"Network of {len(nodes)} nodes and {graph.number_of_edges()} edges")
+
+
+def stacked_area(
+    csv_name: str,
+    x_column: str,
+    y_column: str,
+    series_column: str,
+    title: str = "",
+    output_name: str = "stacked_area",
+    top_n: int = 12,
+    csv_root: str | Path | None = None,
+    html_root: str | Path | None = None,
+):
+    """Render a stacked area chart (HTML): the sum of `y_column` at each `x_column`,
+    split into one band per `series_column` value and stacked so the top edge is the
+    running total. `top_n` keeps the largest series (by total) and folds the rest into
+    "Other", which keeps a composition-over-time chart legible."""
+    print(f"Loading '{csv_name}.csv' to build a stacked area of '{y_column}' by '{series_column}'...")
+    df = load_csv(csv_name, csv_root, columns=(x_column, y_column, series_column))
+
+    df[y_column] = pd.to_numeric(df[y_column], errors="coerce").fillna(0.0)
+    df[series_column] = df[series_column].astype(str)
+
+    totals = df.groupby(series_column)[y_column].sum().sort_values(ascending=False)
+    if top_n and int(top_n) > 0 and len(totals) > int(top_n):
+        keep = set(totals.head(int(top_n)).index)
+        df[series_column] = df[series_column].where(df[series_column].isin(keep), "Other")
+
+    data = df.groupby([x_column, series_column], as_index=False)[y_column].sum().sort_values(x_column)
+    bands = data[series_column].nunique()
+    print(f"Rendering {bands} stacked bands across {data[x_column].nunique()} '{x_column}' values...")
+    fig = px.area(
+        data, x=x_column, y=y_column, color=series_column,
+        title=title or f"{y_column} by {series_column} over {x_column}",
+    )
+
+    write_chart(fig, output_name, html_root, f"Stacked area of {bands} series")
+
+
+def trajectory_chart(
+    csv_name: str,
+    x_column: str,
+    y_column: str,
+    series_column: str,
+    title: str = "",
+    output_name: str = "trajectory_chart",
+    top_n: int = 15,
+    csv_root: str | Path | None = None,
+    html_root: str | Path | None = None,
+):
+    """Render annotated trajectories (HTML): one line per `series_column` value tracing
+    the sum of `y_column` against a sorted `x_column`, each labelled at its right-hand
+    end rather than in a crowded legend so many series stay readable (e.g. theme
+    prominence over the years). `top_n` keeps the series with the highest peak."""
+    print(f"Loading '{csv_name}.csv' to trace '{y_column}' trajectories by '{series_column}'...")
+    df = load_csv(csv_name, csv_root, columns=(x_column, y_column, series_column))
+
+    df[y_column] = pd.to_numeric(df[y_column], errors="coerce")
+    df[series_column] = df[series_column].astype(str)
+    data = df.dropna(subset=[y_column]).groupby([x_column, series_column], as_index=False)[y_column].sum()
+
+    peaks = data.groupby(series_column)[y_column].max().sort_values(ascending=False)
+    if top_n and int(top_n) > 0:
+        data = data[data[series_column].isin(peaks.head(int(top_n)).index)]
+    data = data.sort_values(x_column)
+
+    lines = data[series_column].nunique()
+    print(f"Rendering {lines} trajectories, each labelled at its right end...")
+    fig = px.line(
+        data, x=x_column, y=y_column, color=series_column, markers=True,
+        title=title or f"{y_column} trajectories by {series_column}",
+    )
+    for name, sub in data.groupby(series_column):
+        last = sub.sort_values(x_column).iloc[-1]
+        fig.add_annotation(
+            x=last[x_column], y=last[y_column], text=str(name),
+            xanchor="left", xshift=8, showarrow=False, font=dict(size=10),
+        )
+    fig.update_layout(showlegend=False)
+
+    write_chart(fig, output_name, html_root, f"Trajectory chart of {lines} series")

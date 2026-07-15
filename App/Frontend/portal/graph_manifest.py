@@ -241,6 +241,22 @@ VISUALIZATION_NODES = [
               _pref("top_n", "Top N topics", "number", 30),
               _pref("orientation", "Orientation", "select", "left", ["left", "right", "bottom", "top"])],
        output=_out_html("output_name", "Dendrogram")),
+    _n("network_graph", "Network Graph", "visualization", table_param="csv_name",
+       inputs=[_col_in("source_column", "Source", CATEGORICAL),
+               _col_in("target_column", "Target", CATEGORICAL),
+               _col_in("weight_column", "Weight", ["number"], optional=True)],
+       prefs=[_pref("chart_title", "Title", "text", ""), _pref("top_n", "Top N edges", "number", 60)],
+       output=_out_html("output_name", "network")),
+    _n("stacked_area", "Stacked Area", "visualization", table_param="csv_name",
+       inputs=[_col_in("x_column", "X", AXIS), _col_in("y_column", "Y (value)", ["number"]),
+               _col_in("series_column", "Series", CATEGORICAL)],
+       prefs=[_pref("chart_title", "Title", "text", ""), _pref("top_n", "Top N series", "number", 12)],
+       output=_out_html("output_name", "stacked_area")),
+    _n("trajectory_chart", "Trajectory Chart", "visualization", table_param="csv_name",
+       inputs=[_col_in("x_column", "X", AXIS), _col_in("y_column", "Y (value)", ["number"]),
+               _col_in("series_column", "Series", CATEGORICAL)],
+       prefs=[_pref("chart_title", "Title", "text", ""), _pref("top_n", "Top N series", "number", 15)],
+       output=_out_html("output_name", "trajectory")),
 ]
 
 ALL_NODES = SOURCE_NODES + ANNOTATION_NODES + DISTILLATION_NODES + VISUALIZATION_NODES
