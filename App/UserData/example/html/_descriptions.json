@@ -1,3 +1,9 @@
 {
-  "E2E_Built_Report": "Built from paper “E2E_Built_Report”."
+  "E2E_Built_Report": "Built from paper “E2E_Built_Report”.",
+  "SB_Theme_CoOccurrence": "Within-paper co-emphasis correlation of the ten spaceflight-risk themes across the on-target literature (n=4,415) — which risks are studied together.",
+  "SB_Theme_Network": "Force-directed theme co-occurrence network; greedy-modularity communities with nodes coloured by 30-year momentum — the falling human-physiology risks form one connected community.",
+  "SB_Momentum_Acceleration": "Acceleration map: each theme's early (1995–99→2015–19) vs recent (2015–19→2020–24) emphasis momentum — is the drift speeding up or slowing?",
+  "SB_Trajectories_Annotated": "Five representative emphasis trajectories (1995–2024) annotated with the real-world programmes, facilities and landmark publications that drove them.",
+  "SB_Sequencing_Omics": "Omics & microbiome literature emphasis against NHGRI cost-per-genome (log, inverted) — the molecular turn as an exogenous, sequencing-cost-driven tide.",
+  "Space_Biology_Research_Gap_Report": "Where Is Space Biology Going — and Where Should It? Self-contained interactive three-corpus research-gap report (28 figures)."
 }
