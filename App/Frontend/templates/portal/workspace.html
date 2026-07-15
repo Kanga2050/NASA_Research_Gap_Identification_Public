@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}{% load cache_bust %}
+{% load static %}{% load cache_bust %}{% load info_tips %}
 
 {% block title %}Research Gap Identification{% endblock %}
 
@@ -21,7 +21,7 @@
        data-delete-url="{% url 'delete_file' %}">
     <div class="sidebar">
       <div class="card">
-        <h2>Import <span class="info-icon" tabindex="0" data-tip="Upload a CSV, an HTML visualization, or a saved pipeline template (.json) from your computer into your account.">i</span></h2>
+        <h2>Import {% info_tip "import" %}</h2>
         <form method="post" action="{% url 'import_file' %}" enctype="multipart/form-data">
           {% csrf_token %}
           <label for="id_upload">CSV, HTML, or template (.json) file</label>
@@ -31,7 +31,7 @@
           <button type="submit">Upload</button>
         </form>
 
-        <h3>Public library <span class="info-icon" tabindex="0" data-tip="Files other users have chosen to share. Click Pull to copy one into your own account.">i</span></h3>
+        <h3>Public library {% info_tip "public_library" %}</h3>
         <p class="placeholder">Pull shared CSVs, visualizations, and templates into your account.</p>
         <div id="public-library" data-url="{% url 'public_list' %}" data-import-url="{% url 'import_from_public' %}">
           <p class="placeholder">Loading public files&hellip;</p>
@@ -48,7 +48,7 @@
       {% endif %}
 
       <div class="card">
-        <h3>Data <span class="info-icon" tabindex="0" data-tip="Your uploaded and generated data tables.">i</span></h3>
+        <h3>Data {% info_tip "data" %}</h3>
         <ul class="file-list">
           {% for f in csv_files %}
             <li class="file-row" data-kind="csv" data-name="{{ f.name }}">
@@ -66,7 +66,7 @@
             <li class="placeholder">No data files yet.</li>
           {% endfor %}
         </ul>
-        <h3>Visualizations <span class="info-icon" tabindex="0" data-tip="Your generated charts and visualizations.">i</span></h3>
+        <h3>Visualizations {% info_tip "visualizations" %}</h3>
         <ul class="file-list">
           {% for f in html_files %}
             <li class="file-row" data-kind="html" data-name="{{ f.name }}">
@@ -84,7 +84,7 @@
             <li class="placeholder">No visualizations yet.</li>
           {% endfor %}
         </ul>
-        <h3>Templates <span class="info-icon" tabindex="0" data-tip="Saved Studio pipelines you can reload and run again, here or in the Studio tab.">i</span></h3>
+        <h3>Templates {% info_tip "templates" %}</h3>
         <ul class="file-list">
           {% for f in template_files %}
             <li class="file-row" data-kind="template" data-name="{{ f.name }}">
@@ -102,7 +102,7 @@
             <li class="placeholder">No templates yet. Save one in the Studio.</li>
           {% endfor %}
         </ul>
-        <h3>Papers <span class="info-icon" tabindex="0" data-tip="Research papers written in the Synthesize tab. Build one to turn it into an interactive report in Visualizations.">i</span></h3>
+        <h3>Papers {% info_tip "papers" %}</h3>
         <ul class="file-list">
           {% for f in paper_files %}
             <li class="file-row" data-kind="paper" data-name="{{ f.name }}">
@@ -123,7 +123,7 @@
       </div>
 
       <div class="card">
-        <h2>PDF collections <span class="info-icon" tabindex="0" data-tip="Folders of PDFs you can chunk into a dataset with the Chunk PDFs task. Upload your own, or pull a shared collection from the public library.">i</span></h2>
+        <h2>PDF collections {% info_tip "pdf_collections" %}</h2>
         <form method="post" action="{% url 'upload_pdfs' %}" enctype="multipart/form-data">
           {% csrf_token %}
           <label for="id_pdf_collection">Collection name</label>
@@ -140,7 +140,7 @@
       </div>
 
       <div class="card">
-        <h2>Queue a task <span class="info-icon" tabindex="0" data-tip="Run one data-processing or visualization step on your files, without building a full Studio pipeline.">i</span></h2>
+        <h2>Queue a task {% info_tip "queue_task" %}</h2>
         <form method="post" action="{% url 'submit_task' %}" id="task-form">
           {% csrf_token %}
           {% for field in task_form %}
@@ -176,7 +176,7 @@
       </div>
 
       <div class="card">
-        <h2>Recent tasks <span class="info-icon" tabindex="0" data-tip="A history of the steps you've run and whether they succeeded, failed, or are still working.">i</span></h2>
+        <h2>Recent tasks {% info_tip "recent_tasks" %}</h2>
         <div id="recent-tasks-list">
           {% for task in tasks %}
             <div class="task-row">
@@ -190,7 +190,7 @@
       </div>
 
       <div class="card">
-        <h2>API keys <span class="info-icon" tabindex="0" data-tip="Secret tokens for accessing your data from outside code, e.g. scripts or notebooks. Keep them private.">i</span></h2>
+        <h2>API keys {% info_tip "api_keys" %}</h2>
         <form method="post" action="{% url 'issue_api_key' %}">
           {% csrf_token %}
           {{ api_key_form.as_p }}
@@ -220,7 +220,7 @@
 
     <div class="output-panel">
       <div class="card" id="output-viewer-card">
-        <h2>View an output <span class="info-icon" tabindex="0" data-tip="Preview any CSV table or chart you've generated, not just the most recent one.">i</span></h2>
+        <h2>View an output {% info_tip "view_output" %}</h2>
         {% if csv_names or html_names %}
           <label for="output-viewer-select">Previously generated file</label>
           <select id="output-viewer-select">
@@ -291,7 +291,7 @@
       {% endif %}
 
       <div class="card" id="export-card">
-        <h2>Export <span class="info-icon" tabindex="0" data-tip="Download a copy of one of your files to your computer.">i</span></h2>
+        <h2>Export {% info_tip "export" %}</h2>
         {% if csv_names or html_names or template_files %}
           <form id="export-form">
             <label for="export-select">File</label>
@@ -340,7 +340,7 @@
        data-template-save-url="{% url 'save_template' %}"
        data-template-load-url="/studio/templates/__NAME__/">
     <aside class="studio-palette" id="studio-palette">
-      <div class="studio-palette-title">Blocks <span class="info-icon" tabindex="0" data-tip="Drag any of these onto the canvas to add a pipeline step.">i</span></div>
+      <div class="studio-palette-title">Blocks {% info_tip "studio_blocks" %}</div>
     </aside>
 
     <div class="studio-canvas">
@@ -350,7 +350,7 @@
 
     <aside class="studio-side">
       <div class="card" id="active-tasks-card">
-        <h2>Active tasks <span class="active-tasks-count" id="active-tasks-count"></span> <span class="info-icon" tabindex="0" data-tip="Tasks currently queued or running, queued from either tab — the same list as the Dashboard's Recent tasks, filtered to what's in progress.">i</span></h2>
+        <h2>Active tasks <span class="active-tasks-count" id="active-tasks-count"></span> {% info_tip "active_tasks" %}</h2>
         <div id="active-tasks-list">
           {% for task in active_tasks %}
             <div class="active-task-row">
@@ -367,7 +367,7 @@
       <button type="button" class="run-btn" id="run-btn">▶ Run pipeline</button>
 
       <div class="studio-templates">
-        <label for="template-load">Templates <span class="info-icon" tabindex="0" data-tip="Save your current canvas as a reusable template, or load one you saved earlier.">i</span></label>
+        <label for="template-load">Templates {% info_tip "studio_templates" %}</label>
         <select id="template-load"><option value="">Load a template…</option></select>
         <div class="studio-template-actions">
           <button type="button" id="save-template-btn">Save as template</button>
@@ -397,7 +397,7 @@
        data-html-url="/outputs/html/__NAME__/">
     <aside class="synth-side">
       <div class="card synth-doc-card">
-        <h2>Paper <span class="info-icon" tabindex="0" data-tip="Compose a research paper from your own charts and data. Add sections, cite sources, then Build a self-contained interactive report that appears in your Visualizations.">i</span></h2>
+        <h2>Paper {% info_tip "synth_paper" %}</h2>
         <label class="synth-label" for="synth-title-input">Title</label>
         <input type="text" id="synth-title-input" class="synth-title-input" placeholder="Untitled paper">
         <div class="synth-doc-actions">
@@ -412,7 +412,7 @@
       </div>
 
       <div class="card synth-sources-card">
-        <h2>Sources <span class="info-icon" tabindex="0" data-tip="Add a source once; cite it inline from the selection toolbar. References are numbered and formatted automatically.">i</span></h2>
+        <h2>Sources {% info_tip "synth_sources" %}</h2>
         <div id="synth-sources-list"></div>
         <button type="button" id="synth-add-source" class="btn-secondary">+ Add source</button>
       </div>
@@ -450,7 +450,7 @@
        data-chat-url="{% url 'agent_chat' %}" data-reset-url="{% url 'agent_reset' %}" hidden>
     <div class="agent-panel">
       <div class="agent-header">
-        <h2>Assistant <span class="info-icon" tabindex="0" data-tip="A chat assistant with tools for all three tabs: it can inspect your data and queue pipeline steps, read and run Studio pipelines, and read, edit and build the paper open in Synthesize.">i</span></h2>
+        <h2>Assistant {% info_tip "assistant" %}</h2>
         <div class="agent-header-actions">
           <button type="button" id="agent-reset" class="agent-reset" title="Clear conversation">Clear</button>
           <button type="button" id="agent-close" class="agent-reset" title="Hide the assistant">✕</button>

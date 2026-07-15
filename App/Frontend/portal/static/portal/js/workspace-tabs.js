@@ -81,13 +81,4 @@
       if (e.key === "Escape" && !overlay.hidden) close();
     });
   }
-
-  // ------------------------------------------------ info-icon accessibility
-  // The little "i" help chips carry their text in a CSS-only `data-tip`
-  // tooltip, which assistive tech never sees. Mirror it into an aria-label so
-  // screen-reader users get the same hint instead of a bare "i".
-  document.querySelectorAll(".info-icon[data-tip]").forEach(function (el) {
-    if (!el.getAttribute("aria-label")) el.setAttribute("aria-label", el.getAttribute("data-tip"));
-    if (!el.getAttribute("role")) el.setAttribute("role", "note");
-  });
 })();
