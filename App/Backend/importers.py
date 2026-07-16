@@ -382,3 +382,209 @@ def chunk_pdfs(
 
     print(progress_line("Chunking PDFs", len(pdf_items), len(pdf_items)))
     print(f"Success! Wrote {total_chunks:,} chunks from {len(pdf_items)} PDFs to new file '{csv_name}.csv'.")
+
+
+# --------------------------------------------------------------------------- #
+# NASA Task Book reports
+#
+# Unlike a journal PDF (free-flowing prose -> many chunks), every Task Book PDF is a
+# single ColdFusion-generated form with the SAME fixed set of labelled fields, so it
+# parses to exactly ONE structured row per report -- authors, dates, funding and the
+# project narrative pulled out of their form fields rather than chunked. Downloaded by
+# Data_Import/taskbook_scraper.py into the Taskbook_Search_Pdfs / Taskbook_Bibliography_Pdfs
+# collections.
+# --------------------------------------------------------------------------- #
+TASKBOOK_COLUMNS = [
+    "text", "title", "authors", "publish_time", "fiscal_year",
+    "start_date", "end_date", "division", "program", "organization",
+    "project_type", "funding_source", "grant_number", "co_investigators",
+    "bibliography", "source", "source_file", "task_id",
+]
+
+# Every field label the form emits, IN THE ORDER THEY APPEAR. The parser walks this
+# list once from the top of the document, so the text between one label and the next
+# is that label's value -- which is why the order matters and the list must be
+# complete. Labels that wrap across two lines in the PDF (e.g. "Solicitation / Funding
+# Source:") are written here with a single space; the matcher treats every space as
+# "any run of whitespace", so a space or a line break both match.
+_TASKBOOK_LABELS = [
+    "Fiscal Year:", "Task Last Updated:", "PI Name:", "Project Title:",
+    "Division Name:", "Program/Discipline:",
+    "Program/Discipline-- Element/Subdiscipline:", "Joint Agency Name:",
+    "TechPort:", "Human Research Program Elements:", "Human Research Program Risks:",
+    "Space Biology Element:", "Space Biology Cross-Element Discipline:",
+    "Space Biology Special Category:", "PI Email:", "Fax:",
+    "PI Organization Type:", "Phone:", "Organization Name:",
+    "PI Address 1:", "PI Address 2:", "PI Web Page:", "City:", "State:",
+    "Zip Code:", "Congressional District:", "Comments:", "Project Type:",
+    "Solicitation / Funding Source:", "Start Date:", "End Date:",
+    "No. of Post Docs:", "No. of PhD Degrees:", "No. of PhD Candidates:",
+    "No. of Master' Degrees:", "No. of Master's Candidates:",
+    "No. of Bachelor's Degrees:", "No. of Bachelor's Candidates:",
+    "Monitoring Center:", "Contact Monitor:", "Contact Phone:", "Contact Email:",
+    "Flight Program:", "Flight Assignment:", "Key Personnel Changes/Previous PI:",
+    "COI Name (Institution):", "Grant/Contract No.:", "Performance Goal No.:",
+    "Performance Goal Text:", "Task Description:",
+    "Rationale for HRP Directed Research:", "Research Impact/Earth Benefits:",
+    "Task Progress:", "Bibliography Type:",
+]
+_TASKBOOK_LABEL_RX = {
+    label: re.compile(r"\s+".join(re.escape(token) for token in label.split()))
+    for label in _TASKBOOK_LABELS
+}
+
+# Extracting the whole document interleaves each page's header/footer into the text;
+# these lines are boilerplate, not report content, so they are dropped before parsing.
+_TASKBOOK_FURNITURE_RX = re.compile(
+    r"^(Page \d+ of \d+|Task Book Report|Generated on:\s*[\d/]+)\s*$"
+)
+_YEAR_RX = re.compile(r"(19|20)\d{2}")
+
+# The narrative sections, concatenated into the embeddable `text` column in this order.
+_TASKBOOK_NARRATIVE = [
+    "Task Description:", "Research Impact/Earth Benefits:", "Task Progress:",
+]
+
+
+def _strip_furniture(text: str) -> str:
+    """Drop the per-page "Page 1 of 2 / Task Book Report / Generated on:" boilerplate,
+    which the extractor splices into the middle of the text at every page break."""
+    return "\n".join(
+        line for line in text.splitlines()
+        if not _TASKBOOK_FURNITURE_RX.match(line.strip())
+    )
+
+
+def _tb_clean(value: str) -> str:
+    """Rejoin hyphen-broken words and collapse all whitespace to single spaces, so a
+    field wrapped across several PDF lines reads as one flowing string."""
+    value = re.sub(r"-\s*\n\s*", "", value.replace("\r", "\n"))
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _tb_clean_list(value: str) -> str:
+    """Like `_tb_clean` but for one-entry-per-line fields (the co-investigator block):
+    keep the entries distinct by joining them with '; ' instead of a space."""
+    parts = [re.sub(r"\s+", " ", line).strip() for line in value.replace("\r", "\n").split("\n")]
+    return "; ".join(part for part in parts if part)
+
+
+def _parse_taskbook_report(text: str) -> dict:
+    """Slice a Task Book PDF's text into its form fields by walking `_TASKBOOK_LABELS`
+    once from the top: each label's value is the text up to the next label found."""
+    text = _strip_furniture(text)
+
+    spans = []                       # (label, value_start) for every label present
+    cursor = 0
+    for label in _TASKBOOK_LABELS:
+        match = _TASKBOOK_LABEL_RX[label].search(text, cursor)
+        if match:                    # tolerate an absent field: skip it, keep the cursor
+            spans.append((label, match.start(), match.end()))
+            cursor = match.end()
+
+    fields = {}
+    for i, (label, _start, value_start) in enumerate(spans):
+        value_end = spans[i + 1][1] if i + 1 < len(spans) else len(text)
+        fields[label] = text[value_start:value_end]
+    return fields
+
+
+def _taskbook_row(fields: dict, folder_name: str, source_label: str, source_file: str) -> dict:
+    """Map parsed form fields onto the output schema, choosing a canonical `text` and a
+    parseable `publish_time` year."""
+    fiscal_year = _tb_clean(fields.get("Fiscal Year:", ""))
+    start_date = _tb_clean(fields.get("Start Date:", ""))
+    end_date = _tb_clean(fields.get("End Date:", ""))
+
+    # `publish_time` is the platform's date column (feeds extract_year/to_date): use the
+    # fiscal year, falling back to the project start/end year if the FY field is blank.
+    year = ""
+    for candidate in (fiscal_year, start_date, end_date):
+        found = _YEAR_RX.search(candidate)
+        if found:
+            year = found.group(0)
+            break
+
+    # The embeddable prose = the substantive narrative sections stitched together (the
+    # metadata fields are provenance/filters, not semantic content). Joined on a single
+    # space to keep every cell one physical line, like the platform's other `text`
+    # corpora -- multi-line cells would break the catalog's line-based row count.
+    narrative = [_tb_clean(fields.get(section, "")) for section in _TASKBOOK_NARRATIVE]
+    text = " ".join(section for section in narrative if section)
+
+    return {
+        "text": text,
+        "title": _tb_clean(fields.get("Project Title:", "")),
+        "authors": _tb_clean(fields.get("PI Name:", "")),
+        "publish_time": year,
+        "fiscal_year": fiscal_year,
+        "start_date": start_date,
+        "end_date": end_date,
+        "division": _tb_clean(fields.get("Division Name:", "")),
+        "program": _tb_clean(fields.get("Program/Discipline:", "")),
+        "organization": _tb_clean(fields.get("Organization Name:", "")),
+        "project_type": _tb_clean(fields.get("Project Type:", "")),
+        "funding_source": _tb_clean(fields.get("Solicitation / Funding Source:", "")),
+        "grant_number": _tb_clean(fields.get("Grant/Contract No.:", "")),
+        "co_investigators": _tb_clean_list(fields.get("COI Name (Institution):", "")),
+        "bibliography": _tb_clean(fields.get("Bibliography Type:", "")),
+        "source": source_label or folder_name,
+        "source_file": source_file,
+        "task_id": Path(source_file).stem,
+    }
+
+
+def parse_taskbook_pdfs(
+    folders,
+    csv_name: str = "taskbook_reports",
+    source_label: str = "",
+    csv_root: str | Path | None = None,
+    pdf_root: str | Path | None = None,
+):
+    """Turn one or more NASA Task Book PDF collections into a structured CSV, one row
+    per report.
+
+    Every Task Book PDF is the same fixed ColdFusion form, so its labelled fields are
+    pulled straight out into columns -- `authors` (the PI), `publish_time`/`fiscal_year`
+    and start/end dates, `division`, `program`, `organization`, `funding_source`,
+    `grant_number`, `co_investigators` and the `bibliography` -- with the project's
+    narrative sections (description, Earth-benefit impact, progress) concatenated into
+    an embeddable `text` column. `source_label` tags each row's origin (defaults to the
+    collection folder name). Point it at the Taskbook_Search_Pdfs /
+    Taskbook_Bibliography_Pdfs collections; feed `text` through embed_text ->
+    reduce_dimensionality -> cluster -> label_topics to match Space_Biology's columns.
+    """
+    import fitz  # PyMuPDF
+
+    pdf_items, names = _collect_pdfs(folders, pdf_root)
+
+    output_path = resolve_csv_path(csv_name, csv_root)
+    pd.DataFrame(columns=TASKBOOK_COLUMNS).to_csv(output_path, index=False)
+    print(f"Parsing {len(pdf_items)} Task Book PDFs from {len(names)} folder(s) → '{csv_name}.csv'.")
+
+    written = empty_text = 0
+    for i, (folder_name, path) in enumerate(pdf_items, start=1):
+        print(progress_line(f"Parsing Task Book reports (last: {path.name})", i - 1, len(pdf_items)))
+        try:
+            doc = fitz.open(path)
+            text = "".join(page.get_text() for page in doc)
+            doc.close()
+        except Exception as exc:
+            print(f"Skipping '{path.name}' (could not read: {exc}).")
+            continue
+
+        fields = _parse_taskbook_report(text)
+        row = _taskbook_row(fields, folder_name, source_label, path.name)
+        if not row["text"]:
+            empty_text += 1
+
+        # Stream each report to disk as it is parsed, so a long run survives an
+        # interruption with partial progress intact (same contract as the importers above).
+        pd.DataFrame([row], columns=TASKBOOK_COLUMNS).to_csv(
+            output_path, mode="a", header=False, index=False
+        )
+        written += 1
+
+    print(progress_line("Parsing Task Book reports", len(pdf_items), len(pdf_items)))
+    note = f" ({empty_text} had no narrative text)" if empty_text else ""
+    print(f"Success! Wrote {written:,} Task Book reports to new file '{csv_name}.csv'{note}.")

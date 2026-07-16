@@ -255,6 +255,34 @@ IMPORT_FUNCTIONS = [
         ),
         roots=("csv", "pdf"),
     ),
+    Function(
+        name="parse_taskbook_pdfs",
+        category="import",
+        impl="App.Backend.importers:parse_taskbook_pdfs",
+        label="Parse Task Book PDFs",
+        summary="Parse NASA Task Book PDF collections into a structured report CSV",
+        description=(
+            "[Import] Parse every NASA Task Book PDF in the named `folders` (comma-separated "
+            "collection names from your own PDF area or the public library -- call "
+            "list_pdf_folders to see them, e.g. Taskbook_Search_Pdfs / Taskbook_Bibliography_Pdfs) "
+            "into a brand-new `csv_name` CSV with ONE row per report. Each PDF is the same fixed "
+            "Task Book form, so its fields are pulled straight into columns: `text` (the project "
+            "narrative -- description, Earth-benefit impact and progress -- concatenated for "
+            "embedding), `title`, `authors` (the PI), `publish_time`/`fiscal_year`, `start_date`, "
+            "`end_date`, `division`, `program`, `organization`, `project_type`, `funding_source`, "
+            "`grant_number`, `co_investigators`, `bibliography`, plus provenance (source, "
+            "source_file, task_id). `source_label` tags each row's origin (defaults to the "
+            "collection name). Feed the `text` column through embed_text -> reduce_dimensionality "
+            "-> cluster -> label_topics to match Space_Biology's columns. Queues a background task "
+            "and returns its task_id."
+        ),
+        params=(
+            _p("folders", str, "", "Comma-separated Task Book PDF collection names.", required=True),
+            _p("csv_name", str, "taskbook_reports", "The new CSV to write (no .csv extension)."),
+            _p("source_label", str, "", "Tags each row's origin (defaults to the collection name)."),
+        ),
+        roots=("csv", "pdf"),
+    ),
 ]
 
 # --------------------------------------------------------------------------- #
