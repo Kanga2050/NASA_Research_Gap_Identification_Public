@@ -3,7 +3,7 @@
  "blocks": [
   {
    "type": "subtitle",
-   "html": "A three-corpus computational map of research priorities, open data, and the published literature — with the field's temporal drift read against the programs, publications, and events that drove it, and an evidence-based hypothesis for where NASA funding should move next."
+   "html": "A four-corpus computational map of what space biology publishes, shares, prioritises and funds &mdash; with the field's temporal drift read against the programmes and events that drove it, a lens on what researchers themselves admit they do not know, and an evidence-based hypothesis for where NASA funding should move next."
   },
   {
    "type": "byline",
@@ -14,11 +14,11 @@
     },
     {
      "label": "Corpora",
-     "value": "OpenAlex · NASA OSDR · National Academies Decadal Surveys"
+     "value": "OpenAlex &middot; NASA OSDR &middot; National Academies Decadal Surveys &middot; NASA Task Book"
     },
     {
      "label": "Date",
-     "value": "13 July 2026 &middot; expanded 14 July 2026"
+     "value": "13 July 2026 &middot; expanded 14 &amp; 16 July 2026"
     }
    ]
   },
@@ -29,13 +29,14 @@
   {
    "type": "abstract",
    "paras": [
-    "Human deep-space exploration depends on a biological research base aligned with the risks\n  astronauts will actually face. We ask whether that base is aligned, and in which direction it is\n  drifting, by computationally comparing three corpora that occupy the same scientific embedding space\n  but play different roles: the broad <b>published literature</b> (101,273 OpenAlex records), the\n  <b>open-data evidence base</b> (171 papers deposited in NASA's Open Science Data Repository, OSDR),\n  and the field's <b>strategic priorities</b> (three National Academies Decadal Survey volumes,\n  2,580 passages). Using SPECTER2 embeddings, HDBSCAN topic discovery, a new hierarchical-clustering\n  capability, cross-corpus semantic probing, and per-year emphasis trajectories, we quantify the gap\n  between what is prioritised, what has reusable data, and what is being published — and how that gap\n  moves over three decades.",
-    "Three findings stand out. First, the gap is <b>two-dimensional</b>: the integrative human-physiology\n  risks the Decadal Survey elevates — cardiovascular/fluid-shift, neuro-ocular (SANS), muscle, and\n  (in absolute terms) bone — are not merely under-represented in the literature; their emphasis is\n  <i>actively falling</i>, while omics, microbiome, and plant biology rise without a corresponding pull\n  from priorities or open data. Second, this reorientation is <b>invisible to paper-counting</b>: the\n  coarse topic composition of yearly output is broadly stable, so the shift lives in the semantic\n  emphasis <i>within</i> the on-target literature. Third, the trajectories are <b>legible against the\n  historical record</b>: the rises track identifiable programs and landmark results (NASA GeneLab and\n  the 2019 Twins Study for omics; the NIH Human Microbiome Project for microbiome; the ISS Veggie and\n  Advanced Plant Habitat for plants), while the falls track the <i>maturation</i> of countermeasures\n  and infrastructure (resistive-exercise and bisphosphonate protocols for bone; the NASA Space Radiation\n  Laboratory for radiation) rather than the resolution of the underlying risk. We synthesise the two\n  axes into a single map and close with a hypothesis for how NASA should redistribute research funding —\n  a hypothesis that the 2023 Decadal Survey's own finding of severe programme under-funding makes urgent. Two further analyses sharpen the picture: a theme co-occurrence network shows the retreating integrative-human-physiology risks form a single densely-connected community of co-studied problems — so their decline is one coordinated reorientation rather than ten coincidences — and an acceleration view confirms the drift has not begun to reverse in the most recent five years. Every date in the historical reading is validated against a primary source."
+    "Human deep-space exploration depends on a biological research base aligned with the risks astronauts will actually face. We ask whether that base is aligned, and in which direction it is drifting, by computationally comparing four corpora that occupy the same scientific embedding space but play different roles: the broad published literature (101,273 OpenAlex records), the open-data evidence base (171 papers deposited in NASA's Open Science Data Repository, OSDR), the field's strategic priorities (three National Academies Decadal Survey volumes, 2,580 passages), and the agency's own funding record (6,353 NASA Task Book projects, FY2004&ndash;2027). Using SPECTER2 embeddings, HDBSCAN topic discovery, hierarchical clustering, cross-corpus semantic probing, and per-year emphasis trajectories, we quantify the gap between what is prioritised, what has reusable data, what is funded, and what is being published &mdash; and how that gap moves over three decades.",
+    "Four findings stand out. First, the gap is two-dimensional: the integrative human-physiology risks the Decadal Survey elevates &mdash; cardiovascular/fluid-shift, neuro-ocular (SANS), muscle, and (in absolute terms) bone &mdash; are not merely under-represented in the literature; their emphasis is actively falling, while omics, microbiome, and plant biology rise without a corresponding pull from priorities, open data, or funding. Second, this reorientation is invisible to paper-counting: the coarse topic composition of yearly output is broadly stable, so the shift lives in the semantic emphasis within the on-target literature. Third, of the four windows it is the <i>literature</i> that is the outlier: NASA's funded portfolio tracks the Decadal priorities far more tightly (r = 0.94) than it tracks the drifting literature (r = 0.65), and the money already moves counter-cyclically to the field's fashion. Fourth, the trajectories are legible against the historical record: the rises track identifiable programmes and landmark results (NASA GeneLab and the 2019 Twins Study for omics; the NIH Human Microbiome Project for microbiome; the ISS Veggie and Advanced Plant Habitat for plants), while the falls track the maturation of countermeasures and infrastructure rather than the resolution of the underlying risk.",
+    "A final lens asks each corpus not what it studies but what it admits it does not know, by retrieving the passages in which researchers explicitly hedge &mdash; &ldquo;remains unknown&rdquo;, &ldquo;poorly understood&rdquo;, &ldquo;a knowledge gap&rdquo;. The result inverts the usual reading of momentum: across the ten risks, the literature's willingness to flag a theme as open is <i>negatively</i> correlated with how fast it is moving toward that theme (r = &minus;0.42). The field is loudest about its ignorance precisely where it is retreating, and quietest where it is surging &mdash; plant/crops, the fastest-rising theme of all, is the single least-hedged theme in the corpus. The same lens exposes a methodological trap: semantic embedding cannot represent epistemic stance, so hybrid retrieval of acknowledged unknowns performs <i>worse</i> than keyword retrieval alone. We synthesise these axes into a single map and close with a hypothesis for how NASA should redistribute research funding &mdash; a hypothesis the 2023 Decadal Survey's own finding of severe programme under-funding makes urgent."
    ]
   },
   {
    "type": "keywords",
-   "html": "space biology · research-gap analysis · SPECTER2 · topic modelling ·\nhierarchical clustering · science of science · NASA OSDR / GeneLab · Decadal Survey · funding strategy"
+   "html": "space biology &middot; research-gap analysis &middot; SPECTER2 &middot; topic modelling &middot; hierarchical clustering &middot; science of science &middot; NASA OSDR / GeneLab &middot; Decadal Survey &middot; NASA Task Book &middot; funding strategy &middot; research funding portfolio &middot; acknowledged unknowns &middot; hedging &middot; epistemic stance"
   },
   {
    "type": "heading",
@@ -55,17 +56,17 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "We answer it by triangulating three different <i>kinds</i> of document. What the community\n<i>says it should study</i> is captured by the National Academies' Decadal Surveys. What it has\nproduced <i>reusable evidence</i> for is captured by NASA's Open Science Data Repository. What it is\n<i>actually publishing</i> is captured by a large OpenAlex harvest. Because all three are embedded in\nthe same semantic space, we can measure not only what each contains but how far apart they are — and,\nfor the literature, how that distance has changed year by year since the mid-1990s. We then take the\nunusual step of <i>interpreting</i> those trajectories: for each rising or falling theme we ask what\nprogramme, facility, or landmark publication in the real world plausibly drove the change, and whether\nthe change reflects a scientific <i>advance</i> or merely a shift in fashion. The contribution is\nfivefold: (i) a reusable hierarchical-clustering capability added to the analysis platform; (ii) a\ntwo-axis \"priority gap × temporal momentum\" framework that separates static under-service from\ndirectional drift; (iii) an event-grounded, source-validated reading of the field's three-decade reorientation; (iv) a theme co-occurrence network that resolves the field's ten risks into co-studied communities and shows the neglected human-physiology risks form a single one of them; and (v) a concrete, evidence-tied funding hypothesis."
+   "html": "We answer it by triangulating four different kinds of document, treated throughout as peers. What the community says it should study is captured by the National Academies' Decadal Surveys. What it has produced reusable evidence for is captured by NASA's Open Science Data Repository. What it is actually publishing is captured by a large OpenAlex harvest. And what NASA actually funds is captured by the agency's Task Book grant database. Because all four are embedded in the same semantic space, we can measure not only what each contains but how far apart they are &mdash; and, for the literature and the funding record, how that distance has changed year by year. We then take two further steps. We interpret the trajectories: for each rising or falling theme we ask what programme, facility, or landmark publication plausibly drove the change, and whether it reflects a scientific advance or merely a shift in fashion. And we turn the corpora on their own uncertainty, asking not what each says but what each admits it does not know. The contribution is sixfold: (i) a reusable hierarchical-clustering capability added to the analysis platform; (ii) a two-axis &ldquo;priority gap &times; temporal momentum&rdquo; framework that separates static under-service from directional drift; (iii) an event-grounded, source-validated reading of the field's three-decade reorientation; (iv) a theme co-occurrence network that resolves the field's ten risks into co-studied communities and shows the neglected human-physiology risks form a single one of them; (v) a <b>frontier lens</b> that measures each corpus's acknowledged unknowns and finds the field's candour runs opposite to its momentum; and (vi) a concrete, evidence-tied funding hypothesis, tested against NASA's own funding record rather than merely asserted."
   },
   {
    "type": "heading",
    "num": "2",
-   "text": "Background: three windows on one field"
+   "text": "Background: four windows on one field"
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The analysis rests on the fact that our three corpora are not three samples of the same thing;\nthey are three <i>functionally different</i> records of the field. Understanding what each one is — and\nis not — is a prerequisite for interpreting any gap between them."
+   "html": "The analysis rests on the fact that our four corpora are not four samples of the same thing; they are four functionally different records of the field &mdash; what it publishes, what it makes re-usable, what it says it should do, and what it pays for. Understanding what each one is &mdash; and is not &mdash; is a prerequisite for interpreting any gap between them."
   },
   {
    "type": "subheading",
@@ -198,11 +199,43 @@
    "new": false
   },
   {
+   "type": "subheading",
+   "text": "The funded portfolio — the NASA Task Book",
+   "tag": ""
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "The three records above say what the field publishes, what it makes re-usable, and what it says it should do. None of them says what it is paid to do. NASA keeps that record: the <b>NASA Task Book</b> is the agency's public database of funded Biological and Physical Sciences research projects &mdash; one structured report per award, giving its objectives, progress, personnel, division, funding line and resulting publications.<sup class=\"r\"><a href=\"#r12\">12</a></sup> We parsed 8,487 Task Book PDFs into two collections and, after establishing that they describe the same population, merged them into <b>6,353 unique funded projects</b> spanning FY2004&ndash;2027. The scraper reached the database through two entry points &mdash; a project search (2,916 reports) and a bibliography index of projects with catalogued publications (5,571) &mdash; which overlap in 2,134 projects but are neither a subset of the other. Because the two are inherently related, the first question is whether they tell different stories. They do not: their division composition differs by no more than three percentage points on any division (Figure&nbsp;6), and their theme-emphasis profiles are indistinguishable. That is a small robustness result in itself &mdash; the portfolio's shape does not depend on how the database is queried &mdash; and it settles a choice we apply consistently hereafter: we compare the two collections once, here, where the comparison is the point, and combine them (deduplicated by task id) everywhere else."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Collection_Compare",
+   "headline": "Two queries, one portfolio.",
+   "caption": "Division composition of the two Task Book collections &mdash; the <i>search</i> set (2,916 projects) and the <i>bibliography</i> set (5,571). The two profiles differ by at most three points on any division, so they are merged (union of task ids, 6,353 unique projects) for every analysis that follows.",
+   "alt": "Two queries, one portfolio.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "What kind of record is this? Like the Decadal volumes, and unlike the literature, the Task Book is an <i>institutional</i> corpus: every entry exists because someone at NASA decided to pay for it, so it states intent as well as result. Its composition is the first surprise. Human Research accounts for <b>52%</b> of funded projects (3,284 of 6,353), Physical Sciences for 29% (1,812), and Space Biology for 19% (1,222) &mdash; more than half of what NASA funds is human physiology and operational medicine, whereas the broad literature's centre of mass is molecular and organismal biology. The institutional base (Figure&nbsp;7) mixes NASA field centres (Johnson and Ames lead, with 307 and 171 projects) with research universities (Pennsylvania, Florida, Texas A&amp;M, Washington) &mdash; the signature of an agency funding both in-house operational research and external basic science. This corpus is therefore neither a sample of the field nor a sample of opinion about it: it is the field's budget, written down."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Top_Institutions",
+   "headline": "Who does the funded work.",
+   "caption": "The fifteen institutions with the most funded projects across the merged portfolio. NASA field centres (Johnson, Ames, Glenn, JPL) sit alongside major research universities &mdash; the signature of a portfolio split between in-house operational research and extramural basic science.",
+   "alt": "Who does the funded work.",
+   "new": true
+  },
+  {
    "type": "callout",
    "variant": "",
-   "title": "The three-way question",
+   "title": "The four-way question",
    "paras": [
-    "Priorities (Decadal), evidence (OSDR), and literature (OpenAlex) rarely coincide. Where the\n  literature is loud but priorities and open data are quiet, effort may be mis-allocated; where\n  priorities are loud but literature and data are quiet, a risk may be going unmet. The rest of this\n  report measures those mismatches, tracks their motion over time, and asks what in the real world\n  moved them."
+    "Priorities (Decadal), evidence (OSDR), literature (OpenAlex) and funding (Task Book) rarely coincide. Where the literature is loud but priorities, open data and funding are quiet, effort may be mis-allocated; where priorities are loud but literature and data are quiet, a risk may be going unmet. The rest of this report measures those mismatches, tracks their motion over time, and asks what in the real world moved them.",
+    "Because the funding record is a record of intent as well as activity, it plays a double role: it is one of the four windows compared in &sect;4, and it is the evidence against which the report's closing funding hypothesis is ultimately tested."
    ]
   },
   {
@@ -219,7 +252,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Every passage in all three corpora is embedded with <b>SPECTER2</b>, a scientific-document model\nthat maps titles and abstracts to 768-dimensional vectors in which citation-and-topic neighbours lie\nclose together. Because a single model embeds all three corpora, distances <i>between</i> corpora are\nmeaningful: a Decadal recommendation and an OSDR transcriptomics paper about the same risk land in the\nsame region of the space. This shared geometry is what makes cross-corpus comparison possible."
+   "html": "Every passage in all four corpora is embedded with SPECTER2, a scientific-document model that maps titles and abstracts to 768-dimensional vectors in which citation-and-topic neighbours lie close together. Because a single model embeds all four corpora, distances between them are meaningful: a Decadal recommendation, an OSDR transcriptomics paper, and a funded Task Book project about the same risk land in the same region of the space. This shared geometry is what makes cross-corpus comparison possible."
   },
   {
    "type": "subheading",
@@ -252,7 +285,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "To compare corpora on the same terms, we define ten <b>spaceflight-risk themes</b> (bone, muscle,\ncardiovascular/fluid-shift, neuro-ocular/SANS, immune, radiation/DNA, gene-expression/omics,\nplant/crops, microbiome, circadian/behavioural) and embed a natural-language probe for each. We\ncombine all three corpora into one file, score every passage's cosine similarity to every theme probe\n(<span class=\"tag\">semantic_score</span>), and average within each corpus. A theme's <i>raw</i> mean,\nhowever, is dominated by a baseline offset — the corpora sit at different absolute similarities\n(Literature 0.743 &lt; OSDR 0.758 &lt; Decadal 0.771) simply because strategy prose and curated\nabstracts are lexically denser than a broad harvest. We remove this offset by <b>mean-centering each\ncorpus</b> (subtracting its own across-theme average), so the reported <i>emphasis</i> value answers\nthe right question: <i>relative to everything else this corpus discusses, how much weight does it place\non this theme?</i> Values are scaled ×1000 for readability."
+   "html": "To compare corpora on the same terms, we define ten spaceflight-risk themes (bone, muscle, cardiovascular/fluid-shift, neuro-ocular/SANS, immune, radiation/DNA, gene-expression/omics, plant/crops, microbiome, circadian/behavioural) and embed a natural-language probe for each. We score every passage's cosine similarity to every theme probe (<span class=\"tag\">semantic_score</span>) and average within each corpus. A theme's raw mean, however, is dominated by a baseline offset &mdash; the corpora sit at different absolute similarities (Literature 0.743 &lt; OSDR 0.758 &lt; Decadal 0.771 &lt; Task Book 0.780) simply because strategy prose, curated abstracts and project narratives are lexically denser than a broad harvest. We remove this offset by mean-centering each corpus (subtracting its own across-theme average), so the reported emphasis value answers the right question: relative to everything else this corpus discusses, how much weight does it place on this theme? Values are scaled &times;1000 for readability. The same ten probes are used for all four corpora, so the funded portfolio drops into the comparison as a fourth column rather than a separate analysis."
   },
   {
    "type": "subheading",
@@ -263,7 +296,27 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Only the literature carries usable dates. (OSDR's <span class=\"tag\">publish_time</span> is stored as\na float and mis-parses almost entirely to the Unix epoch; the Decadal volumes have no per-passage\ndates.) For the literature we compute two temporal views per year from 1995–2024, the interval with\nadequate sample sizes: the <b>share of each year's output</b> falling into each super-theme (a volume\nmeasure, §4.3), and the <b>mean semantic emphasis</b> of each risk theme (an attention measure, §4.4).\nComparing the two is itself informative. In §5 we overlay the emphasis trajectories on a hand-built\ntimeline of programmes, facilities, and landmark publications to test whether the movements have\nidentifiable real-world drivers."
+   "html": "Two of the four corpora carry usable dates, and they give us two independent time axes. The literature carries publication years: for it we compute two views per year from 1995&ndash;2024, the interval with adequate sample sizes &mdash; the share of each year's output falling into each super-theme (a volume measure, &sect;4.3), and the mean semantic emphasis of each risk theme (an attention measure, &sect;4.4). The Task Book carries fiscal years, giving a funding time axis from FY2004 that we use to date the portfolio's own shifts (&sect;4.3, &sect;4.5). The remaining two cannot be dated: OSDR's <span class=\"tag\">publish_time</span> is stored as a float and mis-parses almost entirely to the Unix epoch, and the Decadal volumes have no per-passage dates. In &sect;6 we overlay the emphasis trajectories on a hand-built timeline of programmes, facilities, and landmark publications to test whether the movements have identifiable real-world drivers."
+  },
+  {
+   "type": "subheading",
+   "text": "Mining acknowledged unknowns",
+   "tag": "new method"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "The four windows above measure what each corpus <i>attends to</i>. A fifth question is available in the same text and is rarely asked: what does each corpus say it does <i>not</i> know? Researchers mark their own frontier constantly &mdash; &ldquo;the mechanism remains unknown&rdquo;, &ldquo;poorly understood&rdquo;, &ldquo;this knowledge gap needs to be addressed&rdquo; &mdash; and those hedges are a bottom-up, self-declared statement of where work is needed, as opposed to the Decadal's top-down declaration. We retrieve them by scoring every passage against an acknowledged-unknown probe (&ldquo;unknown, poorly understood, remains to be determined, further research is needed, an open question requiring future study&rdquo;) three ways: lexically with <span class=\"tag\">keyword_score</span> (TF-IDF cosine), semantically with <span class=\"tag\">semantic_score</span> (SPECTER2 cosine), and fused with <span class=\"tag\">hybrid_score</span> (reciprocal-rank fusion)."
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "That retrieval step produced a methodological result worth reporting before any finding rests on it, and it changed the instrument we use. Validated against an auditable ground truth &mdash; does the passage actually contain an explicit hedge? &mdash; <b>the semantic probe barely beats chance on the literature (AUC 0.581), and the hybrid score (0.661) performs worse than the keyword score alone (0.742)</b> (Figure&nbsp;35). The reason is structural rather than incidental: SPECTER2 is trained to place documents by <i>topic</i>, and acknowledging ignorance is not a topic but a <i>stance</i>. Asked for passages about unknowns, it returns papers about emerging methods (&ldquo;Deep generative models for peptide design&rdquo;) &mdash; topically adjacent to novelty, epistemically silent. Semantic search cannot see hedging, and fusing it with keyword search actively dilutes a signal keyword search had already found. We therefore define the frontier by an explicit, human-auditable <b>cue-phrase criterion</b> and keep the three scores as the diagnostic that establishes why &mdash; a caution for anyone reaching for embeddings to measure a rhetorical property of text."
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "Two instruments follow, and they answer different questions. <b>Density</b> is the share of a corpus's passages carrying an explicit hedge. It is absolute and comparable, but it is <i>genre-driven</i>: a proposal states its unknowns by design, a strategy document asks questions by design, and a deposited-data paper reports results. We therefore report density as corpus character and never as a ranking of intellectual honesty. <b>Openness</b> is the comparable quantity: for each theme, the open-question rate among the corpus's most theme-leaning quarter (ranked on the within-passage relative emphasis of &sect;4.8), minus that corpus's own baseline rate. Because the cells are equal-sized (25% of the corpus each) and the contrast is internal, openness removes the genre offset exactly as mean-centering removes the similarity offset in &sect;3.4. Every cross-corpus claim in &sect;5 rests on openness, and each cell carries a 95% confidence interval of roughly &plusmn;1&ndash;2 percentage points, which is the resolution at which those claims should be read."
   },
   {
    "type": "heading",
@@ -279,7 +332,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The dendrograms make each corpus's organisation legible. In the literature (Figure&nbsp;6), the\non-target <span class=\"tag\">space, biology, research</span> topic is not a hub — it is a lone leaf that\njoins education, \"spatial\"-homonym false positives, and the biomedical/ecological bulk only at the\nmaximum linkage distance. Because the chart is interactive, the on-target branch can be zoomed directly:\nthe genuine core is small and surrounded by near-neighbours that are lexical accidents rather than\nscientific kin. This is the haystack made visible."
+   "html": "The dendrograms make each corpus's organisation legible. In the literature (Figure&nbsp;8), the\non-target <span class=\"tag\">space, biology, research</span> topic is not a hub — it is a lone leaf that\njoins education, \"spatial\"-homonym false positives, and the biomedical/ecological bulk only at the\nmaximum linkage distance. Because the chart is interactive, the on-target branch can be zoomed directly:\nthe genuine core is small and surrounded by near-neighbours that are lexical accidents rather than\nscientific kin. This is the haystack made visible."
   },
   {
    "type": "figure",
@@ -292,7 +345,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "OSDR (Figure&nbsp;7) tells the opposite story — a compact, coherent tree that splits cleanly into an\nomics/plant branch, a microgravity gene-expression branch, and a radiation/rodent branch, mirroring the\nmechanistic identity established in §2.2. The Decadal tree (Figure&nbsp;8), re-clustered at finer\nresolution so its homogeneous prose resolves into more than a handful of topics, separates into\nhuman-physiology, <b>physical-sciences</b>, and plant branches; the prominence of the physical-sciences\nbranch is a direct visual reminder that the survey's remit is broader than biology."
+   "html": "OSDR (Figure&nbsp;9) tells the opposite story — a compact, coherent tree that splits cleanly into an\nomics/plant branch, a microgravity gene-expression branch, and a radiation/rodent branch, mirroring the\nmechanistic identity established in §2.2. The Decadal tree (Figure&nbsp;10), re-clustered at finer\nresolution so its homogeneous prose resolves into more than a handful of topics, separates into\nhuman-physiology, <b>physical-sciences</b>, and plant branches; the prominence of the physical-sciences\nbranch is a direct visual reminder that the survey's remit is broader than biology."
   },
   {
    "type": "figure",
@@ -313,7 +366,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Cutting the literature tree into nine super-themes (Figure&nbsp;9) gives the interpretable partition\nused for the composition analysis below. The largest is the on-target space-biology/radiation\nmacro-area (~10.5k papers); plant biology forms a distinct ~3.2k super-theme; and a substantial cluster\nis bibliographic-metadata noise — a partition we treat honestly rather than hide."
+   "html": "Cutting the literature tree into nine super-themes (Figure&nbsp;11) gives the interpretable partition\nused for the composition analysis below. The largest is the on-target space-biology/radiation\nmacro-area (~10.5k papers); plant biology forms a distinct ~3.2k super-theme; and a substantial cluster\nis bibliographic-metadata noise — a partition we treat honestly rather than hide."
   },
   {
    "type": "figure",
@@ -326,21 +379,21 @@
   {
    "type": "subheading",
    "num": "4.2",
-   "text": "The static gap: priorities vs. evidence vs. literature",
+   "text": "The static gap: priorities vs. evidence vs. literature vs. funding",
    "tag": ""
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Figure&nbsp;10 is the core cross-sectional result: the mean-centred emphasis of each risk theme in\nall three corpora at once. Reading it theme by theme reveals a structured, non-random pattern rather\nthan uniform misalignment."
+   "html": "Figure&nbsp;12 is the core cross-sectional result: the mean-centred emphasis of each risk theme in all four corpora at once &mdash; what is published, what is shared, what is prioritised, and what is funded. Reading it theme by theme reveals a structured, non-random pattern rather than uniform misalignment. It also delivers the report's single most consequential comparison, which we take up below: across the ten themes, funded emphasis correlates with the Decadal priorities at r = 0.94 and with the open-data base at r = 0.90, but with the published literature at only r = 0.65 &mdash; essentially the same loose coupling the literature has with the priorities themselves (r = 0.68). Of the four windows, it is the literature that is the outlier; funding, priorities and open data agree."
   },
   {
    "type": "figure",
-   "chart": "Coverage_Grouped_Bar",
-   "alt": "Grouped bar of theme emphasis across three corpora",
-   "headline": "The three-corpus gap.",
-   "caption": "Relative (mean-centred, ×1000) emphasis of ten\n  spaceflight-risk themes in the literature, the open-data base, and the priorities. Bars above zero =\n  emphasised more than that corpus's average; below zero = less. The ordering and sign disagreements\n  between the three bars of each theme are the \"gaps\".",
-   "new": false
+   "chart": "TB_Coverage_4way",
+   "headline": "Four windows on the same ten risks.",
+   "caption": "Mean-centred emphasis of each risk theme in all four corpora &mdash; published (Literature), shared (OSDR), prioritised (Decadal) and funded (Task Book). The funded (purple) bars track the priorities (green) and open data (red); the literature (blue) departs from all three most visibly on plant (high in the literature, low everywhere else) and cardiovascular (lowest in the literature).",
+   "alt": "Four windows on the same ten risks.",
+   "new": true
   },
   {
    "type": "paragraph",
@@ -350,7 +403,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Figure&nbsp;11 distils this into a single ranking: the <b>priority gap</b>, Decadal emphasis minus\nliterature emphasis, for each theme. It sorts the field cleanly. On the left, the themes priorities\nwant <i>more</i> of than the literature supplies — circadian (+14.1), muscle (+11.9), cardiovascular\n(+10.4), immune (+9.1), SANS (+6.3); on the right, the themes the literature over-weights relative to\npriorities — plant/crops (−19.0), microbiome (−13.0), gene/omics and bone (−10.2 each). Radiation sits\nalmost exactly at zero: priorities and literature agree on it. This one bar is the static half of the\nreport's thesis."
+   "html": "Figure&nbsp;13 distils this into a single ranking: the <b>priority gap</b>, Decadal emphasis minus\nliterature emphasis, for each theme. It sorts the field cleanly. On the left, the themes priorities\nwant <i>more</i> of than the literature supplies — circadian (+14.1), muscle (+11.9), cardiovascular\n(+10.4), immune (+9.1), SANS (+6.3); on the right, the themes the literature over-weights relative to\npriorities — plant/crops (−19.0), microbiome (−13.0), gene/omics and bone (−10.2 each). Radiation sits\nalmost exactly at zero: priorities and literature agree on it. This one bar is the static half of the\nreport's thesis."
   },
   {
    "type": "figure",
@@ -363,7 +416,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The same information becomes a diagnostic when plotted as a <b>priority-alignment map</b>\n(Figure&nbsp;12): literature emphasis on the horizontal axis, Decadal-priority emphasis on the vertical,\nwith the 45° line marking perfect agreement. Points <i>above</i> the line are under-served — priorities\nwant more than the literature gives — and points <i>below</i> are over-served. Muscle, cardiovascular,\ncircadian, and SANS all sit clearly above the diagonal; plant/crops and microbiome sit conspicuously\nbelow it. Immune and omics sit near the line at high emphasis (aligned strengths); bone sits near the\nline at low emphasis (aligned <i>neglect</i>, with the lexical caveat noted below). The vertical\ndistance of each bubble from the diagonal <i>is</i> the gap."
+   "html": "The same information becomes a diagnostic when plotted as a <b>priority-alignment map</b>\n(Figure&nbsp;14): literature emphasis on the horizontal axis, Decadal-priority emphasis on the vertical,\nwith the 45° line marking perfect agreement. Points <i>above</i> the line are under-served — priorities\nwant more than the literature gives — and points <i>below</i> are over-served. Muscle, cardiovascular,\ncircadian, and SANS all sit clearly above the diagonal; plant/crops and microbiome sit conspicuously\nbelow it. Immune and omics sit near the line at high emphasis (aligned strengths); bone sits near the\nline at low emphasis (aligned <i>neglect</i>, with the lexical caveat noted below). The vertical\ndistance of each bubble from the diagonal <i>is</i> the gap."
   },
   {
    "type": "figure",
@@ -376,7 +429,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "A natural follow-up is whether the <i>open-data</i> base tracks the literature or the priorities.\nFigure&nbsp;13 plots OSDR emphasis against literature emphasis per theme. The two are strongly\ncorrelated — omics and immune are high in both, bone and cardiovascular low in both — which tells us\nopen data is generated <i>where the science already is</i>, not where priorities point. The important\ndepartures are plant/crops and microbiome, which the literature emphasises but OSDR does <i>not</i>\n(they fall below the trend): these themes have bottom-up publishing momentum without a matching\ndeposited-data substrate. Open data, in other words, inherits the literature's blind spots rather than\ncorrecting them — so it cannot be relied on to fill the human-physiology gap on its own."
+   "html": "A natural follow-up is whether the <i>open-data</i> base tracks the literature or the priorities.\nFigure&nbsp;15 plots OSDR emphasis against literature emphasis per theme. The two are strongly\ncorrelated — omics and immune are high in both, bone and cardiovascular low in both — which tells us\nopen data is generated <i>where the science already is</i>, not where priorities point. The important\ndepartures are plant/crops and microbiome, which the literature emphasises but OSDR does <i>not</i>\n(they fall below the trend): these themes have bottom-up publishing momentum without a matching\ndeposited-data substrate. Open data, in other words, inherits the literature's blind spots rather than\ncorrecting them — so it cannot be relied on to fill the human-physiology gap on its own."
   },
   {
    "type": "figure",
@@ -384,6 +437,32 @@
    "alt": "Scatter of literature vs OSDR emphasis per theme",
    "headline": "Open data follows the literature, not the priorities.",
    "caption": "Per-theme OSDR\n  emphasis vs. literature emphasis. The tight positive relationship means reusable data accumulates where\n  publishing is already active; plant/crops and microbiome are the notable literature-rich, data-poor\n  exceptions.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "If the money tracks the priorities, does it also run against the literature? Figure&nbsp;16 plots each theme's funded emphasis against its emphasis in the published literature, and the answer is unambiguous. The integrative human-physiology risks the literature is retreating from are funded <i>more</i> than they are published: circadian/behavioural (funded &minus; published = +12.0), muscle (+10.0), immune (+9.0), cardiovascular (+6.4) and neuro-ocular/SANS (+6.3) all sit above the diagonal. The themes the literature emphasises most are funded less than they are published, plant/crops most dramatically of all (&minus;31.1, from the literature's most positive theme to the portfolio's most negative). NASA's research funding already moves counter-cyclically to the literature's drift &mdash; the very posture &sect;8 argues for, here observed rather than recommended."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Funding_vs_Literature",
+   "headline": "The money runs counter to the literature.",
+   "caption": "Each theme's funded emphasis (vertical) against its emphasis in the published literature (horizontal); the dashed line is parity. Points above the line are funded more than they are published &mdash; and they are precisely the integrative human-physiology risks (red). Plant/crops sits far below: the literature's favourite is the portfolio's least-funded theme.",
+   "alt": "The money runs counter to the literature.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "Against the priorities the money is close to on the line (Figure&nbsp;17): funded and Decadal emphasis agree to within a few points for immune, SANS, microbiome, muscle, circadian and cardiovascular. Two departures matter. Funding sits above the priorities for omics (+7.4) and radiation (+5.5) &mdash; it over-weights the shared molecular method and the best-institutionalised risk relative to a strategy document that treats omics as a tool rather than a goal. And funding sits well below the priorities for plant/crops (&minus;12.2): the one theme the literature is most excited about is the one the funded portfolio most neglects, even against an already plant-sceptical Decadal. This is the crop-science &ldquo;triple bind&rdquo; of &sect;7.4 &mdash; literature-rich, open-data-poor, priority-light &mdash; acquiring a fourth leg: it is funding-light too. Bone deserves the same caveat it received above: it scores low in every window including funding (&minus;21.3), but the probe fires weakly on the &ldquo;musculoskeletal countermeasure&rdquo; vocabulary under which bone work is actually funded inside the Human Research division, so its low score reflects language, not neglect."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Funding_vs_Priorities",
+   "headline": "The money tracks the priorities.",
+   "caption": "Funded emphasis against Decadal-priority emphasis; the dashed line is parity. The points hug it (r = 0.94). The salient exception is plant/crops, funded even less than the plant-sceptical priorities would predict; omics and radiation are funded somewhat above their priority weight.",
+   "alt": "The money tracks the priorities.",
    "new": true
   },
   {
@@ -403,7 +482,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Does the field's <i>volume</i> composition shift as it ages? Figure&nbsp;14 answers directly: the\nshare of each year's papers falling into each super-theme, 1995–2024. The striking result is how\n<b>stable</b> it is. The on-target space-biology/radiation band holds a remarkably steady 25–30% of\noutput across three decades (rising modestly from ~25% to ~30%); the classic cell-biology and\nproteomics clusters slowly cede a few points; and — a genuine data-quality finding — the\nbibliographic-metadata-noise band roughly doubles from ~10% to ~19%, evidence that the OpenAlex net\ngrows noisier over time and that de-noising is essential before any count-based claim."
+   "html": "Does the field's <i>volume</i> composition shift as it ages? Figure&nbsp;18 answers directly: the\nshare of each year's papers falling into each super-theme, 1995–2024. The striking result is how\n<b>stable</b> it is. The on-target space-biology/radiation band holds a remarkably steady 25–30% of\noutput across three decades (rising modestly from ~25% to ~30%); the classic cell-biology and\nproteomics clusters slowly cede a few points; and — a genuine data-quality finding — the\nbibliographic-metadata-noise band roughly doubles from ~10% to ~19%, evidence that the OpenAlex net\ngrows noisier over time and that de-noising is essential before any count-based claim."
   },
   {
    "type": "figure",
@@ -416,7 +495,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The absolute-volume view (Figure&nbsp;15) adds the other half of the picture: while shares are\nstable, <i>counts</i> grow explosively — the field roughly quadruples its annual output over the window,\nso a \"stable share\" of the on-target band still means several-fold more on-target papers per year. It\nalso makes the noise problem vivid: the metadata-noise line is among the fastest-growing in absolute\nterms, a caution for anyone mining OpenAlex at scale."
+   "html": "The absolute-volume view (Figure&nbsp;19) adds the other half of the picture: while shares are\nstable, <i>counts</i> grow explosively — the field roughly quadruples its annual output over the window,\nso a \"stable share\" of the on-target band still means several-fold more on-target papers per year. It\nalso makes the noise problem vivid: the metadata-noise line is among the fastest-growing in absolute\nterms, a caution for anyone mining OpenAlex at scale."
   },
   {
    "type": "figure",
@@ -424,6 +503,19 @@
    "alt": "Absolute papers per super-theme per year",
    "headline": "Absolute output per topic cluster per year.",
    "caption": "The same nine\n  super-themes as counts rather than shares. Total output rises steeply; the on-target band grows with it,\n  but so does the metadata-noise band. Toggle series in the legend to isolate a cluster's growth curve.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "The funding record carries its own clock, and it recovers a piece of the field's history the literature corpus cannot see. Figure&nbsp;20 tracks unique funded projects by fiscal year: volume was high in FY2004&ndash;2006 (470&ndash;555 new project-records a year, the NSBRI-anchored era), collapsed to a third of that by 2008&ndash;2009 (154&ndash;199), and has since recovered to a stable 230&ndash;300 a year. That trough is the post-2005 programme descope &mdash; the very retrenchment the 2011 Decadal Survey was written to reverse<sup class=\"r\"><a href=\"#r8\">8</a></sup> &mdash; appearing here as a direct funding time-series rather than a narrative. Two things stand out against the literature's own composition (Figure&nbsp;18). The division mix is remarkably stable across two decades, Human Research holding over half of the portfolio throughout; and where the literature's volume grew roughly four-fold over the same window, the funded portfolio did not grow at all. The field's output expanded; its budget did not."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Funding_Timeline",
+   "headline": "The portfolio over time.",
+   "caption": "Unique funded projects per fiscal year, stacked by division (FY2004&ndash;2025). The 2008&ndash;2009 trough is the post-2005 programme descope the 2011 Decadal Survey was written to reverse; the division mix (Human Research over half throughout) is strikingly stable across two decades.",
+   "alt": "The portfolio over time.",
    "new": true
   },
   {
@@ -443,7 +535,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Applying the mean-centred probe year by year to the literature exposes the motion the composition\nchart hides. Figure&nbsp;16 tracks all ten risk themes from 1995 to 2024. The lines fan apart into two\ndiverging bundles. <b>Rising:</b> plant/crops climbs fastest of all (Δ +20.6 over the window, crossing\nfrom strongly negative to strongly positive), followed by microbiome (Δ +12.1), gene-expression/omics\n(Δ +4.9, from an already-high base), immune (+2.9), and circadian (+3.1). <b>Falling:</b> bone drops\nhardest (Δ −15.2), then radiation (−8.5, from a high base), muscle (−8.1), neuro-ocular/SANS (−7.0),\nand cardiovascular (−4.8, already the lowest)."
+   "html": "Applying the mean-centred probe year by year to the literature exposes the motion the composition\nchart hides. Figure&nbsp;21 tracks all ten risk themes from 1995 to 2024. The lines fan apart into two\ndiverging bundles. <b>Rising:</b> plant/crops climbs fastest of all (Δ +20.6 over the window, crossing\nfrom strongly negative to strongly positive), followed by microbiome (Δ +12.1), gene-expression/omics\n(Δ +4.9, from an already-high base), immune (+2.9), and circadian (+3.1). <b>Falling:</b> bone drops\nhardest (Δ −15.2), then radiation (−8.5, from a high base), muscle (−8.1), neuro-ocular/SANS (−7.0),\nand cardiovascular (−4.8, already the lowest)."
   },
   {
    "type": "figure",
@@ -456,7 +548,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Figure&nbsp;17 ranks the net movement — the momentum of each theme over the three decades — and makes\nthe two bundles unmistakable. The bar sorts from plant/crops (+20.6) and microbiome (+12.1) at the top\nto radiation (−8.5) and bone (−15.2) at the bottom, with the integrative human-physiology risks\nclustered on the falling side."
+   "html": "Figure&nbsp;22 ranks the net movement — the momentum of each theme over the three decades — and makes\nthe two bundles unmistakable. The bar sorts from plant/crops (+20.6) and microbiome (+12.1) at the top\nto radiation (−8.5) and bone (−15.2) at the bottom, with the integrative human-physiology risks\nclustered on the falling side."
   },
   {
    "type": "figure",
@@ -469,7 +561,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The single most legible reversal is radiation versus plant/crops (Figure&nbsp;18). In the late 1990s,\nradiation was among the most-emphasised themes and plant biology among the least; the lines converge\nthrough the 2000s and <b>cross around 2013</b>, after which plant/crops climbs well above radiation.\nTwo themes central to a Mars mission — protecting the crew from cosmic rays, and growing their food —\nliterally trade places in the literature's attention, in the direction opposite to what a\ncountermeasure-driven agency would choose. §5 asks what drove each line."
+   "html": "The single most legible reversal is radiation versus plant/crops (Figure&nbsp;23). In the late 1990s,\nradiation was among the most-emphasised themes and plant biology among the least; the lines converge\nthrough the 2000s and <b>cross around 2013</b>, after which plant/crops climbs well above radiation.\nTwo themes central to a Mars mission — protecting the crew from cosmic rays, and growing their food —\nliterally trade places in the literature's attention, in the direction opposite to what a\ncountermeasure-driven agency would choose. §6 asks what drove each line."
   },
   {
    "type": "figure",
@@ -482,15 +574,33 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Figure&nbsp;19 isolates the six themes that matter most for the mission argument, showing the same\ncrossing among the human-physiology risks and the molecular/plant risers together. The literature is,\nmeasurably, reorienting <i>away</i> from integrative human physiology and <i>toward</i> molecular and\nplant biology."
+   "html": "Figure&nbsp;24 isolates the six themes that matter most for the mission argument, showing the same\ncrossing among the human-physiology risks and the molecular/plant risers together. The literature is,\nmeasurably, reorienting <i>away</i> from integrative human physiology and <i>toward</i> molecular and\nplant biology."
   },
   {
    "type": "figure",
    "chart": "SB_Theme_Trajectories_Gap",
    "alt": "Focused six-theme widening gap chart",
    "headline": "The widening gap (focused).",
-   "caption": "Six themes from Figure&nbsp;16: rising\n  plant/crops and omics against falling bone, cardiovascular, muscle, and SANS. The crossing lines are\n  the report's central empirical claim.",
+   "caption": "Six themes from Figure&nbsp;21: rising\n  plant/crops and omics against falling bone, cardiovascular, muscle, and SANS. The crossing lines are\n  the report's central empirical claim.",
    "new": false
+  },
+  {
+   "type": "subheading",
+   "text": "Does the money chase fashion?",
+   "tag": "funding · temporal"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "A portfolio can be aligned in aggregate yet still chase whatever is fashionable year to year. The funded portfolio does not. Splitting it into an early (FY2004&ndash;2012) and a recent (FY2016&ndash;2025) window and measuring each theme's shift in emphasis, the funded trajectories are less than half as volatile as the literature's: mean absolute theme-momentum is <b>3.8 for funding versus 8.7 for the literature</b> (Figure&nbsp;25). The literature's defining moves have almost no funding echo &mdash; its plant boom (+20.6 over the window) corresponds to a funding shift of just +2.7, and its retreat from muscle (&minus;8.1) and SANS (&minus;7.0) to funding shifts of +0.4 and +1.8. Funding held where the literature fled. The two themes where funding did step back materially &mdash; bone (&minus;11.0) and radiation (&minus;6.4) &mdash; are exactly the two identified in &sect;6 as maturation-driven declines, where facilities and countermeasures (ARED and bisphosphonates; the NSRL and the RAD dose measurement) matured enough that even the funder, not only the literature, could rationally ease off. Everywhere else, the money is an anchor, not a weather-vane."
+  },
+  {
+   "type": "figure",
+   "chart": "TB_Momentum_Funding_Lit",
+   "headline": "Funding resists fashion.",
+   "caption": "Each theme's change in funded emphasis (vertical) against its change in literature emphasis (horizontal) from the 2004&ndash;2012 window to 2016&ndash;2025. The literature swings widely along the horizontal; funding barely moves along the vertical. Only bone and radiation &mdash; the two maturation cases of &sect;6 &mdash; fall in both.",
+   "alt": "Funding resists fashion.",
+   "new": true
   },
   {
    "type": "subheading",
@@ -501,7 +611,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The static gap (§4.2) and the temporal momentum (§4.4) are independent axes, and a theme's situation\nis defined by both. Figure&nbsp;20 crosses them: the vertical axis is how much more the priorities want\na theme than the literature supplies (Decadal − Literature emphasis); the horizontal axis is which way\nthe literature is moving. The four quadrants have sharp meanings."
+   "html": "The static gap (§4.2) and the temporal momentum (§4.4) are independent axes, and a theme's situation\nis defined by both. Figure&nbsp;26 crosses them: the vertical axis is how much more the priorities want\na theme than the literature supplies (Decadal − Literature emphasis); the horizontal axis is which way\nthe literature is moving. The four quadrants have sharp meanings."
   },
   {
    "type": "figure",
@@ -525,7 +635,7 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Bigram frequencies confirm the identities behind the numbers. OSDR (Figure&nbsp;21) is transcriptomics\nplus experimental design — \"gene expression\", \"rna seq\", \"differentially expressed\", \"simulated\nmicrogravity\", \"ground control\", \"nasa genelab\". The Decadal Survey (Figure&nbsp;22) is strategic and\ncross-disciplinary — \"physical sciences\" is its single most frequent bigram, ahead of \"space exploration\"\nand \"future space\". Most revealing is the literature's own plant super-theme (Figure&nbsp;23): its top\nphrases are \"arabidopsis thaliana\", \"genome editing\", \"internal transcribed spacer\" (a DNA-barcoding\nmarker), and phylogenetics vocabulary — this is <b>foundational plant genomics, not applied crop\nproduction for life support</b>. The rising plant literature of Figure&nbsp;16 is not, at the phrase\nlevel, the bioregenerative-food-system research a Mars mission needs."
+   "html": "Bigram frequencies confirm the identities behind the numbers. OSDR (Figure&nbsp;27) is transcriptomics\nplus experimental design — \"gene expression\", \"rna seq\", \"differentially expressed\", \"simulated\nmicrogravity\", \"ground control\", \"nasa genelab\". The Decadal Survey (Figure&nbsp;28) is strategic and\ncross-disciplinary — \"physical sciences\" is its single most frequent bigram, ahead of \"space exploration\"\nand \"future space\". Most revealing is the literature's own plant super-theme (Figure&nbsp;29): its top\nphrases are \"arabidopsis thaliana\", \"genome editing\", \"internal transcribed spacer\" (a DNA-barcoding\nmarker), and phylogenetics vocabulary — this is <b>foundational plant genomics, not applied crop\nproduction for life support</b>. The rising plant literature of Figure&nbsp;21 is not, at the phrase\nlevel, the bioregenerative-food-system research a Mars mission needs."
   },
   {
    "type": "figure",
@@ -553,13 +663,13 @@
   },
   {
    "type": "subheading",
-   "num": "",
+   "num": "4.7",
    "text": "The connective tissue: which risks are studied together",
    "tag": ""
   },
   {
    "type": "paragraph",
-   "html": "The analysis so far has treated the ten risk themes as independent columns. They are not. A paper on cardiovascular deconditioning is disproportionately likely to also discuss muscle and fluid shifts; a spaceflight transcriptomics paper routinely touches radiation-induced DNA damage. To map this connective tissue we take the on-target literature (the 4,415 papers scoring above the relevance floor) and, for each paper, its ten theme-probe scores. Subtracting each paper's own mean across the ten themes removes the dominant &ldquo;how on-topic is this paper at all&rdquo; factor, leaving a relative-emphasis profile; correlating those profiles across papers answers a sharper question — when a paper leans toward one theme, which others does it lean toward with it? Figure&nbsp;24 shows the resulting 10&times;10 structure."
+   "html": "The analysis so far has treated the ten risk themes as independent columns. They are not. A paper on cardiovascular deconditioning is disproportionately likely to also discuss muscle and fluid shifts; a spaceflight transcriptomics paper routinely touches radiation-induced DNA damage. To map this connective tissue we take the on-target literature (the 4,415 papers scoring above the relevance floor) and, for each paper, its ten theme-probe scores. Subtracting each paper's own mean across the ten themes removes the dominant &ldquo;how on-topic is this paper at all&rdquo; factor, leaving a relative-emphasis profile; correlating those profiles across papers answers a sharper question — when a paper leans toward one theme, which others does it lean toward with it? Figure&nbsp;30 shows the resulting 10&times;10 structure."
   },
   {
    "type": "figure",
@@ -585,7 +695,7 @@
   },
   {
    "type": "paragraph",
-   "html": "Rendering the same matrix as a network (Figure&nbsp;25) makes the report's thesis visible in a single image. Community detection — greedy modularity on the positive edges — returns exactly three groups: {muscle, cardiovascular, SANS, circadian, immune}, {bone, omics, radiation}, and {plant, microbiome}. Colour the nodes by momentum and the alignment is stark: the integrative-human-physiology community is almost uniformly warm — it <i>is</i> the falling bundle — while the organismal community glows green. The falling risks are not ten independent declines that happen to point the same way; they are one densely-connected community of co-studied problems retreating together. That is a stronger and more worrying statement than the marginal trajectories alone: the field is not turning away from muscle and cardiovascular and ocular risk separately, it is turning away from the integrative-physiology cluster as a whole — exactly the cluster whose members fail together on a long mission."
+   "html": "Rendering the same matrix as a network (Figure&nbsp;31) makes the report's thesis visible in a single image. Community detection — greedy modularity on the positive edges — returns exactly three groups: {muscle, cardiovascular, SANS, circadian, immune}, {bone, omics, radiation}, and {plant, microbiome}. Colour the nodes by momentum and the alignment is stark: the integrative-human-physiology community is almost uniformly warm — it <i>is</i> the falling bundle — while the organismal community glows green. The falling risks are not ten independent declines that happen to point the same way; they are one densely-connected community of co-studied problems retreating together. That is a stronger and more worrying statement than the marginal trajectories alone: the field is not turning away from muscle and cardiovascular and ocular risk separately, it is turning away from the integrative-physiology cluster as a whole — exactly the cluster whose members fail together on a long mission."
   },
   {
    "type": "callout",
@@ -597,13 +707,13 @@
   },
   {
    "type": "subheading",
-   "num": "",
+   "num": "4.8",
    "text": "Is the divergence slowing? An acceleration view",
    "tag": ""
   },
   {
    "type": "paragraph",
-   "html": "A widening gap could still be decelerating — the field could be in the act of correcting. To check, we split each theme's 30-year momentum into an <b>early</b> half (mean emphasis 1995&ndash;99 &rarr; 2015&ndash;19) and a <b>recent</b> half (2015&ndash;19 &rarr; 2020&ndash;24) and plot one against the other (Figure&nbsp;26). The recent axis is the decision-relevant one: it says which way each theme is moving <i>now</i>. The news is not reassuring. <b>Bone</b> has the most negative recent momentum of any theme — it is not merely low, it is still falling fastest; radiation, muscle, and cardiovascular remain in the still-falling quadrant. Two encouraging signals do appear: <b>neuro-ocular/SANS</b> crosses into slightly-positive recent momentum, consistent with the emerging-risk reading of &sect;5 (its specialised literature is finally growing), and <b>gene-expression/omics</b> has flattened to essentially zero recent momentum — it has matured into stable infrastructure rather than continuing to crowd out other work. Plant and microbiome are still accelerating upward. In short, the reorientation identified over three decades has <i>not</i> begun to reverse in the most recent five years; if anything the human-physiology risks are still losing ground."
+   "html": "A widening gap could still be decelerating — the field could be in the act of correcting. To check, we split each theme's 30-year momentum into an <b>early</b> half (mean emphasis 1995&ndash;99 &rarr; 2015&ndash;19) and a <b>recent</b> half (2015&ndash;19 &rarr; 2020&ndash;24) and plot one against the other (Figure&nbsp;32). The recent axis is the decision-relevant one: it says which way each theme is moving <i>now</i>. The news is not reassuring. <b>Bone</b> has the most negative recent momentum of any theme — it is not merely low, it is still falling fastest; radiation, muscle, and cardiovascular remain in the still-falling quadrant. Two encouraging signals do appear: <b>neuro-ocular/SANS</b> crosses into slightly-positive recent momentum, consistent with the emerging-risk reading of &sect;6 (its specialised literature is finally growing), and <b>gene-expression/omics</b> has flattened to essentially zero recent momentum — it has matured into stable infrastructure rather than continuing to crowd out other work. Plant and microbiome are still accelerating upward. In short, the reorientation identified over three decades has <i>not</i> begun to reverse in the most recent five years; if anything the human-physiology risks are still losing ground."
   },
   {
    "type": "figure",
@@ -613,6 +723,172 @@
    "caption": "Each theme's early momentum (1995&ndash;99 &rarr; 2015&ndash;19 emphasis change) against its recent momentum (2015&ndash;19 &rarr; 2020&ndash;24); colour is the full 30-year change. Points in the lower-left are still falling — the human-physiology risks sit there, with bone the most negative on the recent axis. Omics has plateaued (matured); SANS has just crossed to slightly rising.",
    "new": true,
    "height": 560
+  },
+  {
+   "type": "heading",
+   "text": "The frontier lens: what the field says it does not know"
+  },
+  {
+   "type": "paragraph",
+   "variant": "lead",
+   "html": "Every measure so far reads the corpora for what they attend to. But a scientific literature also carries a second, quieter signal: its own admissions of ignorance. Researchers hedge constantly, and each hedge is a small, self-declared statement of where the frontier lies. This section turns that signal into a measurement and applies it to all four windows. It yields the report's most counter-intuitive result &mdash; the field's candour about a risk runs <i>opposite</i> to its enthusiasm for it &mdash; and, along the way, a caution about the limits of semantic search."
+  },
+  {
+   "type": "subheading",
+   "text": "The frontier landscape",
+   "tag": ""
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "Applying the cue-phrase criterion of &sect;3.6 to the full literature harvest returns <b>10,499 papers</b> (10.5% of the net) that explicitly flag something as unknown. Clustering that subset in its existing 5-D coordinate space (HDBSCAN, min_cluster_size 20, min_samples 4) resolves it into <b>72 topics</b>, mapped in Figure&nbsp;33. Read it beside the corpus-wide landscape of Figure&nbsp;1 and the honest lesson of &sect;2.1 repeats: the frontier of a broad net is also a broad net. The largest frontier topics include the same science-education and homonym artefacts (<span class=\"tag\">students, learning, biology</span>, <span class=\"tag\">space, spatial, task</span>) that contaminate the corpus as a whole. But the genuine spaceflight frontier is legible within it, and its shape is informative: <span class=\"tag\">space, radiation, earth</span> (306 papers) is the largest on-target frontier cluster, followed by <span class=\"tag\">plant, cell, plants</span> (287), <span class=\"tag\">bone, cells, disc</span> (145) and <span class=\"tag\">microbial, species, microbiome</span> (142). The map is a qualitative instrument &mdash; it shows <i>where</i> the admissions cluster, not how much each risk is admitted. For that we need a measure."
+  },
+  {
+   "type": "figure",
+   "chart": "SB_Frontier_Map",
+   "headline": "The frontier, mapped.",
+   "caption": "One bubble per topic among the 10,499 literature papers that explicitly acknowledge an unknown, positioned at the topic's mean 2-D coordinate in the same projection as Figure&nbsp;1 and sized by paper count (72 topics; 5,366 papers fall in a topic, the rest are HDBSCAN noise). The frontier of a noisy net is itself noisy &mdash; education and homonym artefacts persist &mdash; but the on-target frontier clusters (radiation, plant, bone, microbiome) are legible within it. Hover any bubble for its keywords and size.",
+   "alt": "The frontier, mapped.",
+   "new": true
+  },
+  {
+   "type": "subheading",
+   "text": "Admitting ignorance is a matter of genre",
+   "tag": "density"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "How much of each window admits an unknown at all? The four differ sharply, and the pattern is almost entirely explained by what each document is <i>for</i> (Figure&nbsp;34). Funded Task Book projects hedge in <b>22.9%</b> of cases &mdash; two and a half times the literature's rate &mdash; because a research proposal's core rhetorical move is to name an unknown and offer to resolve it. The Decadal volumes come next (9.9%): a strategy document exists to pose questions. The literature sits at 9.2%. And OSDR is lowest of all at <b>5.3%</b> &mdash; the corpus of deposited, re-analysable evidence is the corpus least likely to say it does not know, because a data-deposition paper reports a result. This ordering is a fact about genre, not about intellectual honesty, and we draw no ranking from it. It does, however, license the design of the next measure: because the baselines differ this much for reasons external to the science, only a <i>within-corpus</i> contrast can be compared across corpora."
+  },
+  {
+   "type": "figure",
+   "chart": "Frontier_Density",
+   "headline": "Genre, not virtue.",
+   "caption": "Share of each corpus's passages containing an explicit acknowledged-unknown cue. Proposals (Task Book) state unknowns by design and hedge 2.5&times; as often as the literature; deposited-data papers (OSDR) report results and hedge least. The differences track what each document is for &mdash; which is why every cross-corpus claim in this section uses the baseline-corrected openness measure instead.",
+   "alt": "Genre, not virtue.",
+   "new": true
+  },
+  {
+   "type": "subheading",
+   "text": "A caution: semantic search cannot see stance",
+   "tag": "method finding"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "Before reading any theme-level result it is worth stating plainly why the measure is lexical, because the negative result is reusable. We scored every passage three ways against the same acknowledged-unknown probe and asked how well each retrieved passages that genuinely contain a hedge (Figure&nbsp;35). Keyword scoring works (AUC 0.742 on the literature, 0.773 on OSDR). Semantic scoring barely functions on abstracts (0.581) and the fused hybrid lands between its parents (0.661) &mdash; <i>below</i> keyword alone. The failure is diagnostic rather than incidental: SPECTER2 arranges documents by what they are about, and &ldquo;we do not know&rdquo; is not a subject. The probe therefore retrieves papers whose <i>topic</i> is novelty and method &mdash; the top semantic hits in the literature are &ldquo;Deep generative models for peptide design&rdquo; and &ldquo;Metal Nanoparticles&ndash;Polymers Hybrid Materials&rdquo; &mdash; while the papers that actually say &ldquo;the mechanism remains unknown&rdquo; sit anywhere in topic space. Notably the one corpus where the hybrid does help is OSDR (0.790), whose long, uniform methods prose gives the semantic probe more to grip; and the Task Book's very long narratives (median 6,448 characters) blunt TF-IDF's discrimination in the other direction. The general lesson: an embedding trained on topical similarity is the wrong instrument for a rhetorical property, and fusing it in can cost you signal you already had."
+  },
+  {
+   "type": "figure",
+   "chart": "Frontier_Retrieval",
+   "headline": "The wrong instrument, measured.",
+   "caption": "AUC for retrieving passages that contain an explicit hedge, by scoring method and corpus (0.5 = chance). Keyword (TF-IDF) works; semantic (SPECTER2) barely beats chance on the literature; the hybrid fusion lands below keyword alone on three of four corpora. Epistemic stance is lexical, not topical.",
+   "alt": "The wrong instrument, measured.",
+   "new": true
+  },
+  {
+   "type": "subheading",
+   "text": "Which risks does each window admit it does not understand?",
+   "tag": "openness"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "The comparable measure is openness: for each theme, the open-question rate among the corpus's most theme-leaning quarter, minus that corpus's own baseline (Figure&nbsp;36). The four profiles agree more than they disagree &mdash; every pairwise correlation is positive, and the literature and the funded portfolio agree most closely (r = 0.56) &mdash; so there is a broadly shared sense of where the open questions are. Three themes stand out against the &plusmn;1&ndash;2 point resolution of the measure. <b>Omics is the most-flagged theme in three of the four windows</b> (literature +3.3, Decadal +4.2, funded +5.6 points above baseline): the field's shared method is also where it most readily says the answer is not in yet &mdash; consistent with &sect;7.5's reading of omics as an instrument rather than a settled result. <b>Radiation is flagged well above baseline in the literature (+3.4) and in funding (+4.0)</b>, matching &sect;6's finding that its dose is measured but not mitigated: a well-institutionalised risk that everyone still calls open. And <b>plant/crops is the least-flagged theme in the literature (&minus;3.4) and joint-least in the funded portfolio (&minus;3.4)</b>."
+  },
+  {
+   "type": "figure",
+   "chart": "Frontier_Openness_4way",
+   "headline": "Where each window admits ignorance.",
+   "caption": "Open-question rate among each corpus's most theme-leaning quarter, minus that corpus's own baseline (percentage points). Positive = this window flags the theme as open more than it flags things in general. Equal-sized cells (25% of each corpus); 95% CI &asymp; &plusmn;1.7 (literature) to &plusmn;2.3 (Decadal) points.",
+   "alt": "Where each window admits ignorance.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "That last result deserves its own sentence, because it cuts against the theme's reputation. Plant/crops is the fastest-rising theme in the literature by a wide margin (&Delta; +20.6, &sect;4.4) and simultaneously the theme least likely to admit an open question. The plant literature is not frontier science; it is confident normal science &mdash; which is exactly what the phrase fingerprint independently said when it showed the plant surge to be <i>Arabidopsis</i> genomics and DNA barcoding rather than applied crop production (&sect;4.7). Two entirely different instruments &mdash; what the papers are about, and how they hedge &mdash; converge on the same conclusion: the field's most energetic area is doing well-posed work on questions it already knows how to answer, while the bioregenerative food-production problem a Mars mission actually poses goes largely unclaimed as an open question by anyone."
+  },
+  {
+   "type": "subheading",
+   "text": "The field is candid about what it is leaving",
+   "tag": "the inversion"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "Cross the openness measure with the 30-year momentum of &sect;4.4 and the section's central result appears (Figure&nbsp;37). The two run <b>opposite</b>: r = &minus;0.42. The themes the literature is moving <i>toward</i> are the themes it is least willing to call open, and the themes it is walking <i>away</i> from are the ones it most readily admits it has not solved. Radiation is falling fast (&minus;8.5) yet is flagged +3.4 above baseline; bone is the fastest-falling theme of all (&minus;15.2) and is still flagged +2.1; plant and microbiome are surging and are flagged &minus;3.4 and &minus;0.6. This is not a paradox, and it is worse than one. It means the field's retreat from the integrative human-physiology risks is <i>not</i> a considered judgement that those questions are closed &mdash; the same literature that is abandoning them is on record saying they remain open. Momentum and candour are pulling in opposite directions, and only momentum shows up in a paper count. It also independently corroborates the maturation reading of &sect;6: bone and radiation emphasis fell because their countermeasures and facilities matured, not because the risks closed &mdash; and here the literature says so in its own words."
+  },
+  {
+   "type": "figure",
+   "chart": "Frontier_vs_Momentum",
+   "headline": "Candour runs backwards to momentum.",
+   "caption": "Each theme's literature openness lift (vertical) against its 30-year emphasis momentum (horizontal). The relationship is negative (r = &minus;0.42): the field admits ignorance about the risks it is leaving and stays quiet about the ones it is racing toward. SANS is the revealing outlier &mdash; falling <i>and</i> unflagged.",
+   "alt": "Candour runs backwards to momentum.",
+   "new": true
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "SANS is the exception that sharpens the point. It is the one falling theme that the literature does <i>not</i> flag as open (&minus;2.7), and the Decadal volumes flag it least of all ten themes (&minus;2.6) &mdash; a striking silence about a syndrome that was only first described in 2011 and now shapes mission medical planning.<sup class=\"r\"><a href=\"#r5\">5</a></sup> The funded portfolio is the sole window that does not under-flag it (+0.2), and the single most unknown-acknowledging passage in the entire Task Book is a SANS project stating that &ldquo;the underlying cause of SANS remains unknown&rdquo;. The people paid to work on it know it is open; the broad literature and the strategy documents have not said so. That is consistent with the measurement caveat of &sect;6 &mdash; a small, lexically specific clinical literature that a broad harvest under-captures &mdash; but it carries an operational reading too: the risk with the thinnest published record and the least declared uncertainty is one of the least understood, and silence in a corpus is not evidence of knowledge."
+  },
+  {
+   "type": "table",
+   "head": [
+    "Window",
+    "A passage from its frontier",
+    "What it shows"
+   ],
+   "rows": [
+    [
+     "Literature",
+     "&ldquo;It degrades abnormal mitochondria and can either repress or activate apoptosis, but the exact mechanism <b>remains unknown</b>.&rdquo;",
+     "Mechanistic hedging inside a molecular paper &mdash; the omics frontier is about <i>how</i>, not <i>whether</i>."
+    ],
+    [
+     "Open data (OSDR)",
+     "&ldquo;Short and long-term dysfunction of the retina and central nervous system are associated with time spent in space, but it <b>is unknown</b> whether Kcnv2 or a human ortholog plays a role in those health issues.&rdquo;",
+     "Even the deposited-evidence corpus, the least hedged of the four, marks the gene-to-risk step as open."
+    ],
+    [
+     "Priorities (Decadal)",
+     "&ldquo;How the space environment induces many of these effects <b>remains poorly understood</b>.&rdquo; &middot; &ldquo;This <b>knowledge gap</b> is well documented and needs to be addressed to ensure the safety of astronauts.&rdquo;",
+     "The strategy register: unknowns stated as programme direction rather than as a caveat."
+    ],
+    [
+     "Funded (Task Book)",
+     "&ldquo;Whether such changes are associated with neuronal damage or might be seen with lower doses that are more relevant to space travel <b>is unknown</b>.&rdquo; &middot; &ldquo;To address this critical <b>knowledge gap</b>, we developed a tiny new device&hellip;&rdquo;",
+     "The proposal register: an unknown named in order to be closed &mdash; which is why this corpus's density is highest."
+    ]
+   ]
+  },
+  {
+   "type": "subheading",
+   "text": "Do the unknowns match the money?",
+   "tag": "openness × funding"
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "If the acknowledged unknowns are a genuine signal of where work is needed, a well-aimed portfolio should track them. NASA's does (Figure&nbsp;38): the literature's openness profile correlates with funded emphasis at <b>r = +0.54</b>, and the funded portfolio's own openness correlates with its own emphasis at <b>r = +0.78</b> &mdash; the money concentrates where the proposals say the questions are. This is a third independent line arriving at &sect;7.8's conclusion. The emphasis analysis said funding tracks priorities rather than the literature's fashion; the momentum analysis said funding resists fashion over time; and now the frontier lens says funding is aimed at the questions the field itself calls open &mdash; including the ones the literature is simultaneously walking away from. Set against the inversion above, the division of labour is unusually clear: <b>the literature's momentum is the least trustworthy guide to where the unknowns are, and NASA is already not following it.</b> The residual gap is where all four windows fall silent together &mdash; applied crop production, which no window flags as open and only the literature pursues, and which it pursues as genomics."
+  },
+  {
+   "type": "figure",
+   "chart": "Frontier_vs_Funded",
+   "headline": "The money is aimed at the acknowledged unknowns.",
+   "caption": "Each theme's literature openness lift (vertical) against its funded emphasis (horizontal); r = +0.54. Themes the literature admits it does not understand are, on the whole, the themes NASA funds &mdash; a third independent route to the finding that the funded portfolio, not the published field, is the better-aimed of the two.",
+   "alt": "The money is aimed at the acknowledged unknowns.",
+   "new": true
+  },
+  {
+   "type": "callout",
+   "variant": "key",
+   "title": "What the frontier lens changes",
+   "paras": [
+    "The field's candour runs opposite to its momentum (r = &minus;0.42). The risks it is retreating from &mdash; bone, radiation, and the integrative human-physiology bundle &mdash; are the ones it still openly calls unsolved; the risks it is surging toward are the ones it is least willing to call open. A retreat accompanied by an admission that the question remains open is not closure. It is abandonment.",
+    "This upgrades the report's central finding from an observation about attention to an observation about stated belief. We are not inferring from falling emphasis that the field thinks bone is solved &mdash; the field says, in its own hedges, that it is not. And the one window aimed at those admitted unknowns is the funding record (r = +0.54), which strengthens the case for protecting it rather than letting the literature's momentum lead."
+   ]
   },
   {
    "type": "heading",
@@ -651,7 +927,7 @@
       "cls": ""
      },
      {
-      "html": "Plant — seeds model-plant genomics that later dominates the plant super-theme (Fig 23)",
+      "html": "Plant — seeds model-plant genomics that later dominates the plant super-theme (Fig 29)",
       "cls": ""
      }
     ],
@@ -814,11 +1090,11 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>The rises are technology- and landmark-driven.</b> Gene-expression/omics holds the highest emphasis\nthroughout and rises further, which is exactly what one expects from a theme carried by a falling cost of\nsequencing and by dedicated infrastructure: NASA <b>GeneLab launched in 2014</b> and consolidated into\nOSDR in 2021,<sup class=\"r\"><a href=\"#r1\">1</a></sup> and the <b>2019 Twins Study</b> — NASA's first\nintegrated human multi-omics investigation, published in <i>Science</i><sup class=\"r\"><a href=\"#r2\">2</a></sup>\n— gave the molecular turn a canonical, heavily-cited exemplar. Microbiome's Δ +12 rise begins in\nearnest in the 2010s, lagging the <b>NIH Human Microbiome Project</b> (funded 2007, landmark results\n2012), which catalysed a roughly forty-fold increase in microbiome research funding across\nNIH<sup class=\"r\"><a href=\"#r7\">7</a></sup> and supplied both the methods and the framing that space\nbiology then applied to the ISS and to the Twins Study's gut-microbiome findings. Plant/crops — the\nfastest riser, crossing zero around 2004 and overtaking radiation around 2013 (Fig 18) — coincides with\nthe operational plant programme on the ISS: the <b>Veggie</b> chamber (2014) and the first space-grown\nfood eaten by astronauts (<b>2015</b>), and the automated <b>Advanced Plant Habitat</b>\n(2018).<sup class=\"r\"><a href=\"#r3\">3</a></sup> Yet the phrase fingerprint (Fig 23) shows the published\nplant surge is dominated by <i>Arabidopsis</i> genomics and DNA-barcoding, not by the applied\nfood-production science the flight hardware was built for — the literature rode the visibility of the\nmilestones with the tools it already had."
+   "html": "<b>The rises are technology- and landmark-driven.</b> Gene-expression/omics holds the highest emphasis\nthroughout and rises further, which is exactly what one expects from a theme carried by a falling cost of\nsequencing and by dedicated infrastructure: NASA <b>GeneLab launched in 2014</b> and consolidated into\nOSDR in 2021,<sup class=\"r\"><a href=\"#r1\">1</a></sup> and the <b>2019 Twins Study</b> — NASA's first\nintegrated human multi-omics investigation, published in <i>Science</i><sup class=\"r\"><a href=\"#r2\">2</a></sup>\n— gave the molecular turn a canonical, heavily-cited exemplar. Microbiome's Δ +12 rise begins in\nearnest in the 2010s, lagging the <b>NIH Human Microbiome Project</b> (funded 2007, landmark results\n2012), which catalysed a roughly forty-fold increase in microbiome research funding across\nNIH<sup class=\"r\"><a href=\"#r7\">7</a></sup> and supplied both the methods and the framing that space\nbiology then applied to the ISS and to the Twins Study's gut-microbiome findings. Plant/crops — the\nfastest riser, crossing zero around 2004 and overtaking radiation around 2013 (Fig 23) — coincides with\nthe operational plant programme on the ISS: the <b>Veggie</b> chamber (2014) and the first space-grown\nfood eaten by astronauts (<b>2015</b>), and the automated <b>Advanced Plant Habitat</b>\n(2018).<sup class=\"r\"><a href=\"#r3\">3</a></sup> Yet the phrase fingerprint (Fig 29) shows the published\nplant surge is dominated by <i>Arabidopsis</i> genomics and DNA-barcoding, not by the applied\nfood-production science the flight hardware was built for — the literature rode the visibility of the\nmilestones with the tools it already had."
   },
   {
    "type": "paragraph",
-   "html": "One of these drivers is quantifiable, and it is not specific to space biology at all. The molecular turn rides the collapse in the cost of DNA sequencing: NHGRI's cost-per-genome fell from roughly <b>$95&nbsp;million in 2001</b> to about <b>$525 by 2022</b>, with the discontinuity of next-generation sequencing compressing a decade of Moore's-law decline into 2008 alone.<sup class=\"r\"><a href=\"#r10\">10</a></sup> Overlaying that curve on the omics and microbiome emphasis trajectories (Figure&nbsp;28) shows the rise tracking the fall in cost — a field-wide tide, imported from biomedicine at large, that lifted omics everywhere and that space biology rode with the tools it already had. It reinforces &sect;6.5's reading: omics is not a space-biology priority that won on the merits of the mission, it is a general-purpose method made cheap, and the right response is to aim it at the under-served risks rather than to read its momentum as a signal of where the science <i>should</i> go."
+   "html": "One of these drivers is quantifiable, and it is not specific to space biology at all. The molecular turn rides the collapse in the cost of DNA sequencing: NHGRI's cost-per-genome fell from roughly <b>$95&nbsp;million in 2001</b> to about <b>$525 by 2022</b>, with the discontinuity of next-generation sequencing compressing a decade of Moore's-law decline into 2008 alone.<sup class=\"r\"><a href=\"#r10\">10</a></sup> Overlaying that curve on the omics and microbiome emphasis trajectories (Figure&nbsp;40) shows the rise tracking the fall in cost — a field-wide tide, imported from biomedicine at large, that lifted omics everywhere and that space biology rode with the tools it already had. It reinforces &sect;7.5's reading: omics is not a space-biology priority that won on the merits of the mission, it is a general-purpose method made cheap, and the right response is to aim it at the under-served risks rather than to read its momentum as a signal of where the science <i>should</i> go."
   },
   {
    "type": "figure",
@@ -849,7 +1125,7 @@
   {
    "type": "table",
    "head": [
-    "Claim in &sect;5",
+    "Claim in &sect;6",
     "Verified",
     "Source"
    ],
@@ -995,46 +1271,51 @@
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.1 — The gap is two-dimensional, and it is widening.</b> Under-service and negative momentum\ncoincide. The very themes the Decadal Survey elevates above current literature (muscle, cardiovascular,\nSANS) are the themes whose literature emphasis is <i>falling</i> (Figure&nbsp;20, red quadrant). A gap\nthat were merely static might close on its own; a gap that is static <i>and</i> widening will not. This\nis the report's central finding, and it is specifically about <b>integrative human physiology</b> — the\nsystems that fail together on a long mission."
+   "html": "<b>7.1 — The gap is two-dimensional, and it is widening.</b> Under-service and negative momentum\ncoincide. The very themes the Decadal Survey elevates above current literature (muscle, cardiovascular,\nSANS) are the themes whose literature emphasis is <i>falling</i> (Figure&nbsp;26, red quadrant). A gap\nthat were merely static might close on its own; a gap that is static <i>and</i> widening will not. This\nis the report's central finding, and it is specifically about <b>integrative human physiology</b> — the\nsystems that fail together on a long mission."
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.2 — Volume hides the shift.</b> Coarse composition is stable (Figure&nbsp;14) while semantic\nemphasis diverges (Figure&nbsp;16). A field can look motionless by paper count while quietly\nreorienting its attention. Any research-portfolio audit that counts outputs rather than measuring\nemphasis will miss exactly this kind of drift."
+   "html": "<b>7.2 — Volume hides the shift.</b> Coarse composition is stable (Figure&nbsp;18) while semantic\nemphasis diverges (Figure&nbsp;21). A field can look motionless by paper count while quietly\nreorienting its attention. Any research-portfolio audit that counts outputs rather than measuring\nemphasis will miss exactly this kind of drift."
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.3 — Falls signal maturation, not closure.</b> The event grounding (§5) shows the declining\nthemes fell as their countermeasures and facilities matured — ARED and bisphosphonates for bone, NSRL\nand the RAD dose measurement for radiation — not because the risks were solved. Emphasis is a proxy for\n<i>attention</i>, and attention rationally leaves a problem that looks handled; but \"handled for six\nmonths in LEO\" is not \"handled for three years to Mars\". The falling bundle is where a\nmission-driven funder should be most alert to the difference between fashion and closure."
+   "html": "<b>7.3 — Falls signal maturation, not closure.</b> The event grounding (§6) shows the declining\nthemes fell as their countermeasures and facilities matured — ARED and bisphosphonates for bone, NSRL\nand the RAD dose measurement for radiation — not because the risks were solved. Emphasis is a proxy for\n<i>attention</i>, and attention rationally leaves a problem that looks handled; but \"handled for six\nmonths in LEO\" is not \"handled for three years to Mars\". The falling bundle is where a\nmission-driven funder should be most alert to the difference between fashion and closure."
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.4 — The crop-science triple bind.</b> Plant/crops is the fastest-rising theme in the literature,\nyet it is priority-light (Decadal −11.4), open-data-poor (OSDR −9.3, and below the corpus-correlation\ntrend in Fig 13), and — at the phrase level — foundational <i>Arabidopsis</i> genomics rather than\napplied crop production (Figure&nbsp;23). It is simultaneously the field's greatest bottom-up momentum\nand its least-coordinated: energy without a mission channel or a reusable-data substrate. The ISS\nalready flies the hardware (Veggie, Advanced Plant Habitat); the gap is between the flight programme's\napplied intent and the literature's genomic reflex. This is an opportunity, not a criticism — momentum\nthis strong is exactly what targeted coordination can convert into mission capability."
+   "html": "<b>7.4 — The crop-science triple bind.</b> Plant/crops is the fastest-rising theme in the literature,\nyet it is priority-light (Decadal −11.4), open-data-poor (OSDR −9.3, and below the corpus-correlation\ntrend in Fig 15), and — at the phrase level — foundational <i>Arabidopsis</i> genomics rather than\napplied crop production (Figure&nbsp;29). It is simultaneously the field's greatest bottom-up momentum\nand its least-coordinated: energy without a mission channel or a reusable-data substrate. The ISS\nalready flies the hardware (Veggie, Advanced Plant Habitat); the gap is between the flight programme's\napplied intent and the literature's genomic reflex. This is an opportunity, not a criticism — momentum\nthis strong is exactly what targeted coordination can convert into mission capability."
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.5 — Omics is a method, not a mission.</b> Gene-expression/omics is the highest-emphasis theme in\nboth the literature and OSDR, but lower in the Decadal Survey, because the survey organises priorities\nby <i>risk and system</i> whereas omics is a <i>technique</i> that serves all of them. Omics is not a\ngap; it is the shared instrument — and the \"NASA GeneLab RNA-seq consensus pipeline\" (Figure&nbsp;21)\nplus the Twins Study's multi-omics design show the community already treats it as infrastructure. The\ncorpus-correlation result (Fig 13) reinforces this: open data pools <i>where the molecular methods\nalready are</i>. The implication is to fund omics <i>as</i> infrastructure pointed at the under-served\nrisks, not as an open-ended science area."
+   "html": "<b>7.5 — Omics is a method, not a mission.</b> Gene-expression/omics is the highest-emphasis theme in\nboth the literature and OSDR, but lower in the Decadal Survey, because the survey organises priorities\nby <i>risk and system</i> whereas omics is a <i>technique</i> that serves all of them. Omics is not a\ngap; it is the shared instrument — and the \"NASA GeneLab RNA-seq consensus pipeline\" (Figure&nbsp;27)\nplus the Twins Study's multi-omics design show the community already treats it as infrastructure. The\ncorpus-correlation result (Fig 15) reinforces this: open data pools <i>where the molecular methods\nalready are</i>. The implication is to fund omics <i>as</i> infrastructure pointed at the under-served\nrisks, not as an open-ended science area."
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "<b>6.6 — Radiation is slipping from a strong base.</b> Radiation is priority-relevant (its gap is\nnear zero, Fig 11) and the best-datafied risk in OSDR, yet its literature emphasis is falling (Δ −8.5).\nUnlike bone (thin and falling) this is a well-resourced area losing momentum — a \"protect the lead\" case\nrather than a \"rescue\" case, but still a warning for a beyond-LEO programme where radiation is\nunavoidable and, per the RAD measurement, quantified but not mitigated."
+   "html": "<b>7.6 — Radiation is slipping from a strong base.</b> Radiation is priority-relevant (its gap is\nnear zero, Fig 13) and the best-datafied risk in OSDR, yet its literature emphasis is falling (Δ −8.5).\nUnlike bone (thin and falling) this is a well-resourced area losing momentum — a \"protect the lead\" case\nrather than a \"rescue\" case, but still a warning for a beyond-LEO programme where radiation is\nunavoidable and, per the RAD measurement, quantified but not mitigated."
   },
   {
    "type": "paragraph",
-   "html": "<b>6.7 — The neglected risks form a community, which makes the drift coherent rather than accidental.</b> The co-occurrence analysis (&sect;4.7) shows the falling themes — muscle, cardiovascular, neuro-ocular, circadian — are a single densely-connected cluster the literature studies together, and the acceleration view (&sect;4.8) shows that cluster is still losing emphasis in the most recent five years. A drift spread across ten unrelated topics might be noise; a coordinated retreat from one coherent community of co-studied, mutually-compounding physiological risks is a structural signal. It is also the community a Mars transit stresses simultaneously — which is why the connectivity matters operationally, not just statistically."
+   "html": "<b>7.7 — The neglected risks form a community, which makes the drift coherent rather than accidental.</b> The co-occurrence analysis (&sect;4.8) shows the falling themes — muscle, cardiovascular, neuro-ocular, circadian — are a single densely-connected cluster the literature studies together, and the acceleration view (&sect;4.9) shows that cluster is still losing emphasis in the most recent five years. A drift spread across ten unrelated topics might be noise; a coordinated retreat from one coherent community of co-studied, mutually-compounding physiological risks is a structural signal. It is also the community a Mars transit stresses simultaneously — which is why the connectivity matters operationally, not just statistically."
+  },
+  {
+   "type": "paragraph",
+   "variant": "normal",
+   "html": "<b>7.8 &mdash; The money is already where the argument points.</b> The funding window (&sect;4.2, &sect;4.5) tests these patterns against NASA's own record. It is reassuring on one axis and sharpening on another: the funded portfolio is dominated by human physiology and tracks the Decadal priorities (r = 0.94) far more tightly than it tracks the drifting literature (r = 0.65), so the gap this report identifies is not primarily a failure of NASA's own portfolio but a divergence between that anchored, priority-aligned portfolio and the broader published field &mdash; with one shared blind spot, applied crop production, that even the funded portfolio neglects."
   },
   {
    "type": "heading",
-   "num": "7",
+   "num": "8",
    "text": "A funding hypothesis"
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "The analysis is correlational and its probes are proxies (§8), so what follows is a hypothesis, not a\ndirective. But the evidence points one way with unusual consistency: NASA's research funding should move\n<b>counter-cyclically to the literature's drift</b>, anchoring on Decadal priorities and mission\ncriticality rather than on where publications are already flowing. The 2023 Decadal Survey's own finding\n— that BPS is the least-funded division in the Science Mission Directorate and needs roughly a ten-fold\nincrease<sup class=\"r\"><a href=\"#r9\">9</a></sup> — means the practical question is less \"what to cut\" than\n\"where new money should land first.\" Concretely:"
+   "html": "The analysis is correlational and its probes are proxies (&sect;9), so what follows is a hypothesis, not a directive. The funding window (&sect;4.2, &sect;4.5) strengthens it and changes its emphasis: NASA's funded portfolio already moves counter-cyclically to the literature's drift and tracks the Decadal priorities closely (r = 0.94), so the recommendation is less &ldquo;redirect the money toward human physiology&rdquo; &mdash; the money is largely there &mdash; than <b>protect and extend the existing anchor</b>, and close the data and applied-science gaps around it. The frontier lens (&sect;5) adds a caution the emphasis analysis could not: the themes the field is rushing toward are the ones it is least willing to call open, so bottom-up momentum is a poor guide to where the unknowns actually are. The marginal dollar still earns most where the mission is most exposed and the six-month countermeasure evidence base must be stretched to Mars durations. All of this sits against the 2023 Decadal Survey's own finding that BPS is the least-funded division in the Science Mission Directorate and needs roughly a ten-fold increase<sup class=\"r\"><a href=\"#r9\">9</a></sup> &mdash; so the practical question is less &ldquo;what to cut&rdquo; than &ldquo;where new money should land first.&rdquo; Concretely:"
   },
   {
    "type": "table",
@@ -1054,7 +1335,7 @@
       "cls": ""
      },
      {
-      "html": "The \"danger\" quadrant (Fig 20): priority-elevated yet under-served and falling (Δ −4.8 to −15.2). Falls track countermeasure maturation, not closure (§5). Mission-critical for Mars-class durations; thin in OSDR.",
+      "html": "The \"danger\" quadrant (Fig 26): priority-elevated yet under-served and falling (Δ −4.8 to −15.2). Falls track countermeasure maturation, not closure (§6). Mission-critical for Mars-class durations; thin in OSDR.",
       "cls": ""
      }
     ],
@@ -1082,7 +1363,7 @@
       "cls": ""
      },
      {
-      "html": "Redirect the strong plant momentum (Fig 16, 18) from <i>Arabidopsis</i> genomics (Fig 23) toward the food-system science the ISS hardware (Veggie, APH) was built for, and require OSDR crop-data deposition (the triple bind, §6.4).",
+      "html": "Redirect the strong plant momentum (Fig 21, 23) from <i>Arabidopsis</i> genomics (Fig 29) toward the food-system science the ISS hardware (Veggie, APH) was built for, and require OSDR crop-data deposition (the triple bind, §7.4).",
       "cls": ""
      }
     ],
@@ -1096,7 +1377,7 @@
       "cls": ""
      },
      {
-      "html": "Radiation: aligned (Fig 11) and well-datafied but momentum slipping — protect it; the dose is measured but not mitigated. Immune: aligned and healthily rising — steady support.",
+      "html": "Radiation: aligned (Fig 13) and well-datafied but momentum slipping — protect it; the dose is measured but not mitigated. Immune: aligned and healthily rising — steady support.",
       "cls": ""
      }
     ],
@@ -1110,7 +1391,7 @@
       "cls": ""
      },
      {
-      "html": "Omics is the shared method (§6.5), already treated as infrastructure; open data pools where methods already are (Fig 13). Fund it pointed at the human-physiology gaps, not as a standalone growth area.",
+      "html": "Omics is the shared method (§7.5), already treated as infrastructure; open data pools where methods already are (Fig 15). Fund it pointed at the human-physiology gaps, not as a standalone growth area.",
       "cls": ""
      }
     ],
@@ -1124,7 +1405,7 @@
       "cls": ""
      },
      {
-      "html": "The literature already supplies this abundantly and it is <i>rising on its own</i> (Fig 16); marginal NASA dollars earn more in the under-served integrative risks.",
+      "html": "The literature already supplies this abundantly and it is <i>rising on its own</i> (Fig 21); marginal NASA dollars earn more in the under-served integrative risks.",
       "cls": ""
      }
     ],
@@ -1138,7 +1419,7 @@
       "cls": ""
      },
      {
-      "html": "The metadata-noise share doubled to ~19% and grows fast in absolute terms (Fig 14, 15); better curation raises the return on every other investment.",
+      "html": "The metadata-noise share doubled to ~19% and grows fast in absolute terms (Fig 18, 19); better curation raises the return on every other investment.",
       "cls": ""
      }
     ]
@@ -1154,29 +1435,32 @@
   },
   {
    "type": "heading",
-   "num": "8",
+   "num": "9",
    "text": "Limitations"
   },
   {
    "type": "list",
    "items": [
-    "<b>Proxies, not outcomes.</b> Semantic emphasis measures research <i>attention</i>, not funding,\n  quality, or result. High emphasis need not mean a risk is solved, nor low emphasis that it is ignored\n  in practice — the SANS case (§5) shows a real, growing risk that the broad-net probe under-captures.",
+    "<b>Proxies, not outcomes.</b> Semantic emphasis measures research <i>attention</i>, not funding,\n  quality, or result. High emphasis need not mean a risk is solved, nor low emphasis that it is ignored\n  in practice — the SANS case (§6) shows a real, growing risk that the broad-net probe under-captures.",
     "<b>Relative, within-corpus metric.</b> Mean-centering answers \"relative to this corpus's own\n  average\"; it cannot compare absolute levels across corpora. Bone (§4.2) shows how a narrow lexical\n  probe can understate a risk discussed under other vocabulary — domain judgement is required.",
     "<b>Literature-only time axis.</b> OSDR dates are corrupted (epoch bug) and the Decadal volumes are\n  undated, so all temporal claims describe the published literature, not the priorities or the data base.",
-    "<b>Event grounding is associational.</b> The §5 timeline establishes plausibility and temporal\n  coincidence, not causation; other factors (journal launches, adjacent-field spillover, funding cycles\n  we did not model) also move emphasis.",
+    "<b>Event grounding is associational.</b> The §6 timeline establishes plausibility and temporal\n  coincidence, not causation; other factors (journal launches, adjacent-field spillover, funding cycles\n  we did not model) also move emphasis.",
     "<b>A noisy net.</b> The OpenAlex harvest is broad and &gt;99% low-relevance, with a rising\n  metadata-noise fraction; all count-based statements are corrected for relevance but residual noise\n  remains.",
-    "<b>Hand-specified probes and correlational design.</b> The ten themes and their query wordings are\n  chosen, not learned, and no causal claim is made about why the literature drifts."
+    "<b>Hand-specified probes and correlational design.</b> The ten themes and their query wordings are\n  chosen, not learned, and no causal claim is made about why the literature drifts.",
+    "<b>The frontier is a lexical measure.</b> An &ldquo;acknowledged unknown&rdquo; is detected by an explicit cue-phrase criterion, so a passage that implies an open question without hedging is missed, and a boilerplate &ldquo;further research is needed&rdquo; counts as fully as a considered admission. We adopted it only after the semantic and hybrid probes failed a retrieval check (&sect;5.3), and it inherits TF-IDF's biases: very long documents (the Task Book's median passage is 6,448 characters) dilute the signal, very short ones sharpen it.",
+    "<b>Frontier density is genre-bound.</b> The four corpora hedge at rates set largely by what kind of document they are, not by how much they know. We therefore never rank the windows by density, and every cross-corpus frontier claim uses the baseline-corrected openness measure &mdash; but openness still assumes hedging rates are comparable <i>within</i> a corpus across themes, which sub-genres (a review vs. a data paper) could violate.",
+    "<b>Openness effects are small.</b> Openness lifts span roughly &plusmn;6 percentage points against a 95% confidence interval of &plusmn;1&ndash;2 points per cell. The theme-level orderings and the momentum correlation (r = &minus;0.42, n = 10 themes) are directional findings from a modest number of points, not precise estimates; they should be read as a pattern that corroborates the emphasis analysis, not as a measurement that stands alone."
    ]
   },
   {
    "type": "heading",
-   "num": "9",
+   "num": "10",
    "text": "Conclusion"
   },
   {
    "type": "paragraph",
    "variant": "normal",
-   "html": "Placing NASA's stated priorities, its open-data evidence, and its published literature in one shared\nsemantic space turns an unanswerable qualitative worry — \"is space biology studying the right things?\"\n— into a measurable one. The answer is a qualified no with a clear direction. The field is aligned and\nstrong where it is molecular (omics, immune); it is drifting where it is integrative and human\n(cardiovascular, ocular, muscular, skeletal). That drift is invisible to paper-counting and only appears\nwhen emphasis is measured; it is not static but widening; and — read against the historical record — it\nreflects attention following new tools and flagship results toward the molecular, while leaving the\nhuman-physiology risks behind precisely as their countermeasures <i>looked</i> handled. The rising energy\nin the field — plant biology, microbiome, omics — is real and valuable but currently points away from the\nmission and lacks the open-data substrate to be reused. With the Decadal Survey itself calling the\nprogramme severely under-funded, the opportunity for NASA is to spend counter-cyclically: to pull the\nintegrative human-physiology risks back up the agenda, extend their six-month countermeasure evidence to\nMars durations, and convert the field's molecular momentum into the infrastructure and applied capability\na crewed Mars mission will require."
+   "html": "Placing NASA's stated priorities, its open-data evidence, its funded portfolio, and its published literature in one shared semantic space turns an unanswerable qualitative worry &mdash; &ldquo;is space biology studying the right things?&rdquo; &mdash; into a measurable one. The answer is a qualified no with a clear direction, and a surprise about where the fault lies. The field is aligned and strong where it is molecular (omics, immune); it is drifting where it is integrative and human (cardiovascular, ocular, muscular, skeletal). That drift is invisible to paper-counting and only appears when emphasis is measured; it is not static but widening; and &mdash; read against the historical record &mdash; it reflects attention following new tools and flagship results toward the molecular, while leaving the human-physiology risks behind precisely as their countermeasures looked handled. The surprise is that NASA's own money is not the problem: the funded portfolio hugs the priorities and moves counter-cyclically to the literature's fashion. It is the published field that has drifted away from the agency's agenda, not the agency from its own. And when we ask the corpora what they admit they do not know, the field's candour runs backwards to its momentum &mdash; loudest about the risks it is leaving, quietest about the ones it is racing toward. With the Decadal Survey itself calling the programme severely under-funded, the opportunity for NASA is to spend counter-cyclically and deliberately: to protect and extend the integrative human-physiology anchor to Mars-class durations, to convert the field's molecular and plant momentum into infrastructure and applied capability, and to treat a theme's silence about its own unknowns as a reason to look harder, not a sign that the question is closed."
   },
   {
    "type": "divider"
@@ -1189,7 +1473,7 @@
   },
   {
    "type": "footnote",
-   "html": "<b>Reproducibility.</b> All figures are generated by the Research-Gap Identification\nplatform from three corpora: Space_Biology (101,273 OpenAlex records), OSDR (171 open-data papers /\n8,646 chunks), and Decadal_Survey (3 National Academies volumes / 2,580 passages). Pipeline: SPECTER2\nembeddings → UMAP → HDBSCAN topic discovery → keyword labelling; hierarchical structure via\ntopic-centroid Ward linkage (<span class=\"tag\">hierarchical_dendrogram</span> /\n<span class=\"tag\">hierarchical_cluster</span>); cross-corpus comparison via combined-corpus semantic\nscoring with per-corpus mean-centering; temporal views via per-year share and per-year mean emphasis\n(literature only). Emphasis values are mean-centred and scaled ×1000. This document embeds every chart\nas a live Plotly figure together with a single copy of the plotting library, so it is fully\nself-contained and interactive offline."
+   "html": "<b>Reproducibility.</b> All figures are generated by the Research-Gap Identification platform from four corpora: Space_Biology (101,273 OpenAlex records), OSDR (171 open-data papers / 8,646 chunks), Decadal_Survey (3 National Academies volumes / 2,580 passages), and the NASA Task Book (8,487 project PDFs parsed with the platform's <span class=\"tag\">parse_taskbook_pdfs</span> importer into 6,353 unique funded awards, FY2004&ndash;2027) &mdash; all four embedded and theme-scored in the same SPECTER2 space with the same ten probes. Pipeline: SPECTER2 embeddings &rarr; UMAP &rarr; HDBSCAN topic discovery &rarr; keyword labelling; hierarchical structure via topic-centroid Ward linkage (<span class=\"tag\">hierarchical_dendrogram</span> / <span class=\"tag\">hierarchical_cluster</span>); cross-corpus comparison via combined-corpus semantic scoring with per-corpus mean-centering; temporal views via per-year share and per-year mean emphasis (literature) and per fiscal year (Task Book). The frontier lens (&sect;5) scores every passage with <span class=\"tag\">keyword_score</span>, <span class=\"tag\">semantic_score</span> and <span class=\"tag\">hybrid_score</span> against an acknowledged-unknown probe, then defines the frontier by an explicit cue-phrase criterion after the retrieval diagnostic showed the semantic and hybrid scores to be unfit for the purpose; the frontier map is HDBSCAN (min_cluster_size 20, min_samples 4) over the frontier subset's existing 5-D coordinates. Emphasis values are mean-centred and scaled &times;1000. This document embeds every chart as a live Plotly figure together with a single copy of the plotting library, so it is fully self-contained and interactive offline."
   }
  ],
  "sources": [
@@ -1225,6 +1509,13 @@
   },
   {
    "text": "Zeitlin et&nbsp;al., &ldquo;Measurements of Energetic Particle Radiation in Transit to Mars on the Mars Science Laboratory&rdquo;, <i>Science</i> 340, 2013, doi:10.1126/science.1235989 (Curiosity RAD instrument)."
+  },
+  {
+   "authors": "NASA Biological and Physical Sciences Division",
+   "title": "NASA Task Book: funded research projects in the biological and physical sciences",
+   "journal": "taskbook.nasaprs.com",
+   "year": "2026",
+   "url": "https://taskbook.nasaprs.com/"
   }
  ]
 }
