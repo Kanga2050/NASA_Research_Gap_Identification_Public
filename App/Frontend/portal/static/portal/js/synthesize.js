@@ -72,12 +72,32 @@
   function nameTmpl(tmpl, name) {
     return tmpl.replace("__NAME__", encodeURIComponent(name));
   }
+  // Local draft. Stores the open paper's filename alongside the doc so a reload
+  // mid-edit comes back still bound to that file — otherwise Save would have no
+  // name to overwrite and would fork a second paper off the title.
   var saveTimer = null;
   function autosave() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(doc)); } catch (e) {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: currentName, doc: doc }));
+      } catch (e) {}
     }, 400);
+  }
+  function readDraft() {
+    var raw = null;
+    try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+    if (!raw) return null;
+    // Drafts written before the draft grew a `name` were the bare doc.
+    if (raw.blocks) return { name: null, doc: raw };
+    return (raw.doc && raw.doc.blocks) ? { name: raw.name || null, doc: raw.doc } : null;
+  }
+
+  // The paper's filename is fixed once it exists: whatever it was opened/saved as,
+  // falling back to a slug of the title for a paper that has never been saved. Save
+  // overwrites it in place — no "save as" prompt, no second copy.
+  function docName() {
+    return currentName || slug(doc.title) || "Untitled_paper";
   }
 
   // ---- Inline HTML sanitiser (read-back from contenteditable) --------------
@@ -927,6 +947,7 @@
       currentName = j.name;
       render();
       openSel.value = j.name;
+      autosave();
       setStatus(note || "Opened “" + j.name + "”.", "ok");
     }).catch(function (err) { setStatus("Open failed: " + err.message, "err"); });
   }
@@ -938,16 +959,17 @@
   document.getElementById("synth-new").addEventListener("click", function () {
     if (!confirm("Start a new blank paper? Unsaved changes to the current one will be lost.")) return;
     doc = starterDoc(); currentName = null; render(); openSel.value = "";
+    autosave();
     setStatus("New paper.", "ok");
   });
 
   document.getElementById("synth-save").addEventListener("click", function () {
     syncFromDom();
-    var name = prompt("Save paper as:", currentName || slug(doc.title) || "Untitled_paper");
-    if (!name) return;
+    var name = docName();
     setStatus("Saving…");
     post(SAVE_URL, { name: name, doc: doc, description: "" }).then(function (j) {
       currentName = j.name;
+      autosave();
       setStatus("Saved “" + j.name + "”.", "ok");
       refreshPaperList(j.name);
     }).catch(function (err) { setStatus("Save failed: " + err.message, "err"); });
@@ -955,11 +977,9 @@
 
   document.getElementById("synth-build").addEventListener("click", function () {
     syncFromDom();
-    var name = prompt("Build interactive report as (appears in your Visualizations):",
-      currentName || slug(doc.title) || "Untitled_report");
-    if (!name) return;
+    var name = docName();
     setStatus("Building… embedding live charts.");
-    post(BUILD_URL, { doc: doc, output_name: name, name: currentName || name }).then(function (j) {
+    post(BUILD_URL, { doc: doc, output_name: name, name: name }).then(function (j) {
       setStatus("Built “" + j.name + "” → open it from the Dashboard's Visualizations.", "ok");
     }).catch(function (err) { setStatus("Build failed: " + err.message, "err"); });
   });
@@ -1012,12 +1032,19 @@
   // ========================================================================
   (function init() {
     // A server-injected initial doc (e.g. "open this paper on load") wins over the
-    // autosaved draft; otherwise restore the local draft, otherwise start fresh.
+    // autosaved draft; otherwise restore the local draft (doc *and* the filename it
+    // is bound to), otherwise start fresh.
     var initial = readJSON("synthesize-initial", null);
-    var stored = null;
-    if (!initial) { try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) {} }
-    var src = (initial && initial.blocks) ? initial : (stored && stored.blocks ? stored : starterDoc());
-    doc = normalize(src);
+    var draft = initial ? null : readDraft();
+    if (initial && initial.blocks) {
+      doc = normalize(initial);
+      currentName = initial.name || null;
+    } else if (draft) {
+      doc = normalize(draft.doc);
+      currentName = draft.name;
+    } else {
+      doc = normalize(starterDoc());
+    }
     render();
     refreshPaperList(currentName);
   })();

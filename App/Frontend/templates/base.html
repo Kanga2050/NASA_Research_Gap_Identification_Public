@@ -87,6 +87,7 @@
     {% endif %}
     {% block body %}{% endblock %}
     {% if user.is_authenticated %}
+      <script src="{% static_versioned 'portal/js/info-tips.js' %}"></script>
       <script src="{% static_versioned 'portal/js/tasks_live.js' %}"></script>
       <script src="{% static_versioned 'portal/js/workspace-tabs.js' %}"></script>
     {% endif %}

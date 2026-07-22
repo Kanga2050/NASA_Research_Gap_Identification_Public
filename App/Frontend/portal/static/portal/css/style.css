@@ -58,10 +58,13 @@ code {
   padding: 0 1.25rem;
 }
 
+/* The meatball is a white-matted PNG, so its plate stays white in both themes —
+   `var(--surface)` would turn the padding around it charcoal in dark mode and
+   leave the logo sitting on a visible light square. */
 .topbar img {
   height: 56px;
   width: auto;
-  background: var(--surface);
+  background: #fff;
   border-radius: 0px;
   padding: 0.3rem 0.5rem;
   margin-right: -1.25rem;
@@ -1073,12 +1076,18 @@ ul.errorlist {
 }
 
 /* ============================ Dashboard + Studio tabs on one page ============================ */
-/* Both panels stay mounted (rather than display:none) so the inactive one keeps
+/* Every panel stays mounted (rather than display:none) so the inactive ones keep
    real layout dimensions — Drawflow measures its canvas size on init, and a
-   display:none container would hand it a 0x0 box. */
+   display:none container would hand it a 0x0 box.
+   Inactive panels are position:fixed rather than absolute: an absolutely
+   positioned panel still extends the document's scrollable overflow, so the page
+   scrolled to the height of the *tallest* tab. A fixed panel is laid out against
+   the viewport and never contributes to page scroll, so each tab now scrolls to
+   its own length. (Wrapping the panels in an overflow:hidden box would also fix
+   the scroll, but it would break the position:sticky sidebars inside them.) */
 .tab-panel {
   visibility: hidden;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -1115,7 +1124,14 @@ ul.errorlist {
   background: var(--nasa-blue);
   outline: none;
 }
-/* Scoped to [data-tip] so an info icon without a tip never renders an empty box. */
+/* The tip itself is rendered by info-tips.js into a single <body>-level box
+   (`.info-tip-pop`) rather than an ::after on the icon. Most info icons sit
+   inside a scrolling sidebar or a card, and an absolutely positioned pseudo
+   element is clipped by those overflow boxes no matter how high its z-index —
+   a body-level fixed box escapes every ancestor's clip and paints above all the
+   app chrome. The ::after below is the no-JS fallback: it can still be clipped,
+   but it beats showing nothing. `html.js-tips` (set by the script) turns it off
+   so the two never render at once. */
 .info-icon[data-tip]::after {
   content: attr(data-tip);
   position: absolute;
@@ -1144,6 +1160,39 @@ ul.errorlist {
 }
 .info-icon[data-tip]:hover::after,
 .info-icon[data-tip]:focus::after {
+  opacity: 1;
+  visibility: visible;
+}
+:root.js-tips .info-icon[data-tip]::after { content: none; }
+
+/* z-index sits above the modal overlay (100) and the agent dock, since an info
+   icon can live inside either. */
+.info-tip-pop {
+  position: fixed;
+  z-index: 2147483000;
+  top: 0;
+  left: 0;
+  width: 230px;
+  max-width: 60vw;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: #1b1f24;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+.info-tip-pop.show {
   opacity: 1;
   visibility: visible;
 }

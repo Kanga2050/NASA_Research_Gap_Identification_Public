@@ -87,10 +87,15 @@
 /* ============================================================================
    Editor chrome (app-side, sans-serif). Layout mirrors the Studio tab.
    ========================================================================== */
-.synthesize { display:flex; gap:16px; align-items:flex-start; padding:16px;
+/* Pinned to the viewport (topbar 56 + tabbar 44 = 100, matching .layout on the
+   other tabs) with each column its own scroller, so a long paper doesn't drag
+   the sidebar off-screen and a long sources list doesn't move the paper. */
+.synthesize { display:flex; gap:16px; align-items:stretch; padding:16px;
+  height:calc(100vh - 100px); overflow:hidden;
   font-family: var(--font-body, "Public Sans", sans-serif); }
-.synth-side { flex:0 0 300px; display:flex; flex-direction:column; gap:14px; position:sticky; top:12px; }
-.synth-side .card { margin:0; }
+.synth-side { flex:0 0 300px; display:flex; flex-direction:column; gap:14px;
+  overflow-y:auto; min-height:0; padding-right:4px; }
+.synth-side .card { margin:0; flex:0 0 auto; }
 .synth-label { display:block; font-size:12px; font-weight:600; color:var(--text-muted,#5b6572);
   margin:6px 0 3px; }
 .synth-title-input { width:100%; padding:7px 9px; border:1px solid var(--border,#dde3ea);
@@ -129,7 +134,7 @@
 .synth-source-row .synth-src-actions button { font-size:11px; padding:3px 6px; }
 
 /* Canvas */
-.synth-canvas { flex:1 1 auto; min-width:0; }
+.synth-canvas { flex:1 1 auto; min-width:0; min-height:0; overflow-y:auto; padding-right:4px; }
 .synth-canvas-hint { font-size:12px; color:var(--text-muted,#5b6572); margin:2px 2px 10px;
   font-family: var(--font-body, "Public Sans", sans-serif); }
 .synthesize-doc { border:1px solid var(--border,#dde3ea); border-radius:10px;
