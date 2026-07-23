@@ -41,4 +41,4 @@ combined_app.add_middleware(
 combined_app.mount("/", django_app)
 
 if __name__ == "__main__":
-    uvicorn.run(combined_app, host="127.0.0.1", port=8001)
+    uvicorn.run(combined_app, host="127.0.0.1", port=8000)

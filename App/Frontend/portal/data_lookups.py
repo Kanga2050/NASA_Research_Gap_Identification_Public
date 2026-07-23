@@ -85,14 +85,6 @@ def list_public_tree(kind: str) -> dict:
     return folders.list_tree(PUBLIC_ROOTS[kind](), TREE_SUFFIXES[kind])
 
 
-def user_folder_paths(user, kind: str) -> list[str]:
-    return folders.folder_paths(USER_ROOTS[kind](user))
-
-
-def public_folder_paths(kind: str) -> list[str]:
-    return folders.folder_paths(PUBLIC_ROOTS[kind]())
-
-
 def list_user_csv_names(user) -> list[str]:
     return _list_names(user_csv_root(user), ".csv")
 

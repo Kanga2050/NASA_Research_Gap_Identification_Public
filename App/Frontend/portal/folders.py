@@ -93,18 +93,6 @@ def _tree_of(root: Path, folder: Path, suffixes: tuple) -> dict:
     return {"name": name, "path": rel, "folders": subfolders, "files": files}
 
 
-def folder_paths(root: Path) -> list[str]:
-    """Every folder in the tree as a relative path (root first as ""), for a
-    'place this in which folder?' picker."""
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
-    out = [""]
-    for child in sorted(root.rglob("*")):
-        if child.is_dir():
-            out.append(child.relative_to(root).as_posix())
-    return out
-
-
 # --------------------------------------------------------------------------- #
 # Mutations
 # --------------------------------------------------------------------------- #

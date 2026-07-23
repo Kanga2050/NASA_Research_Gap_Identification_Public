@@ -30,8 +30,6 @@ from .data_lookups import (
     list_user_pdf_folders,
     list_user_tree,
     pdf_folder_choices,
-    public_folder_paths,
-    user_folder_paths,
 )
 from . import folders
 from .file_meta import (DESCRIPTIONS_FILE, find_description, get_description,
@@ -164,9 +162,8 @@ def _dashboard_context(request):
         "html_names": html_names,
         "template_files": list_user_files(request.user, "template"),
         # Files organised into nested folders: the Dashboard renders these trees, and
-        # the folder pickers (move / publish-into / pull-into) read the path lists.
+        # the same tree data drives the move/publish/rename/delete location pickers.
         "file_trees": {kind: list_user_tree(request.user, kind) for kind in KIND_SUFFIX},
-        "user_folder_choices": {kind: user_folder_paths(request.user, kind) for kind in KIND_SUFFIX},
         "pdf_folders": list_user_pdf_folders(request.user),
         "pdf_folder_choices": pdf_folder_choices(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
@@ -516,7 +513,6 @@ def public_list(request):
     return JsonResponse({
         **{kind: list_public(kind) for kind in KIND_SUFFIX},
         "trees": {kind: list_public_tree(kind) for kind in KIND_SUFFIX},
-        "folder_choices": {kind: public_folder_paths(kind) for kind in KIND_SUFFIX},
         "pdf": list_public_pdf_folders(),
     })
 

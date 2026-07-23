@@ -57,7 +57,6 @@
     var el = document.getElementById(id);
     try { return el ? JSON.parse(el.textContent) : null; } catch (e) { return null; }
   }
-  var USER_CHOICES = parseJSON("user-folder-choices-data") || {};
   // The user's own files as folder trees, keyed by kind (csv/template/paper) --
   // hoisted here (not local to initFileTrees) so the picker below, and Studio's
   // and Synthesize's own scripts (via window.PortalFileTrees), can all read it.
@@ -65,7 +64,7 @@
   window.PortalFileTrees = TREES;
 
   // The public library is fetched once and shared by the public list and by every
-  // "publish into which public folder?" prompt.
+  // "publish into which public folder?" location picker.
   var publicPromise = null;
   function loadPublic() {
     if (!publicPromise) {
@@ -76,34 +75,8 @@
     }
     return publicPromise;
   }
-  function publicChoices(kind) {
-    return loadPublic().then(function (d) { return (d.folder_choices || {})[kind] || [""]; });
-  }
-
-  // A modal that asks which folder to place an import/export in: pick an existing
-  // folder or type a new (possibly nested) path. Resolves to the chosen path (""=root)
-  // or null if cancelled.
-  function pickFolder(choices, title) {
-    return new Promise(function (resolve) {
-      var overlay = document.createElement("div");
-      overlay.className = "folder-modal-overlay";
-      var opts = (choices && choices.length ? choices : [""]).map(function (c) {
-        return '<option value="' + esc(c) + '">' + (c === "" ? "— root —" : esc(c)) + "</option>";
-      }).join("");
-      overlay.innerHTML = '<div class="folder-modal"><h4>' + esc(title) + "</h4>" +
-        '<label>Existing folder</label><select class="fm-select">' + opts + "</select>" +
-        '<label>…or a new folder path</label><input type="text" class="fm-new" placeholder="e.g. Figures/Temporal">' +
-        '<div class="fm-actions"><button type="button" class="fm-cancel">Cancel</button>' +
-        '<button type="button" class="fm-ok">Place here</button></div></div>';
-      document.body.appendChild(overlay);
-      function done(v) { overlay.remove(); resolve(v); }
-      overlay.querySelector(".fm-cancel").addEventListener("click", function () { done(null); });
-      overlay.addEventListener("click", function (e) { if (e.target === overlay) done(null); });
-      overlay.querySelector(".fm-ok").addEventListener("click", function () {
-        done((overlay.querySelector(".fm-new").value.trim()) || overlay.querySelector(".fm-select").value);
-      });
-      var nu = overlay.querySelector(".fm-new"); if (nu) nu.focus();
-    });
+  function publicTree(kind) {
+    return loadPublic().then(function (d) { return (d.trees || {})[kind] || { folders: [], files: [], path: "" }; });
   }
 
   function findByPath(node, path) {
@@ -117,12 +90,27 @@
     return null;
   }
 
-  // A modal for picking ONE file out of one or more folder trees at once (e.g.
-  // "Data" + "Charts" + "Reports") -- built for the four pickers that used to be
-  // one giant flat <select> (View output, Export, Load template, Insert
-  // visualization), all unwieldy once a workspace carries dozens of foldered
-  // files. `groups`: [{ label, tree, filter(f), render(f) -> label, sub(f) ->
-  // label }]. Resolves {group, file} or null if cancelled.
+  function findFolderByPath(node, path) {
+    if ((node.path || "") === path) return node;
+    var folders = node.folders || [];
+    for (var i = 0; i < folders.length; i++) {
+      var found = findFolderByPath(folders[i], path);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // A modal for picking ONE file and/or folder out of one or more folder trees at
+  // once (e.g. "Data" + "Charts" + "Reports") -- built for the pickers that used to
+  // be flat <select>s (View output, Export, Load template, Insert visualization,
+  // and now every dashboard file/folder action too), all unwieldy once a workspace
+  // carries dozens of foldered files. `groups`: [{ label, tree, filter(f),
+  // render(f) -> label, sub(f) -> label, pickFiles (default true), pickFolders
+  // (default false) -- adds a "Select" button to every folder header, allowFolder
+  // (default true when pickFolders) -- also selectable as isFolder,
+  // allowRoot (default false) -- adds a "place here (top level)" row for the
+  // group's own root }]. Resolves {group, file} for a file, {group, folder,
+  // isFolder: true} for a folder, or null if cancelled.
   function openGroupedPicker(title, groups) {
     return new Promise(function (resolve) {
       var overlay = document.createElement("div");
@@ -135,17 +123,23 @@
           esc(label) + (sub ? '<span class="picker-sub">' + esc(sub) + "</span>" : "") + "</li>";
       }
       function folderNode(node, group, isRoot) {
-        var files = (node.files || []).filter(group.filter || function () { return true; });
+        var files = group.pickFiles === false ? [] :
+          (node.files || []).filter(group.filter || function () { return true; });
         var inner = (node.folders || []).map(function (sf) { return folderNode(sf, group, false); }).join("") +
           files.map(function (f) { return fileRow(f, group); }).join("");
-        if (!inner) return "";
+        var pickBtn = (group.pickFolders && !isRoot) ?
+          '<button type="button" class="picker-pick-folder" data-path="' + esc(node.path) +
+          '" data-group="' + esc(group.label) + '">Select</button>' : "";
+        if (!inner && !pickBtn) return "";
         if (isRoot) return inner;
         return '<li class="tree-folder" data-path="' + esc(node.path) + '"><div class="folder-head">' +
-          '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(node.name) + "</span></div>" +
-          '<ul class="file-list folder-body">' + inner + "</ul></li>";
+          '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(node.name) + "</span>" +
+          pickBtn + "</div>" + '<ul class="file-list folder-body">' + inner + "</ul></li>";
       }
       var body = groups.map(function (g) {
-        var inner = folderNode(g.tree || { folders: [], files: [], path: "" }, g, true);
+        var rootRow = g.allowRoot ?
+          '<li class="picker-row picker-root-row" data-group="' + esc(g.label) + '">— place here (top level) —</li>' : "";
+        var inner = rootRow + folderNode(g.tree || { folders: [], files: [], path: "" }, g, true);
         if (!inner) return "";
         return '<li class="tree-folder" data-path="__group:' + esc(g.label) + '"><div class="folder-head">' +
           '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(g.label) + "</span></div>" +
@@ -163,6 +157,19 @@
       overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) done(null); });
       overlay.addEventListener("click", function (e) {
         var t = e.target, folderEl = t.closest(".tree-folder");
+        if (t.classList.contains("picker-pick-folder")) {
+          var pgLabel = t.getAttribute("data-group");
+          var pgroup = groups.filter(function (g) { return g.label === pgLabel; })[0];
+          var folder = pgroup && findFolderByPath(pgroup.tree, t.getAttribute("data-path"));
+          if (folder) done({ group: pgroup, folder: folder, isFolder: true });
+          return;
+        }
+        if (t.classList.contains("picker-root-row")) {
+          var rgLabel = t.getAttribute("data-group");
+          var rgroup = groups.filter(function (g) { return g.label === rgLabel; })[0];
+          if (rgroup) done({ group: rgroup, folder: { path: "", name: "" }, isFolder: true });
+          return;
+        }
         if (t.classList.contains("folder-toggle") || t.classList.contains("folder-name")) {
           if (folderEl) folderEl.classList.toggle("collapsed");
           return;
@@ -187,7 +194,25 @@
   }
   window.openGroupedPicker = openGroupedPicker;
 
+  // Thin wrappers over openGroupedPicker for the common single-kind cases: pick one
+  // file/folder to act on, or pick a destination folder to place something into.
+  var KIND_LABEL = { csv: "Data", template: "Templates", paper: "Papers" };
+  function pickItem(kind, tree, title, opts) {
+    var g = { label: KIND_LABEL[kind] || kind, tree: tree };
+    for (var k in opts) if (opts.hasOwnProperty(k)) g[k] = opts[k];
+    return openGroupedPicker(title, [g]);
+  }
+  function pickDestination(kind, tree, title) {
+    return pickItem(kind, tree, title, { pickFiles: false, pickFolders: true, allowRoot: true })
+      .then(function (picked) { return picked ? picked.folder.path : null; });
+  }
+
   // ---- The user's own files, as navigable folder trees ---------------------
+  // Read-only rendering of the user's own file trees. Every mutation (new folder,
+  // describe, move, rename, publish, delete) now lives in one toolbar at the top of
+  // each section (see initSectionToolbars) rather than a button per row -- a section
+  // can carry dozens of foldered files, and repeating five buttons on every single
+  // row was both the visual clutter and the "chalked" wrapping problem.
   function initFileTrees() {
     if (!TREES) return;
 
@@ -203,7 +228,7 @@
       return '<a class="file-view" href="/outputs/html/' + encodeURIComponent(f.path) +
         '/" target="_blank" rel="noopener">View ↗</a>';
     }
-    function fileRow(kind, f, actions) {
+    function fileRow(kind, f) {
       var descClass = f.description ? "" : " empty";
       // "csv" has exactly one suffix, shown inline; "template"/"paper" may pair
       // two physical files under one row, so which ones exist is shown as tags.
@@ -211,29 +236,17 @@
       return '<li class="file-row" data-kind="' + kind + '" data-name="' + esc(f.path) + '">' +
         '<div class="file-main"><span class="file-name">' + esc(f.name) + suffix + "</span>" +
         kindTags(kind, f) +
-        '<span class="file-actions">' + viewLink(kind, f) + actions + "</span></div>" +
+        '<span class="file-actions">' + viewLink(kind, f) + "</span></div>" +
         '<div class="file-desc' + descClass + '">' + esc(f.description || "") + "</div></li>";
-    }
-    function ownActions() {
-      return '<button type="button" class="file-describe" title="Edit description">✎</button>' +
-        '<button type="button" class="file-move" title="Move to a folder">Move</button>' +
-        '<button type="button" class="file-publish" title="Publish to the public library">Publish</button>' +
-        '<button type="button" class="file-delete" title="Delete">Delete</button>';
     }
     function folderNode(kind, node, isRoot) {
       var inner = node.folders.map(function (sf) { return folderNode(kind, sf, false); }).join("") +
-        node.files.map(function (f) { return fileRow(kind, f, ownActions()); }).join("");
+        node.files.map(function (f) { return fileRow(kind, f); }).join("");
       if (isRoot) return inner || '<li class="placeholder">Nothing here yet.</li>';
       return '<li class="tree-folder" data-path="' + esc(node.path) + '">' +
         '<div class="folder-head"><span class="folder-toggle">▾</span> ' +
-        '<span class="folder-name">' + esc(node.name) + "</span>" +
-        '<span class="folder-actions">' +
-          '<button type="button" class="folder-newsub" title="New subfolder">+ Folder</button>' +
-          '<button type="button" class="folder-move" title="Move this folder">Move</button>' +
-          '<button type="button" class="folder-publish" title="Publish this folder">Publish</button>' +
-          '<button type="button" class="folder-rename" title="Rename">Rename</button>' +
-          '<button type="button" class="folder-delete" title="Delete folder">Delete</button>' +
-        "</span></div><ul class=\"file-list folder-body\">" + inner + "</ul></li>";
+        '<span class="folder-name">' + esc(node.name) + "</span></div>" +
+        '<ul class="file-list folder-body">' + inner + "</ul></li>";
     }
     FILE_KINDS.forEach(function (kind) {
       var container = document.querySelector('.file-tree[data-kind="' + kind + '"]');
@@ -243,74 +256,103 @@
     });
 
     document.querySelectorAll(".file-tree").forEach(function (container) {
-      var kind = container.getAttribute("data-kind");
       container.addEventListener("click", function (e) {
         var t = e.target, folderEl = t.closest(".tree-folder");
         if (t.classList.contains("folder-toggle") || t.classList.contains("folder-name")) {
           if (folderEl) folderEl.classList.toggle("collapsed");
-          return;
-        }
-        var fpath = folderEl ? folderEl.getAttribute("data-path") : "";
-        if (t.classList.contains("folder-newsub")) {
-          var sub = prompt("New subfolder inside " + fpath + ":"); if (!sub) return;
-          post(URLS.fcreate, { kind: kind, parent: fpath, name: sub }).then(reload); return;
-        }
-        if (t.classList.contains("folder-rename")) {
-          var nn = prompt("Rename folder:", folderEl.querySelector(".folder-name").textContent.trim()); if (!nn) return;
-          post(URLS.frename, { kind: kind, path: fpath, name: nn }).then(reload); return;
-        }
-        if (t.classList.contains("folder-delete")) {
-          if (!confirm("Delete folder “" + fpath + "” and everything in it?")) return;
-          post(URLS.fdelete, { kind: kind, path: fpath }).then(reload); return;
-        }
-        if (t.classList.contains("folder-move")) {
-          pickFolder(USER_CHOICES[kind], "Move folder into:").then(function (dest) {
-            if (dest === null) return;
-            post(URLS.move, { kind: kind, path: fpath, is_folder: 1, folder: dest }).then(reload);
-          }); return;
-        }
-        if (t.classList.contains("folder-publish")) {
-          publicChoices(kind).then(function (pc) {
-            return pickFolder(pc, "Publish folder to which public folder?").then(function (dest) {
-              if (dest === null) return;
-              post(URLS.publish, { kind: kind, path: fpath, is_folder: 1, folder: dest }).then(reload);
-            });
-          }); return;
-        }
-        var row = t.closest(".file-row"); if (!row) return;
-        var name = row.getAttribute("data-name");
-        if (t.classList.contains("file-describe")) {
-          var descEl = row.querySelector(".file-desc");
-          var next = prompt("Description for " + name + ":", descEl ? descEl.textContent.trim() : "");
-          if (next === null) return;
-          post(URLS.describe, { kind: kind, name: name, description: next }).then(reload); return;
-        }
-        if (t.classList.contains("file-delete")) {
-          if (!confirm("Delete " + name + "? This cannot be undone.")) return;
-          post(URLS.del, { kind: kind, name: name }).then(reload); return;
-        }
-        if (t.classList.contains("file-move")) {
-          pickFolder(USER_CHOICES[kind], "Move file into:").then(function (dest) {
-            if (dest === null) return;
-            post(URLS.move, { kind: kind, name: name, folder: dest }).then(reload);
-          }); return;
-        }
-        if (t.classList.contains("file-publish")) {
-          publicChoices(kind).then(function (pc) {
-            return pickFolder(pc, "Publish to which public folder?").then(function (dest) {
-              if (dest === null) return;
-              post(URLS.publish, { kind: kind, name: name, folder: dest }).then(reload);
-            });
-          }); return;
         }
       });
     });
+  }
 
-    document.querySelectorAll(".folder-new-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var kind = btn.getAttribute("data-kind");
-        var name = prompt("New folder name:"); if (!name) return;
-        post(URLS.fcreate, { kind: kind, parent: "", name: name }).then(reload);
+  // ---- Section toolbars: + Folder / Describe / Move / Rename / Publish / Delete,
+  // one set per kind, each opening the same tree picker used for View/Export/etc to
+  // choose which file or folder to act on (and, for move/publish/new-folder, a
+  // second pass of the same picker to choose the destination location).
+  function initSectionToolbars() {
+    function itemLabel(picked) {
+      return picked.isFolder ? picked.folder.path.split("/").pop() : picked.file.name;
+    }
+    function doNewFolder(kind) {
+      var name = prompt("New folder name:"); if (!name) return;
+      pickDestination(kind, TREES[kind], "Place “" + name + "” inside:").then(function (dest) {
+        if (dest === null) return;
+        post(URLS.fcreate, { kind: kind, parent: dest, name: name }).then(reload);
+      });
+    }
+    function doDescribe(kind) {
+      pickItem(kind, TREES[kind], "Describe which file?", { pickFiles: true, pickFolders: false })
+        .then(function (picked) {
+          if (!picked) return;
+          var next = prompt("Description for " + picked.file.name + ":", picked.file.description || "");
+          if (next === null) return;
+          post(URLS.describe, { kind: kind, name: picked.file.path, description: next }).then(reload);
+        });
+    }
+    function doMove(kind) {
+      pickItem(kind, TREES[kind], "Move which file or folder?", { pickFiles: true, pickFolders: true })
+        .then(function (picked) {
+          if (!picked) return;
+          var label = itemLabel(picked);
+          pickDestination(kind, TREES[kind], "Move “" + label + "” into:").then(function (dest) {
+            if (dest === null) return;
+            var params = { kind: kind, folder: dest };
+            if (picked.isFolder) { params.path = picked.folder.path; params.is_folder = 1; }
+            else { params.name = picked.file.path; }
+            post(URLS.move, params).then(reload);
+          });
+        });
+    }
+    function doRename(kind) {
+      pickItem(kind, TREES[kind], "Rename which folder?", { pickFiles: false, pickFolders: true })
+        .then(function (picked) {
+          if (!picked) return;
+          var current = picked.folder.path.split("/").pop();
+          var nn = prompt("Rename folder:", current); if (!nn) return;
+          post(URLS.frename, { kind: kind, path: picked.folder.path, name: nn }).then(reload);
+        });
+    }
+    function doPublish(kind) {
+      pickItem(kind, TREES[kind], "Publish which file or folder?", { pickFiles: true, pickFolders: true })
+        .then(function (picked) {
+          if (!picked) return;
+          var label = itemLabel(picked);
+          publicTree(kind).then(function (tree) {
+            return pickDestination(kind, tree, "Publish “" + label + "” to which public folder?");
+          }).then(function (dest) {
+            if (dest === null) return;
+            var params = { kind: kind, folder: dest };
+            if (picked.isFolder) { params.path = picked.folder.path; params.is_folder = 1; }
+            else { params.name = picked.file.path; }
+            post(URLS.publish, params).then(reload);
+          });
+        });
+    }
+    function doDelete(kind) {
+      pickItem(kind, TREES[kind], "Delete which file or folder?", { pickFiles: true, pickFolders: true })
+        .then(function (picked) {
+          if (!picked) return;
+          var label = itemLabel(picked);
+          if (picked.isFolder) {
+            if (!confirm("Delete folder “" + label + "” and everything in it?")) return;
+            post(URLS.fdelete, { kind: kind, path: picked.folder.path }).then(reload);
+          } else {
+            if (!confirm("Delete " + label + "? This cannot be undone.")) return;
+            post(URLS.del, { kind: kind, name: picked.file.path }).then(reload);
+          }
+        });
+    }
+
+    document.querySelectorAll(".section-toolbar").forEach(function (bar) {
+      var kind = bar.getAttribute("data-kind");
+      var HANDLERS = {
+        "tb-new-folder": doNewFolder, "tb-describe": doDescribe, "tb-move": doMove,
+        "tb-rename": doRename, "tb-publish": doPublish, "tb-delete": doDelete,
+      };
+      bar.addEventListener("click", function (e) {
+        for (var cls in HANDLERS) {
+          if (e.target.classList.contains(cls)) { HANDLERS[cls](kind); return; }
+        }
       });
     });
   }
@@ -377,7 +419,7 @@
         var anyRow = folderEl.querySelector(".file-row");
         var fkind = anyRow ? anyRow.getAttribute("data-kind") : null;
         if (!fkind) return;
-        pickFolder(USER_CHOICES[fkind], "Import folder into which of your folders?").then(function (dest) {
+        pickDestination(fkind, TREES[fkind], "Import folder into which of your folders?").then(function (dest) {
           if (dest === null) return;
           post(IMPORT_URL, { kind: fkind, path: folderEl.getAttribute("data-path"), is_folder: 1, folder: dest }).then(reload);
         });
@@ -387,7 +429,7 @@
       var row = t.closest(".file-row");
       var rkind = row.getAttribute("data-kind"), rname = row.getAttribute("data-name");
       if (rkind === "pdf") { post(URLS.pdfImport, { name: rname }).then(reload); return; }
-      pickFolder(USER_CHOICES[rkind], "Import into which of your folders?").then(function (dest) {
+      pickDestination(rkind, TREES[rkind], "Import into which of your folders?").then(function (dest) {
         if (dest === null) return;
         post(IMPORT_URL, { kind: rkind, name: rname, folder: dest }).then(reload);
       });
@@ -638,6 +680,7 @@
   }
 
   safe(initFileTrees);
+  safe(initSectionToolbars);
   safe(initPublicLibrary);
   safe(initTaskForm);
   safe(initOutputViewer);

@@ -62,17 +62,39 @@
       {% endif %}
 
       <div class="card">
-        <h3>Data {% info_tip "data" %}
-          <button type="button" class="folder-new-btn" data-kind="csv" title="New folder">+ Folder</button></h3>
+        <h3>Data {% info_tip "data" %}</h3>
+        <div class="section-toolbar" data-kind="csv">
+          <button type="button" class="tb-new-folder" title="New folder">+ Folder</button>
+          <button type="button" class="tb-describe" title="Edit a file's description">Describe</button>
+          <button type="button" class="tb-move" title="Move a file or folder">Move</button>
+          <button type="button" class="tb-rename" title="Rename a folder">Rename</button>
+          <button type="button" class="tb-publish" title="Publish to the public library">Publish</button>
+          <button type="button" class="tb-delete" title="Delete a file or folder">Delete</button>
+        </div>
         <div class="file-tree" data-kind="csv"></div>
-        <h3>Templates {% info_tip "templates" %}
-          <button type="button" class="folder-new-btn" data-kind="template" title="New folder">+ Folder</button></h3>
+
+        <h3>Templates {% info_tip "templates" %}</h3>
+        <div class="section-toolbar" data-kind="template">
+          <button type="button" class="tb-new-folder" title="New folder">+ Folder</button>
+          <button type="button" class="tb-describe" title="Edit a file's description">Describe</button>
+          <button type="button" class="tb-move" title="Move a file or folder">Move</button>
+          <button type="button" class="tb-rename" title="Rename a folder">Rename</button>
+          <button type="button" class="tb-publish" title="Publish to the public library">Publish</button>
+          <button type="button" class="tb-delete" title="Delete a file or folder">Delete</button>
+        </div>
         <div class="file-tree" data-kind="template"></div>
-        <h3>Papers {% info_tip "papers" %}
-          <button type="button" class="folder-new-btn" data-kind="paper" title="New folder">+ Folder</button></h3>
+
+        <h3>Papers {% info_tip "papers" %}</h3>
+        <div class="section-toolbar" data-kind="paper">
+          <button type="button" class="tb-new-folder" title="New folder">+ Folder</button>
+          <button type="button" class="tb-describe" title="Edit a file's description">Describe</button>
+          <button type="button" class="tb-move" title="Move a file or folder">Move</button>
+          <button type="button" class="tb-rename" title="Rename a folder">Rename</button>
+          <button type="button" class="tb-publish" title="Publish to the public library">Publish</button>
+          <button type="button" class="tb-delete" title="Delete a file or folder">Delete</button>
+        </div>
         <div class="file-tree" data-kind="paper"></div>
         {{ file_trees|json_script:"file-trees-data" }}
-        {{ user_folder_choices|json_script:"user-folder-choices-data" }}
         <h3>PDF collections {% info_tip "pdf_collections" %}</h3>
         <ul class="file-list">
           {% for f in pdf_folders %}

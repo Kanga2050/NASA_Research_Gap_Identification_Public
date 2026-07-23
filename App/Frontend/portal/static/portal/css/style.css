@@ -1159,17 +1159,30 @@ ul.errorlist {
 }
 .file-desc.empty { display: none; }
 
-/* ---- Folder trees: nested .file-list, one .tree-folder per subfolder ---- */
-.file-tree { margin-bottom: 0.4rem; }
-.folder-new-btn {
-  margin-left: 0.4rem;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.68rem;
+/* ---- Section toolbar: + Folder/Describe/Move/Rename/Publish/Delete, one set per
+   kind at the top of its section -- each button opens the same tree picker used
+   for View/Export/etc to choose which file or folder to act on, rather than
+   repeating five buttons on every row of a section that can carry dozens of
+   foldered files. ---- */
+.section-toolbar { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.3rem 0 0.5rem; }
+.section-toolbar button {
+  margin-top: 0;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  background: var(--text-muted);
+}
+.section-toolbar button:hover { background: var(--nasa-blue-dark); }
+.section-toolbar .tb-new-folder {
   background: transparent;
   color: var(--nasa-blue);
   border: 1px solid var(--nasa-blue);
 }
-.folder-new-btn:hover { background: var(--nasa-blue); color: #fff; }
+.section-toolbar .tb-new-folder:hover { background: var(--nasa-blue); color: #fff; }
+.section-toolbar .tb-delete { background: transparent; color: var(--nasa-red); border: 1px solid var(--nasa-red); }
+.section-toolbar .tb-delete:hover { background: var(--nasa-red); color: #fff; }
+
+/* ---- Folder trees: nested .file-list, one .tree-folder per subfolder ---- */
+.file-tree { margin-bottom: 0.4rem; }
 .tree-folder { list-style: none; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
 .tree-folder:last-child { border-bottom: none; }
 .folder-head {
@@ -1177,9 +1190,6 @@ ul.errorlist {
   align-items: center;
   gap: 0.3rem 0.4rem;
   cursor: default;
-  /* A folder can carry up to five action buttons (+ Folder/Move/Publish/Rename/
-     Delete); without wrapping, a narrow sidebar squeezes .folder-name down to
-     near-zero width and breaks its text mid-character. */
   flex-wrap: wrap;
 }
 .folder-toggle {
@@ -1200,16 +1210,6 @@ ul.errorlist {
   flex: 1 1 90px;
   min-width: 0;
 }
-.folder-actions { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; flex: 0 0 auto; }
-.folder-actions button {
-  margin-top: 0;
-  padding: 0.12rem 0.4rem;
-  font-size: 0.68rem;
-  background: var(--text-muted);
-}
-.folder-actions button:hover { background: var(--nasa-blue-dark); }
-.folder-actions .folder-delete { background: transparent; color: var(--nasa-red); border: 1px solid var(--nasa-red); }
-.folder-actions .folder-delete:hover { background: var(--nasa-red); color: #fff; }
 .folder-body {
   margin: 0.3rem 0 0.2rem 1.2rem;
   padding-left: 0.6rem;
@@ -1293,6 +1293,16 @@ ul.errorlist {
 .picker-row:hover { background: var(--nasa-blue); color: #fff; }
 .picker-sub { color: var(--text-muted); font-size: 0.7rem; margin-left: 0.4rem; }
 .picker-row:hover .picker-sub { color: #dbe7f7; }
+/* A folder-scoped picker (destination for move/publish/new-folder, or a folder to
+   rename/delete) adds a "Select" button to each folder header, plus a leading
+   "place here" row for the group's own root -- both resolve the same way a file
+   row does, just carrying a folder instead. */
+.picker-pick-folder {
+  margin: 0; padding: 0.1rem 0.45rem; font-size: 0.68rem; background: var(--nasa-blue);
+}
+.picker-pick-folder:hover { background: var(--nasa-blue-dark); }
+.picker-root-row { font-style: italic; color: var(--text-muted); }
+.picker-root-row:hover { color: #fff; }
 .picker-current {
   display: block;
   font-size: 0.78rem;
