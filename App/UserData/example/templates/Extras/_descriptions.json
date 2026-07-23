@@ -1,0 +1,17 @@
+{
+  "Topics": "After filtering csvs with high semantic similarity to \"unknown/to be researched\", we developed a profile on what is considered important to research.",
+  "OSDR_Topics_Bar": "Re-derives OSDR's topics (Embed_And_Project -> Topic_Model) and charts the largest ones by paper count. Reconstructed for the template+visualization merge; matches the original ad-hoc run's parameters recovered from portal_taskrecord.",
+  "OSDR_Topics_Pie": "Re-derives OSDR's topics and charts the largest ones' share. Reconstructed for the template+visualization merge.",
+  "OSDR_Distance_Map": "Re-derives OSDR's topics and positions one bubble per topic at its mean 2-D coordinate, labelled by its top keywords. Reconstructed for the template+visualization merge.",
+  "Decadal_Topics_Bar": "Re-derives Decadal_Survey's topics (Embed_And_Project -> Topic_Model) and charts the largest ones by paper count. Reconstructed for the template+visualization merge; matches the original ad-hoc run's parameters recovered from portal_taskrecord.",
+  "Decadal_Topics_Pie": "Re-derives Decadal_Survey's topics and charts the largest ones' share. Reconstructed for the template+visualization merge.",
+  "Decadal_Distance_Map": "Re-derives Decadal_Survey's topics and positions one bubble per topic at its mean 2-D coordinate, labelled by its top keywords. Reconstructed for the template+visualization merge.",
+  "SB_Topics_Bar": "Re-derives Space_Biology's topics (Embed_And_Project -> Topic_Model) and charts the largest ones by paper count. Reconstructed for the template+visualization merge; matches the original ad-hoc run's parameters recovered from portal_taskrecord.",
+  "SB_Topics_Pie": "Re-derives Space_Biology's topics and charts the largest ones' share. Reconstructed for the template+visualization merge.",
+  "OSDR_Top_Terms": "Counts word frequency across OSDR's raw text and charts the most frequent terms. Reconstructed for the template+visualization merge.",
+  "Coverage_Grouped_Bar": "The same Four_Corpora -> Theme_Emphasis -> Coverage_Share backbone as Fig12_TB_Coverage_4way, read as a grouped bar instead. Reconstructed for the template+visualization merge.",
+  "Coverage_Heatmap": "The same Four_Corpora -> Theme_Emphasis -> Coverage_Share backbone as Fig12_TB_Coverage_4way, read as a heatmap instead. Reconstructed for the template+visualization merge.",
+  "SB_Papers_Per_Year": "Reads the already-derived SB_Year_Counts (one row per year) and charts it as a line. Reconstructed for the template+visualization merge; the year/count aggregation itself predates this template (see portal_taskrecord).",
+  "SB_Papers_Per_Year_Recent": "Reads the already-derived SB_Year_Recent (one row per year) and charts it as a line. Reconstructed for the template+visualization merge; the year/count aggregation itself predates this template (see portal_taskrecord).",
+  "SB_SuperTheme_Year_Heatmap": "Approximate reconstruction (no exact matching portal_taskrecord run): re-derives topics, coarsens them into ~9 super-themes the way Fig11_SB_SuperTheme_Sizes does, and reads year x super-theme as a density heatmap. The original run instead built a wide year x super-theme cross-tab and melted it off-platform; this version uses heatmap's own count-density mode instead so it stays fully in-vocabulary."
+}

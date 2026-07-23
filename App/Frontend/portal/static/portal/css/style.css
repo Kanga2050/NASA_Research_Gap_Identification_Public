@@ -1103,18 +1103,42 @@ ul.errorlist {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem 0.5rem;
+  /* With several action buttons on a narrow sidebar, letting the row wrap keeps
+     the name on its own line instead of the browser squeezing it down to a
+     sliver and breaking every word mid-character (word-break: break-word with
+     ~0px of available width). The actions group wraps as one unit (below). */
+  flex-wrap: wrap;
 }
 .file-name {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text);
   word-break: break-word;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 /* A PDF collection is sized by how many PDFs it holds, where a file would show
    its extension -- kept subordinate to the name it trails. */
 .file-count { color: var(--text-muted); font-size: 0.72rem; }
-.file-actions { display: inline-flex; gap: 0.3rem; flex: 0 0 auto; }
+.kind-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+  flex: 0 0 auto;
+}
+.file-view {
+  font-size: 0.72rem;
+  color: var(--nasa-blue);
+  text-decoration: none;
+  white-space: nowrap;
+  align-self: center;
+}
+.file-view:hover { text-decoration: underline; }
+.file-actions { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; flex: 0 0 auto; }
 .file-actions button,
 .public-pull {
   margin-top: 0;
@@ -1151,8 +1175,12 @@ ul.errorlist {
 .folder-head {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem 0.4rem;
   cursor: default;
+  /* A folder can carry up to five action buttons (+ Folder/Move/Publish/Rename/
+     Delete); without wrapping, a narrow sidebar squeezes .folder-name down to
+     near-zero width and breaks its text mid-character. */
+  flex-wrap: wrap;
 }
 .folder-toggle {
   cursor: pointer;
@@ -1169,9 +1197,10 @@ ul.errorlist {
   font-weight: 600;
   font-size: 0.82rem;
   color: var(--text);
-  flex: 1 1 auto;
+  flex: 1 1 90px;
+  min-width: 0;
 }
-.folder-actions { display: inline-flex; gap: 0.25rem; flex: 0 0 auto; }
+.folder-actions { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; flex: 0 0 auto; }
 .folder-actions button {
   margin-top: 0;
   padding: 0.12rem 0.4rem;
@@ -1238,6 +1267,39 @@ ul.errorlist {
 .fm-cancel:hover { background: var(--border); }
 .fm-ok { background: var(--nasa-blue); }
 .fm-ok:hover { background: var(--nasa-blue-dark); }
+
+/* ---- Generic "browse & pick one file" modal (View output / Export / Load
+   template / Insert visualization all share this instead of one giant flat
+   <select>, since a workspace can carry dozens of foldered files now) ---- */
+.picker-modal { width: min(90vw, 26rem); max-height: 80vh; display: flex; flex-direction: column; }
+.picker-filter { margin-bottom: 0.5rem; }
+.picker-tree {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  background: var(--bg);
+}
+.picker-row {
+  list-style: none;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.picker-row:hover { background: var(--nasa-blue); color: #fff; }
+.picker-sub { color: var(--text-muted); font-size: 0.7rem; margin-left: 0.4rem; }
+.picker-row:hover .picker-sub { color: #dbe7f7; }
+.picker-current {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0.3rem 0 0.6rem;
+  font-family: var(--font-mono);
+}
 
 #public-library h4 {
   font-family: var(--font-display);

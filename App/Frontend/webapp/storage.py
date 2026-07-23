@@ -52,10 +52,6 @@ def user_csv_root(user) -> Path:
     return ensure_directory(user_storage_root(user) / "csvs")
 
 
-def user_html_root(user) -> Path:
-    return ensure_directory(user_storage_root(user) / "html")
-
-
 def user_task_root(user) -> Path:
     return ensure_directory(user_storage_root(user) / "tasks")
 
@@ -72,21 +68,20 @@ def user_template_root(user) -> Path:
 
 
 def user_paper_root(user) -> Path:
-    """Per-user folder for Synthesize research papers (JSON block-model docs).
-    A paper is authored/re-edited as JSON here, then *built* into a self-contained
-    interactive .html that lands in the user's html/ area (see Paper_Builder)."""
+    """Per-user folder for Synthesize research papers: each paper's block-model
+    ``<name>.json`` is authored/re-edited here, and sits right alongside the
+    self-contained interactive ``<name>.html`` it's *built* into (see Paper_Builder),
+    once it has been built."""
     return ensure_directory(user_storage_root(user) / "papers")
 
 
 # --- Shared "public" library folders -----------------------------------------
-# A single commons any signed-in user can publish to and pull from. CSVs and
-# HTML visualizations already ship populated; Templates is created on demand.
+# A single commons any signed-in user can publish to and pull from. CSVs already
+# ship populated; Templates/Papers are created on demand. A Studio recipe's
+# rendered chart, and a paper's built report, live right alongside it in
+# Templates/Papers respectively -- there is no separate "Visualizations" root.
 def public_csv_root() -> Path:
     return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "CSVs")
-
-
-def public_html_root() -> Path:
-    return ensure_directory(settings.BASE_DIR / "App" / "Backend" / "Visualizations")
 
 
 def public_template_root() -> Path:

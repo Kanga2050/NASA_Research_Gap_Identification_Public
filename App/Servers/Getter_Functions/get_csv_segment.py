@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 import pandas as pd
 
-from Servers.storage_paths import resolve_csv_root
+from Servers.storage_paths import resolve_csv_path
 
 def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str, storage_root: str | Path | None = None) -> str:
     """
@@ -13,9 +13,10 @@ def get_csv_segment(csv_name: str, start_row: int, num_rows: int, columns: str, 
     - num_rows: How many rows to return
     - columns: Comma-separated list of columns, or 'all' for all columns
     """
-    data_dir = resolve_csv_root(storage_root)
-    path = data_dir / f"{csv_name}.csv"
-    
+    # CSVs live in real subfolders now, so a bare name is resolved by searching the
+    # tree (same lookup the rest of the app uses), not just the root itself.
+    path = resolve_csv_path(csv_name, storage_root)
+
     if not os.path.exists(path):
         return f"Error: File '{csv_name}' not found at '{path}'."
 

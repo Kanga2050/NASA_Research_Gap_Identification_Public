@@ -50,30 +50,45 @@ def safe_dir(root: Path, relpath: str = "") -> Path:
 # --------------------------------------------------------------------------- #
 # Listing
 # --------------------------------------------------------------------------- #
-def list_tree(root: Path, suffix: str) -> dict:
+def list_tree(root: Path, suffixes) -> dict:
     """The type's contents as a nested tree: every folder carries its own files (with
-    descriptions from that folder's sidecar) and its subfolders, recursively."""
+    descriptions from that folder's sidecar) and its subfolders, recursively.
+
+    ``suffixes`` may be a single suffix (``".csv"``) or a tuple of suffixes that are
+    displayed as one paired row per stem (a Studio recipe and its rendered chart, or
+    a paper document and its built report, now live side by side in the same folder
+    under the same stem) -- each file entry carries a ``kinds`` list naming which
+    suffixes were actually found (``["json"]``, ``["html"]``, or both).
+    """
+    if isinstance(suffixes, str):
+        suffixes = (suffixes,)
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
-    return _tree_of(root, root, suffix)
+    return _tree_of(root, root, tuple(suffixes))
 
 
-def _tree_of(root: Path, folder: Path, suffix: str) -> dict:
+def _tree_of(root: Path, folder: Path, suffixes: tuple) -> dict:
     rel = folder.relative_to(root).as_posix()
     rel = "" if rel == "." else rel
     descriptions = read_descriptions(folder)
-    files, subfolders = [], []
+    by_stem: dict[str, dict] = {}
+    subfolders = []
     for child in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
         if child.name == DESCRIPTIONS_FILE:
             continue
         if child.is_dir():
-            subfolders.append(_tree_of(root, child, suffix))
-        elif child.suffix == suffix:
+            subfolders.append(_tree_of(root, child, suffixes))
+        elif child.suffix in suffixes:
             stem = child.stem
-            files.append({"name": stem,
-                          "path": (f"{rel}/{stem}" if rel else stem),
-                          "folder": rel,
-                          "description": descriptions.get(stem, "")})
+            entry = by_stem.setdefault(stem, {
+                "name": stem,
+                "path": (f"{rel}/{stem}" if rel else stem),
+                "folder": rel,
+                "description": descriptions.get(stem, ""),
+                "kinds": [],
+            })
+            entry["kinds"].append(child.suffix.lstrip("."))
+    files = sorted(by_stem.values(), key=lambda f: f["name"].lower())
     name = folder.name if rel else ""
     return {"name": name, "path": rel, "folders": subfolders, "files": files}
 
@@ -174,6 +189,30 @@ def move_file(root: Path, name: str, suffix: str, dest_folder: str) -> str:
     if description:
         set_description(dest_dir, final_stem, description)
     return dest.relative_to(Path(root).resolve()).with_suffix("").as_posix()
+
+
+def move_stem(root: Path, name: str, suffixes: tuple, dest_folder: str) -> str:
+    """Move every sibling of ``name`` that exists under any of ``suffixes`` (a Studio
+    recipe and its rendered chart, or a paper doc and its built report -- paired files
+    that share one folder row) into ``dest_folder`` together, under one shared stem.
+    Returns the new relpath (suffix-less). Raises FolderError if none of them exist."""
+    found = [s for s in suffixes if _locate_file(root, name, s) is not None]
+    if not found:
+        raise FolderError("No such file.")
+    shared_stem = None
+    new_relpath = None
+    for suffix in found:
+        if shared_stem is None:
+            new_relpath = move_file(root, name, suffix, dest_folder)
+            shared_stem = Path(new_relpath).name
+        else:
+            # Land the sibling under the same stem the first move landed on, rather
+            # than re-running the uniqueness check (which could pick a different stem).
+            src = _locate_file(root, name, suffix)
+            dest_dir = safe_dir(root, dest_folder)
+            dest = dest_dir / f"{shared_stem}{suffix}"
+            shutil.move(str(src), str(dest))
+    return new_relpath
 
 
 def move_folder(root: Path, relpath: str, dest_folder: str) -> str:

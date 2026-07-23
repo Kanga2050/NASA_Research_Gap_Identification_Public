@@ -1574,34 +1574,29 @@
   });
 
   // ------------------------------------------------------- templates + clear
-  var templateSelect = document.getElementById("template-load");
+  var templateLoadBtn = document.getElementById("template-load-btn");
   var saveTemplateBtn = document.getElementById("save-template-btn");
   var clearBtn = document.getElementById("clear-canvas-btn");
 
   var TEMPLATE_KIND = {};
+  var TEMPLATE_DESC = {};
 
   function refreshTemplateList() {
-    if (!templateSelect || !TEMPLATES_URL) return;
+    if (!TEMPLATES_URL) return;
     fetch(TEMPLATES_URL, { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var items = d.templates || [];
         refreshBlockPalette(items);
         TEMPLATE_KIND = {};
-        var opt = function (t) {
+        TEMPLATE_DESC = {};
+        items.forEach(function (t) {
           TEMPLATE_KIND[t.name] = t.kind || "pipeline";
-          var label = t.description ? t.name + " — " + t.description : t.name;
-          if (t.kind === "block" && t.ports) {
-            label = t.name + " (" + (t.ports.inputs.length) + " in / " +
-              (t.ports.outputs.length) + " out)" + (t.description ? " — " + t.description : "");
-          }
-          return '<option value="' + esc(t.name) + '">' + esc(label) + "</option>";
-        };
-        var pipelines = items.filter(function (t) { return t.kind !== "block"; });
-        var blocks = items.filter(function (t) { return t.kind === "block"; });
-        templateSelect.innerHTML = '<option value="">Load a template…</option>' +
-          (pipelines.length ? '<optgroup label="Pipelines">' + pipelines.map(opt).join("") + "</optgroup>" : "") +
-          (blocks.length ? '<optgroup label="Schemas (open)">' + blocks.map(opt).join("") + "</optgroup>" : "");
+          TEMPLATE_DESC[t.name] = t.kind === "block" && t.ports
+            ? "(" + t.ports.inputs.length + " in / " + t.ports.outputs.length + " out)" +
+              (t.description ? " — " + t.description : "")
+            : (t.description || "");
+        });
       })
       .catch(function () {});
   }
@@ -1631,9 +1626,7 @@
       .catch(function () { flash("Network error saving template."); });
   });
 
-  if (templateSelect) templateSelect.addEventListener("change", function () {
-    var name = templateSelect.value;
-    if (!name) return;
+  function loadTemplateByName(name) {
     fetch(TEMPLATE_LOAD_URL.replace("__NAME__", encodeURIComponent(name)), { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -1661,8 +1654,24 @@
           }).join(" · "));
         }
       })
-      .catch(function () { flash("Network error loading template."); })
-      .then(function () { templateSelect.value = ""; });
+      .catch(function () { flash("Network error loading template."); });
+  }
+
+  if (templateLoadBtn) templateLoadBtn.addEventListener("click", function () {
+    // Make sure TEMPLATE_KIND/TEMPLATE_DESC (block-vs-pipeline + port counts,
+    // from the Studio's own manifest endpoint) are fresh before labelling rows.
+    refreshTemplateList();
+    var tree = (window.PortalFileTrees || {}).template || { folders: [], files: [], path: "" };
+    window.openGroupedPicker("Load a template", [
+      { label: "Templates", tree: tree,
+        filter: function (f) { return (f.kinds || []).indexOf("json") !== -1; },
+        render: function (f) {
+          return f.name + (TEMPLATE_KIND[f.name] === "block" ? "  [schema]" : "");
+        },
+        sub: function (f) { return TEMPLATE_DESC[f.name] || f.description || ""; } },
+    ]).then(function (picked) {
+      if (picked) loadTemplateByName(picked.file.name);
+    });
   });
 
   // Assistant bridge: the agent can save a pipeline server-side, so let it refresh

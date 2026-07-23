@@ -17,6 +17,7 @@ from .agent import AgentError, genai_installed, run_agent_turn
 from .data_lookups import (
     KIND_SUFFIX,
     PUBLIC_ROOTS,
+    TREE_SUFFIXES,
     USER_ROOTS,
     list_csv_columns_typed,
     list_public,
@@ -27,7 +28,6 @@ from .data_lookups import (
     list_user_html_names,
     list_user_paper_names,
     list_user_pdf_folders,
-    list_user_template_names,
     list_user_tree,
     pdf_folder_choices,
     public_folder_paths,
@@ -59,7 +59,6 @@ from App.Frontend.webapp.storage import (
     rename_user_storage,
     storage_folder_name,
     user_csv_root,
-    user_html_root,
     user_paper_root,
     user_pdf_root,
     user_template_root,
@@ -110,7 +109,9 @@ KIND_ROOTS = {kind: (USER_ROOTS[kind], KIND_SUFFIX[kind]) for kind in KIND_SUFFI
 
 # Uploaded file extension -> import kind. Both Studio templates and Synthesize
 # papers arrive as .json, so the .json kind is resolved by content (_json_kind).
-EXT_TO_KIND = {"csv": "csv", "html": "html", "json": "template"}
+# A standalone .html upload is treated as a chart (a template's rendered half) --
+# built paper reports aren't really meant to be re-uploaded independently.
+EXT_TO_KIND = {"csv": "csv", "html": "template", "json": "template"}
 
 
 def _json_kind(raw: bytes) -> str:
@@ -161,10 +162,7 @@ def _dashboard_context(request):
         "task_form": TaskSubmitForm(),
         "csv_names": csv_names,
         "html_names": html_names,
-        "csv_files": list_user_files(request.user, "csv"),
-        "html_files": list_user_files(request.user, "html"),
         "template_files": list_user_files(request.user, "template"),
-        "template_names": list_user_template_names(request.user),
         # Files organised into nested folders: the Dashboard renders these trees, and
         # the folder pickers (move / publish-into / pull-into) read the path lists.
         "file_trees": {kind: list_user_tree(request.user, kind) for kind in KIND_SUFFIX},
@@ -236,7 +234,11 @@ def preview_output(request, kind, name):
 @login_required
 @xframe_options_sameorigin
 def preview_output_html(request, name):
-    html_path = resolve_safe_path(user_html_root(request.user), name, ".html")
+    # An .html name is either a chart (lives with its Studio recipe) or a built
+    # paper report (lives with its document) -- try both roots.
+    html_path = resolve_safe_path(user_template_root(request.user), name, ".html")
+    if html_path is None or not html_path.exists():
+        html_path = resolve_safe_path(user_paper_root(request.user), name, ".html")
     if html_path is None or not html_path.exists():
         raise Http404("Visualization not found.")
 
@@ -293,10 +295,18 @@ def import_file(request):
 
 @login_required
 def export_file(request, kind, name):
+    """Download one physical file. A "template"/"paper" row may pair a recipe/doc
+    (.json) with its rendered chart/report (.html) in the same folder now, so
+    ``?ext=html`` picks the rendered half instead of the kind's default suffix."""
     if kind not in KIND_ROOTS:
         raise Http404("Unknown export kind.")
 
-    root_fn, suffix = KIND_ROOTS[kind]
+    root_fn, default_suffix = KIND_ROOTS[kind]
+    requested_ext = request.GET.get("ext", "").lstrip(".")
+    suffix = f".{requested_ext}" if requested_ext else default_suffix
+    if suffix not in TREE_SUFFIXES.get(kind, (default_suffix,)):
+        raise Http404("Unknown export kind.")
+
     file_path = resolve_safe_path(root_fn(request.user), name, suffix)
     if file_path is None or not file_path.exists():
         raise Http404("File not found.")
@@ -320,18 +330,30 @@ def _unique_destination(folder: Path, name: str, suffix: str):
 
 
 def _copy_file_between(src_root: Path, dst_root: Path, kind: str, name: str, dest_folder: str):
-    """Copy file ``name`` of ``kind`` from one library into ``dest_folder`` of another,
-    carrying its description into the destination folder's sidecar. Returns the
-    destination stem, or None if the source is missing / unsafe."""
-    suffix = KIND_SUFFIX[kind]
-    src = resolve_safe_path(src_root, name, suffix)
-    if src is None or not src.exists():
+    """Copy file(s) named ``name`` of ``kind`` from one library into ``dest_folder`` of
+    another, carrying its description into the destination folder's sidecar. A
+    "template"/"paper" row may pair a recipe/doc with its rendered chart/report in
+    the same folder -- every sibling that exists travels together, under one shared
+    stem. Returns the destination stem, or None if nothing was found."""
+    suffixes = []
+    for s in TREE_SUFFIXES.get(kind, (KIND_SUFFIX[kind],)):
+        p = resolve_safe_path(src_root, name, s)
+        if p is not None and p.exists():
+            suffixes.append(s)
+    if not suffixes:
         return None
     dst_dir = folders.safe_dir(dst_root, dest_folder)
     dst_dir.mkdir(parents=True, exist_ok=True)
-    dst, final_stem = _unique_destination(dst_dir, Path(name).name, suffix)
-    shutil.copy2(src, dst)
-    description = get_description(src.parent, src.stem)
+    first_src = resolve_safe_path(src_root, name, suffixes[0])
+    description = get_description(first_src.parent, first_src.stem)
+    final_stem = None
+    for suffix in suffixes:
+        src = resolve_safe_path(src_root, name, suffix)
+        if final_stem is None:
+            dst, final_stem = _unique_destination(dst_dir, Path(name).name, suffix)
+        else:
+            dst = dst_dir / f"{final_stem}{suffix}"
+        shutil.copy2(src, dst)
     if description:
         set_description(dst_dir, final_stem, description)
     return final_stem
@@ -474,25 +496,13 @@ def move_entry(request):
         if request.POST.get("is_folder") in ("1", "true", "on"):
             folders.move_folder(root, request.POST.get("path", ""), dest)
         else:
-            folders.move_file(root, request.POST.get("name", ""), KIND_SUFFIX[kind], dest)
+            # A "template"/"paper" row may pair a recipe/doc with its rendered
+            # chart/report in the same folder -- move every sibling together.
+            folders.move_stem(root, request.POST.get("name", ""), TREE_SUFFIXES[kind], dest)
         messages.success(request, "Moved.")
     except folders.FolderError as exc:
         messages.error(request, str(exc))
     return redirect("dashboard")
-
-
-@login_required
-@require_POST
-def publish_file(request):
-    """Copy one of the user's files into the shared public library (open commons)."""
-    return _transfer_file(request, to_public=True)
-
-
-@login_required
-@require_POST
-def import_from_public(request):
-    """Copy a chosen file from the public library into the user's own storage."""
-    return _transfer_file(request, to_public=False)
 
 
 @login_required
@@ -521,13 +531,17 @@ def describe_file(request):
         messages.error(request, "Unknown file kind.")
         return redirect("dashboard")
 
+    # A "template"/"paper" row may pair a recipe/doc with its rendered chart/report
+    # in the same folder -- the description sidecar is keyed by stem only, so
+    # whichever sibling exists resolves to the same shared entry.
     root = USER_ROOTS[kind](request.user)
-    path = resolve_safe_path(root, name, KIND_SUFFIX[kind])
-    if path is None or not path.exists():
+    paths = [p for s in TREE_SUFFIXES[kind]
+             if (p := resolve_safe_path(root, name, s)) and p.exists()]
+    if not paths:
         messages.error(request, "File not found.")
         return redirect("dashboard")
 
-    store_description(root, name, KIND_SUFFIX[kind], request.POST.get("description", ""))
+    store_description(root, name, paths[0].suffix, request.POST.get("description", ""))
     messages.success(request, f"Updated description for {Path(name).name}.")
     return redirect("dashboard")
 
@@ -542,15 +556,19 @@ def delete_file(request):
         messages.error(request, "Unknown file kind.")
         return redirect("dashboard")
 
+    # Delete every sibling of this stem (a template's chart, or a paper's built
+    # report, travels with its recipe/doc since they share one folder row now).
     root = USER_ROOTS[kind](request.user)
-    path = resolve_safe_path(root, name, KIND_SUFFIX[kind])
-    if path is None or not path.exists():
+    paths = [p for s in TREE_SUFFIXES[kind]
+             if (p := resolve_safe_path(root, name, s)) and p.exists()]
+    if not paths:
         messages.error(request, "File not found.")
         return redirect("dashboard")
 
-    path.unlink()
-    remove_description(path.parent, path.stem)
-    messages.success(request, f"Deleted {Path(name).name}{KIND_SUFFIX[kind]}.")
+    for path in paths:
+        path.unlink()
+    remove_description(paths[0].parent, paths[0].stem)
+    messages.success(request, f"Deleted {Path(name).name}.")
     return redirect("dashboard")
 
 
@@ -715,7 +733,9 @@ def issue_api_key(request):
     return redirect("dashboard")
 
 
-ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root, "pdf": user_pdf_root}
+# A chart's .html lives right alongside the Studio recipe that made it (the
+# "template" root) -- there is no longer a standalone "html" root.
+ROOT_BUILDERS = {"csv": user_csv_root, "html": user_template_root, "pdf": user_pdf_root}
 
 
 def _resolve_arg(cleaned: dict, param: registry.Param):
@@ -953,7 +973,7 @@ def load_paper(request, name):
 @require_POST
 def build_paper(request):
     """Render a paper's block model into a self-contained, interactive HTML file
-    and write it into the user's Visualizations (html/) area so it can be viewed,
+    and write it right alongside the paper's own document so it can be viewed,
     published, downloaded — or embedded as a figure in another paper. Builds from
     the posted `doc` (the live editor state) so the user need not save first."""
     try:
@@ -978,15 +998,17 @@ def build_paper(request):
     if not output_name:
         return JsonResponse({"error": "Give the built report a valid name."}, status=400)
 
-    html_root = user_html_root(request.user)
+    paper_root = user_paper_root(request.user)
     try:
-        html = build_paper_html(doc, str(html_root))
+        # A figure may name a plain chart (lives with its Studio recipe) or another
+        # paper's own built report (lives with that paper's document) -- search both.
+        html = build_paper_html(doc, [str(user_template_root(request.user)), str(paper_root)])
     except Exception as exc:  # keep a bad doc from 500ing the whole request
         return JsonResponse({"error": f"Build failed: {exc}"}, status=400)
 
-    out_path = resolve_html_path(output_name, str(html_root))
+    out_path = resolve_html_path(output_name, str(paper_root))
     out_path.write_text(html, encoding="utf-8")
-    set_description(html_root, output_name, payload.get("description", "") or f"Built from paper “{output_name}”.")
+    set_description(paper_root, output_name, payload.get("description", "") or f"Built from paper “{output_name}”.")
     return JsonResponse({"ok": True, "name": output_name})
 
 

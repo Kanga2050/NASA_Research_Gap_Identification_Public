@@ -12,7 +12,10 @@ def default_pdf_root() -> Path:
 
 
 def default_html_root() -> Path:
-    return Path("./App/Backend/Visualizations")
+    """Fallback when no explicit root is given (e.g. running a chart function
+    standalone). In the app proper, a chart's .html lives right alongside the
+    Studio recipe that made it -- see ``default_template_root``."""
+    return default_template_root()
 
 
 def default_template_root() -> Path:

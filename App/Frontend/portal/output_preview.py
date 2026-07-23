@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 
 from App.Backend import registry
-from App.Frontend.webapp.storage import user_csv_root, user_html_root
+from App.Frontend.webapp.storage import user_csv_root, user_paper_root, user_template_root
 from .models import TaskRecord
 
 PREVIEW_ROW_LIMIT = 50
@@ -100,7 +100,9 @@ def build_output_preview(task: TaskRecord, user) -> dict[str, Any] | None:
     output_name = args[fn.output_index]
 
     kind = fn.output_kind
-    root = user_csv_root(user) if kind == "csv" else user_html_root(user)
+    # Every chart-producing registry function writes into the (merged) template
+    # root -- build_paper's report is a separate, non-registry code path.
+    root = user_csv_root(user) if kind == "csv" else user_template_root(user)
     path = resolve_safe_path(root, output_name, f".{kind}")
     base = {"category": fn.category, "kind": kind, "name": output_name}
 
@@ -120,11 +122,19 @@ def build_named_preview(user, kind: str, name: str) -> dict[str, Any]:
     if kind not in ("csv", "html"):
         return {"kind": kind, "name": name, "missing": True}
 
-    root = user_csv_root(user) if kind == "csv" else user_html_root(user)
-    path = resolve_safe_path(root, name, f".{kind}")
     base = {"kind": kind, "name": name}
-    if path is None or not path.exists():
-        return {**base, "missing": True}
+    if kind == "csv":
+        path = resolve_safe_path(user_csv_root(user), name, ".csv")
+        if path is None or not path.exists():
+            return {**base, "missing": True}
+    else:
+        # An .html name is either a chart (lives with its Studio recipe) or a
+        # built paper report (lives with its document) -- try both roots.
+        path = resolve_safe_path(user_template_root(user), name, ".html")
+        if path is None or not path.exists():
+            path = resolve_safe_path(user_paper_root(user), name, ".html")
+        if path is None or not path.exists():
+            return {**base, "missing": True}
 
     if kind == "csv":
         return {**base, **_read_csv_preview(path)}

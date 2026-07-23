@@ -27,7 +27,6 @@
     if (!el) return fallback;
     try { return JSON.parse(el.textContent); } catch (e) { return fallback; }
   }
-  var CHARTS = readJSON("synthesize-charts", []) || [];
   var PAPERS = readJSON("synthesize-papers", []) || [];
   var MANIFEST = readJSON("studio-manifest", {}) || {};
   var CSVS = readJSON("studio-csvs", []) || [];
@@ -261,12 +260,8 @@
       case "figure": {
         var n = figureNumber(idx);
         var h = b.height || 500;
-        var opts = '<option value="">— choose a chart —</option>' + CHARTS.map(function (c) {
-          return '<option value="' + escAttr(c) + '"' + (c === b.chart ? " selected" : "") + '>'
-            + escText(c) + '</option>';
-        }).join("");
         var picker = '<div class="fig-picker" contenteditable="false">'
-          + '<select data-fig-select>' + opts + '</select>'
+          + '<button type="button" data-fig-pick>' + (b.chart ? escText(b.chart) : "— choose a chart —") + '</button>'
           + '<label>h<input type="number" data-fig-height value="' + h + '" min="180" max="1200" step="20" style="width:64px"></label>'
           + '</div>';
         var preview = b.chart
@@ -640,6 +635,22 @@
   // Clicks: block tools, figure picker, per-block add buttons
   page.addEventListener("click", function (e) {
     var t = e.target;
+    if (t.hasAttribute && t.hasAttribute("data-fig-pick")) {
+      var fi = blockIndexOf(t);
+      if (fi < 0 || !window.openGroupedPicker) return;
+      var trees = window.PortalFileTrees || {};
+      var hasHtml = function (f) { return (f.kinds || []).indexOf("html") !== -1; };
+      window.openGroupedPicker("Insert a visualization", [
+        { label: "Charts", tree: trees.template, filter: hasHtml,
+          render: function (f) { return f.name; } },
+        { label: "Reports", tree: trees.paper, filter: hasHtml,
+          render: function (f) { return f.name; } },
+      ]).then(function (picked) {
+        if (!picked) return;
+        syncFromDom(); doc.blocks[fi].chart = picked.file.name; render();
+      });
+      return;
+    }
     // "+" between sections -> open the add-section menu at that insertion point
     var gapBtn = t.closest ? t.closest(".synth-gap-btn") : null;
     if (gapBtn) {
@@ -696,14 +707,12 @@
     }
   });
 
-  // Figure chart selection + height
+  // Figure height (chart selection is a button -- see data-fig-pick in the click handler)
   page.addEventListener("change", function (e) {
     var t = e.target;
     var idx = blockIndexOf(t);
     if (idx < 0) return;
-    if (t.hasAttribute("data-fig-select")) {
-      syncFromDom(); doc.blocks[idx].chart = t.value; render();
-    } else if (t.hasAttribute("data-fig-height")) {
+    if (t.hasAttribute("data-fig-height")) {
       syncFromDom(); doc.blocks[idx].height = +t.value || 500; render();
     }
   });

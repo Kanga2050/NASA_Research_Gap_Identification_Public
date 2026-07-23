@@ -32,8 +32,16 @@
     try { fn(); } catch (e) { if (window.console) console.error(e); }
   }
 
-  var SUFFIX = { csv: ".csv", html: ".html", template: ".json", paper: ".json" };
-  var FILE_KINDS = ["csv", "html", "template", "paper"];
+  // A "template" row pairs a Studio recipe (.json) with its rendered chart
+  // (.html) in the same folder now; a "paper" row pairs its document (.json)
+  // with its built report (.html) -- a row may carry either or both, tagged here.
+  var SUFFIX = { csv: ".csv", template: ".json", paper: ".json" };
+  var KIND_TAGS = {
+    csv: { csv: "" },
+    template: { json: "recipe", html: "chart" },
+    paper: { json: "doc", html: "report" },
+  };
+  var FILE_KINDS = ["csv", "template", "paper"];
   var URLS = root ? {
     publish: root.getAttribute("data-publish-url"),
     describe: root.getAttribute("data-describe-url"),
@@ -50,6 +58,11 @@
     try { return el ? JSON.parse(el.textContent) : null; } catch (e) { return null; }
   }
   var USER_CHOICES = parseJSON("user-folder-choices-data") || {};
+  // The user's own files as folder trees, keyed by kind (csv/template/paper) --
+  // hoisted here (not local to initFileTrees) so the picker below, and Studio's
+  // and Synthesize's own scripts (via window.PortalFileTrees), can all read it.
+  var TREES = parseJSON("file-trees-data") || {};
+  window.PortalFileTrees = TREES;
 
   // The public library is fetched once and shared by the public list and by every
   // "publish into which public folder?" prompt.
@@ -93,16 +106,112 @@
     });
   }
 
+  function findByPath(node, path) {
+    var files = node.files || [];
+    for (var i = 0; i < files.length; i++) if (files[i].path === path) return files[i];
+    var folders = node.folders || [];
+    for (var j = 0; j < folders.length; j++) {
+      var found = findByPath(folders[j], path);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // A modal for picking ONE file out of one or more folder trees at once (e.g.
+  // "Data" + "Charts" + "Reports") -- built for the four pickers that used to be
+  // one giant flat <select> (View output, Export, Load template, Insert
+  // visualization), all unwieldy once a workspace carries dozens of foldered
+  // files. `groups`: [{ label, tree, filter(f), render(f) -> label, sub(f) ->
+  // label }]. Resolves {group, file} or null if cancelled.
+  function openGroupedPicker(title, groups) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement("div");
+      overlay.className = "folder-modal-overlay";
+
+      function fileRow(f, group) {
+        var label = group.render ? group.render(f) : f.name;
+        var sub = group.sub ? group.sub(f) : "";
+        return '<li class="picker-row" data-path="' + esc(f.path) + '" data-group="' + esc(group.label) + '">' +
+          esc(label) + (sub ? '<span class="picker-sub">' + esc(sub) + "</span>" : "") + "</li>";
+      }
+      function folderNode(node, group, isRoot) {
+        var files = (node.files || []).filter(group.filter || function () { return true; });
+        var inner = (node.folders || []).map(function (sf) { return folderNode(sf, group, false); }).join("") +
+          files.map(function (f) { return fileRow(f, group); }).join("");
+        if (!inner) return "";
+        if (isRoot) return inner;
+        return '<li class="tree-folder" data-path="' + esc(node.path) + '"><div class="folder-head">' +
+          '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(node.name) + "</span></div>" +
+          '<ul class="file-list folder-body">' + inner + "</ul></li>";
+      }
+      var body = groups.map(function (g) {
+        var inner = folderNode(g.tree || { folders: [], files: [], path: "" }, g, true);
+        if (!inner) return "";
+        return '<li class="tree-folder" data-path="__group:' + esc(g.label) + '"><div class="folder-head">' +
+          '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(g.label) + "</span></div>" +
+          '<ul class="file-list folder-body">' + inner + "</ul></li>";
+      }).join("");
+
+      overlay.innerHTML = '<div class="folder-modal picker-modal"><h4>' + esc(title) + "</h4>" +
+        '<input type="text" class="picker-filter" placeholder="Filter by name…">' +
+        '<ul class="file-list picker-tree">' + (body || '<li class="placeholder">Nothing here yet.</li>') + "</ul>" +
+        '<div class="fm-actions"><button type="button" class="fm-cancel">Cancel</button></div></div>';
+      document.body.appendChild(overlay);
+
+      function done(v) { overlay.remove(); resolve(v); }
+      overlay.querySelector(".fm-cancel").addEventListener("click", function () { done(null); });
+      overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) done(null); });
+      overlay.addEventListener("click", function (e) {
+        var t = e.target, folderEl = t.closest(".tree-folder");
+        if (t.classList.contains("folder-toggle") || t.classList.contains("folder-name")) {
+          if (folderEl) folderEl.classList.toggle("collapsed");
+          return;
+        }
+        var row = t.closest(".picker-row");
+        if (!row) return;
+        var groupLabel = row.getAttribute("data-group");
+        var group = groups.filter(function (g) { return g.label === groupLabel; })[0];
+        var file = group && findByPath(group.tree, row.getAttribute("data-path"));
+        if (file) done({ group: group, file: file });
+      });
+      var filterInput = overlay.querySelector(".picker-filter");
+      filterInput.addEventListener("input", function () {
+        var q = filterInput.value.trim().toLowerCase();
+        overlay.querySelectorAll(".picker-row").forEach(function (row) {
+          row.style.display = row.textContent.toLowerCase().indexOf(q) === -1 ? "none" : "";
+        });
+        if (q) overlay.querySelectorAll(".tree-folder").forEach(function (f) { f.classList.remove("collapsed"); });
+      });
+      filterInput.focus();
+    });
+  }
+  window.openGroupedPicker = openGroupedPicker;
+
   // ---- The user's own files, as navigable folder trees ---------------------
   function initFileTrees() {
-    var TREES = parseJSON("file-trees-data");
     if (!TREES) return;
 
+    function kindTags(kind, f) {
+      var labels = KIND_TAGS[kind] || {};
+      return (f.kinds || []).map(function (k) {
+        var label = labels[k];
+        return label ? '<span class="kind-tag">' + esc(label) + "</span>" : "";
+      }).join("");
+    }
+    function viewLink(kind, f) {
+      if ((f.kinds || []).indexOf("html") === -1) return "";
+      return '<a class="file-view" href="/outputs/html/' + encodeURIComponent(f.path) +
+        '/" target="_blank" rel="noopener">View ↗</a>';
+    }
     function fileRow(kind, f, actions) {
       var descClass = f.description ? "" : " empty";
+      // "csv" has exactly one suffix, shown inline; "template"/"paper" may pair
+      // two physical files under one row, so which ones exist is shown as tags.
+      var suffix = kind === "csv" ? esc(SUFFIX.csv) : "";
       return '<li class="file-row" data-kind="' + kind + '" data-name="' + esc(f.path) + '">' +
-        '<div class="file-main"><span class="file-name">' + esc(f.name) + esc(SUFFIX[kind]) + "</span>" +
-        '<span class="file-actions">' + actions + "</span></div>" +
+        '<div class="file-main"><span class="file-name">' + esc(f.name) + suffix + "</span>" +
+        kindTags(kind, f) +
+        '<span class="file-actions">' + viewLink(kind, f) + actions + "</span></div>" +
         '<div class="file-desc' + descClass + '">' + esc(f.description || "") + "</div></li>";
     }
     function ownActions() {
@@ -211,12 +320,18 @@
     var lib = document.getElementById("public-library");
     if (!lib) return;
     var IMPORT_URL = lib.getAttribute("data-import-url");
-    var LABELS = { csv: "Data", html: "Visualizations", template: "Templates", paper: "Papers" };
+    var LABELS = { csv: "Data", template: "Templates", paper: "Papers" };
 
     function fileRow(kind, f) {
       var desc = f.description ? '<div class="file-desc">' + esc(f.description) + "</div>" : "";
+      var suffix = kind === "csv" ? esc(SUFFIX.csv) : "";
+      var labels = KIND_TAGS[kind] || {};
+      var tags = (f.kinds || []).map(function (k) {
+        var label = labels[k];
+        return label ? '<span class="kind-tag">' + esc(label) + "</span>" : "";
+      }).join("");
       return '<li class="file-row" data-kind="' + kind + '" data-name="' + esc(f.path) + '">' +
-        '<div class="file-main"><span class="file-name">' + esc(f.name) + esc(SUFFIX[kind]) + "</span>" +
+        '<div class="file-main"><span class="file-name">' + esc(f.name) + suffix + "</span>" + tags +
         '<button type="button" class="public-pull">Pull</button></div>' + desc + "</li>";
     }
     function folderNode(kind, node, isRoot) {
@@ -395,8 +510,9 @@
 
   // ---- "View an output" picker: CSV table / HTML iframe preview ------------
   function initOutputViewer() {
-    var select = document.getElementById("output-viewer-select");
-    if (!select) return;
+    var btn = document.getElementById("output-viewer-picker-btn");
+    if (!btn) return;
+    var current = document.getElementById("output-viewer-current");
     var container = document.getElementById("output-viewer");
 
     function renderCsv(name, data) {
@@ -435,11 +551,21 @@
         .catch(function () { container.innerHTML = '<p class="placeholder">Could not load preview.</p>'; });
     }
 
-    select.addEventListener("change", function () {
-      var val = select.value;
-      if (!val) { render(null, null); return; }
-      var sep = val.indexOf(":");
-      render(val.slice(0, sep), val.slice(sep + 1));
+    btn.addEventListener("click", function () {
+      openGroupedPicker("View an output", [
+        { label: "Data", tree: TREES.csv, resultKind: "csv",
+          render: function (f) { return f.name + ".csv"; } },
+        { label: "Charts", tree: TREES.template, resultKind: "html",
+          filter: function (f) { return (f.kinds || []).indexOf("html") !== -1; },
+          render: function (f) { return f.name + ".html"; } },
+        { label: "Reports", tree: TREES.paper, resultKind: "html",
+          filter: function (f) { return (f.kinds || []).indexOf("html") !== -1; },
+          render: function (f) { return f.name + ".html"; } },
+      ]).then(function (picked) {
+        if (!picked) return;
+        current.textContent = picked.file.name + (picked.group.resultKind === "csv" ? ".csv" : ".html");
+        render(picked.group.resultKind, picked.file.name);
+      });
     });
   }
 
@@ -475,14 +601,39 @@
     poll();
   }
 
-  // ---- Export form: download the selected file -----------------------------
+  // ---- Export: download a chosen file ---------------------------------------
   function initExport() {
-    var form = document.getElementById("export-form");
-    if (!form) return;
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var url = document.getElementById("export-select").value;
-      if (url) window.location.href = url;
+    var btn = document.getElementById("export-picker-btn");
+    if (!btn) return;
+    var current = document.getElementById("export-current");
+
+    function exportUrl(urlKind, name, ext) {
+      var url = "/files/export/" + encodeURIComponent(urlKind) + "/" + encodeURIComponent(name) + "/";
+      return ext ? url + "?ext=" + encodeURIComponent(ext) : url;
+    }
+
+    btn.addEventListener("click", function () {
+      openGroupedPicker("Export", [
+        { label: "Data", tree: TREES.csv, urlKind: "csv", suffix: ".csv",
+          render: function (f) { return f.name + ".csv"; } },
+        { label: "Recipes", tree: TREES.template, urlKind: "template", suffix: ".json",
+          filter: function (f) { return (f.kinds || []).indexOf("json") !== -1; },
+          render: function (f) { return f.name + ".json"; } },
+        { label: "Charts", tree: TREES.template, urlKind: "template", ext: "html", suffix: ".html",
+          filter: function (f) { return (f.kinds || []).indexOf("html") !== -1; },
+          render: function (f) { return f.name + ".html"; } },
+        { label: "Paper docs", tree: TREES.paper, urlKind: "paper", suffix: ".json",
+          filter: function (f) { return (f.kinds || []).indexOf("json") !== -1; },
+          render: function (f) { return f.name + ".json"; } },
+        { label: "Reports", tree: TREES.paper, urlKind: "paper", ext: "html", suffix: ".html",
+          filter: function (f) { return (f.kinds || []).indexOf("html") !== -1; },
+          render: function (f) { return f.name + ".html"; } },
+      ]).then(function (picked) {
+        if (!picked) return;
+        var g = picked.group;
+        current.textContent = picked.file.name + g.suffix;
+        window.location.href = exportUrl(g.urlKind, picked.file.name, g.ext);
+      });
     });
   }
 

@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig
@@ -19,7 +20,7 @@ django.setup()
 from App.Frontend.portal import paper_ops, studio_ops
 from App.Frontend.portal.services import resolve_api_key
 from App.Frontend.portal.task_engine import get_task_history as _get_task_history, get_task_status as _get_task_status, queue_user_task
-from App.Frontend.webapp.storage import user_csv_root, user_html_root, user_pdf_root
+from App.Frontend.webapp.storage import user_csv_root, user_paper_root, user_pdf_root, user_template_root
 from App.Servers.pipeline_tools import queue_from_api, register_mcp_tools
 
 from Servers.Getter_Functions.Get_Csv_Catalog import get_csv_catalog as _get_csv_catalog
@@ -29,7 +30,16 @@ from Servers.Getter_Functions.List_Pdf_Folders import list_pdf_folders as _list_
 
 mcp = FastMCP("NLP Analysis Platform")
 
-ROOT_BUILDERS = {"csv": user_csv_root, "html": user_html_root, "pdf": user_pdf_root}
+# A chart's .html lives right alongside the Studio recipe that made it (the
+# "template" root); a paper's built report lives right alongside its own .json
+# document (the "paper" root) -- there is no longer a standalone "html" root.
+ROOT_BUILDERS = {"csv": user_csv_root, "html": user_template_root, "pdf": user_pdf_root}
+
+
+def _html_roots(user):
+    """Every root that may hold a rendered .html a user could ask to see: charts
+    (living with their Studio recipe) and built paper reports (living with their doc)."""
+    return [user_template_root(user), user_paper_root(user)]
 
 
 def _get_user(api_key: str):
@@ -80,9 +90,10 @@ def get_csv_catalog(api_key: str):
 
 @mcp.tool()
 def list_html_files(api_key: str):
-    """List the rendered visualization HTML files (charts, maps) in this user's
-    workspace. Pass one of these names to `display_html_file` to view it."""
-    return _list_html_files(user_html_root(_get_user(api_key)))
+    """List the rendered visualization HTML files (charts, maps, built paper reports)
+    in this user's workspace. Pass one of these names to `display_html_file` to view it."""
+    user = _get_user(api_key)
+    return "\n\n".join(_list_html_files(root) for root in _html_roots(user))
 
 
 @mcp.tool()
@@ -278,11 +289,14 @@ def display_html_file(api_key: str, filename: str) -> str:
     """Load and display one of this user's rendered visualization HTML files (as
     listed by `list_html_files`) inside the interactive viewer. Pass the file name
     including its .html extension, e.g. "Topic_Share_Pie.html"."""
-    html_root = str(user_html_root(_get_user(api_key)))
-    filepath = os.path.join(html_root, filename)
-    if not os.path.abspath(filepath).startswith(os.path.abspath(html_root)):
-        return "<h1>Error: Invalid file path</h1>"
-    if not os.path.isfile(filepath):
-        return f"<h1>Error: {filename} not found</h1>"
-    with open(filepath, "r", encoding="utf-8") as f:
-        return f.read()
+    user = _get_user(api_key)
+    stem = filename[:-5] if filename.lower().endswith(".html") else filename
+    # Charts/reports live in real subfolders now (Figures/, Extras/, ...), so this
+    # has to search the tree, not just the root -- and across both roots that can
+    # hold a rendered .html (a chart's, or a paper's built report).
+    for root in _html_roots(user):
+        root = Path(root).resolve()
+        for match in sorted(root.rglob(f"{stem}.html")):
+            if root in match.resolve().parents:
+                return match.read_text(encoding="utf-8")
+    return f"<h1>Error: {filename} not found</h1>"

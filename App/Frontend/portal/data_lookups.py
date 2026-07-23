@@ -7,12 +7,10 @@ import pandas as pd
 
 from App.Frontend.webapp.storage import (
     public_csv_root,
-    public_html_root,
     public_paper_root,
     public_pdf_root,
     public_template_root,
     user_csv_root,
-    user_html_root,
     user_paper_root,
     user_pdf_root,
     user_template_root,
@@ -24,21 +22,28 @@ from .output_preview import resolve_safe_path
 # How many rows to sample when inferring a column's wire type.
 TYPE_SAMPLE_ROWS = 50
 
-# Per import/export "kind": the dotted suffix, the per-user root accessor, and
-# the shared public-library root accessor. Shared by the listing helpers below
-# and the import/export/publish views.
-KIND_SUFFIX = {"csv": ".csv", "html": ".html", "template": ".json", "paper": ".json"}
+# Per import/export/describe/delete "kind": its default (primary) suffix and the
+# per-user / shared-public root accessor. A "template" (Studio recipe) and a "paper"
+# (Synthesize document) each may carry a second, rendered file -- its chart or its
+# built report -- living right alongside it under the same stem (see TREE_SUFFIXES
+# below); "html" is no longer a kind of its own; a chart/report is just the ".html"
+# half of whichever kind it belongs to.
+KIND_SUFFIX = {"csv": ".csv", "template": ".json", "paper": ".json"}
 USER_ROOTS = {
     "csv": user_csv_root,
-    "html": user_html_root,
     "template": user_template_root,
     "paper": user_paper_root,
 }
 PUBLIC_ROOTS = {
     "csv": public_csv_root,
-    "html": public_html_root,
     "template": public_template_root,
     "paper": public_paper_root,
+}
+# All suffixes a folder-tree row for this kind may combine into one paired entry.
+TREE_SUFFIXES = {
+    "csv": (".csv",),
+    "template": (".json", ".html"),
+    "paper": (".json", ".html"),
 }
 
 
@@ -52,27 +57,32 @@ def _list_names(folder, suffix: str) -> list[str]:
     )
 
 
-def _list_with_descriptions(folder, suffix: str) -> list[dict[str, str]]:
-    out = []
+def _list_with_descriptions(folder, suffixes) -> list[dict[str, str]]:
+    if isinstance(suffixes, str):
+        suffixes = (suffixes,)
+    out: dict[str, dict] = {}
     sidecars: dict = {}
-    for p in sorted(folder.rglob(f"*{suffix}")):
-        if p.name == DESCRIPTIONS_FILE:
-            continue
-        if p.parent not in sidecars:
-            sidecars[p.parent] = read_descriptions(p.parent)
-        out.append({"name": p.stem, "description": sidecars[p.parent].get(p.stem, "")})
-    out.sort(key=lambda d: d["name"].lower())
-    return out
+    for suffix in suffixes:
+        for p in sorted(folder.rglob(f"*{suffix}")):
+            if p.name == DESCRIPTIONS_FILE:
+                continue
+            if p.parent not in sidecars:
+                sidecars[p.parent] = read_descriptions(p.parent)
+            entry = out.setdefault(p.stem, {"name": p.stem,
+                                            "description": sidecars[p.parent].get(p.stem, "")})
+    result = list(out.values())
+    result.sort(key=lambda d: d["name"].lower())
+    return result
 
 
 def list_user_tree(user, kind: str) -> dict:
     """The signed-in user's files of a kind, as a nested folder tree (for the Dashboard)."""
-    return folders.list_tree(USER_ROOTS[kind](user), KIND_SUFFIX[kind])
+    return folders.list_tree(USER_ROOTS[kind](user), TREE_SUFFIXES[kind])
 
 
 def list_public_tree(kind: str) -> dict:
     """The shared public library of a kind, as a nested folder tree."""
-    return folders.list_tree(PUBLIC_ROOTS[kind](), KIND_SUFFIX[kind])
+    return folders.list_tree(PUBLIC_ROOTS[kind](), TREE_SUFFIXES[kind])
 
 
 def user_folder_paths(user, kind: str) -> list[str]:
@@ -88,7 +98,10 @@ def list_user_csv_names(user) -> list[str]:
 
 
 def list_user_html_names(user) -> list[str]:
-    return _list_names(user_html_root(user), ".html")
+    """Every chart/report .html the user owns -- charts live under the (merged)
+    template root, built paper reports under the (merged) paper root."""
+    return sorted(_list_names(user_template_root(user), ".html") +
+                  _list_names(user_paper_root(user), ".html"))
 
 
 def list_user_template_names(user) -> list[str]:
@@ -101,12 +114,12 @@ def list_user_paper_names(user) -> list[str]:
 
 def list_user_files(user, kind: str) -> list[dict[str, str]]:
     """[{"name","description"}] for the signed-in user's files of a given kind."""
-    return _list_with_descriptions(USER_ROOTS[kind](user), KIND_SUFFIX[kind])
+    return _list_with_descriptions(USER_ROOTS[kind](user), TREE_SUFFIXES[kind])
 
 
 def list_public(kind: str) -> list[dict[str, str]]:
     """[{"name","description"}] for the shared public library of a given kind."""
-    return _list_with_descriptions(PUBLIC_ROOTS[kind](), KIND_SUFFIX[kind])
+    return _list_with_descriptions(PUBLIC_ROOTS[kind](), TREE_SUFFIXES[kind])
 
 
 # --- PDF collections (folders of PDFs, unlike the flat-file kinds above) -------

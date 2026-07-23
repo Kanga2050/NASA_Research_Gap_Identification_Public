@@ -208,8 +208,10 @@
 .synthesize-doc figure:focus-within .fig-picker { opacity:1; }
 .synthesize-doc figure.no-chart .fig-picker { position:static; opacity:1; background:transparent;
   border:0; padding:0; margin-bottom:8px; }
-.synthesize-doc figure .fig-picker select { flex:1; padding:6px 8px; border:1px solid var(--rule);
-  border-radius:6px; font-size:13px; }
+.synthesize-doc figure .fig-picker button[data-fig-pick] { flex:1; padding:6px 8px; border:1px solid var(--rule);
+  border-radius:6px; font-size:13px; background:#fff; color:inherit; text-align:left; cursor:pointer;
+  font-family:inherit; }
+.synthesize-doc figure .fig-picker button[data-fig-pick]:hover { background:#f5f7fa; }
 .synthesize-doc figure .fig-preview { width:100%; height:var(--fig-h,500px); border:1px solid var(--rule);
   border-radius:6px; background:#fff; display:block; }
 .synthesize-doc figure .fig-empty { width:100%; height:220px; border:1px dashed var(--rule); border-radius:6px;

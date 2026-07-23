@@ -1,25 +1,24 @@
 from pathlib import Path
 
-import os
-
 from Servers.storage_paths import resolve_html_root
 
 def list_html_files(storage_root: str | Path | None = None) -> str:
     """Returns a list of all currently generated HTML app files."""
 
-    html_dir = resolve_html_root(storage_root)
+    html_dir = Path(resolve_html_root(storage_root))
     catalog_info = ["# HTML Visualizations Catalog\n"]
-    
 
-    files = [f for f in os.listdir(html_dir) if f.endswith(".html")]
-    
+    # Charts live in real subfolders now (Figures/, Extras/, ...), so this has to
+    # walk the tree -- a non-recursive listdir would silently drop every foldered file.
+    files = sorted(html_dir.rglob("*.html"))
+
     if not files:
         return "No HTML apps generated yet."
-        
-    for file in files:
-        path = os.path.join(html_dir, file)
+
+    for path in files:
+        file = path.name
         try:
-            size_kb = os.path.getsize(path) / 1024
+            size_kb = path.stat().st_size / 1024
             catalog_info.append(f"- **{file}** ({size_kb:.2f} KB)")
         except Exception as e:
             catalog_info.append(f"- **{file}** (Error reading file: {str(e)})")

@@ -19,8 +19,8 @@ Django URL-load time without any app/runtime coupling.
 from __future__ import annotations
 
 import html as _html
-import os
 import re
+from pathlib import Path
 
 DEFAULT_H = 500          # default figure height (px); width is always the column width
 PAPER_EMBED_H = 760      # default height for an embedded paper/non-chart HTML
@@ -317,30 +317,49 @@ def render_fragment(doc: dict) -> str:
 _LIB_RE = re.compile(r'(<script>/\*\*\s*\n\* plotly\.js.*?</script>)', re.S)
 
 
-def _extract_lib(html_root: str):
-    """Pull the inline plotly.js <script> out of any chart file in html_root
-    (they all bundle the same version). Returns the script string, or None."""
-    if not os.path.isdir(html_root):
-        return None
-    for fname in sorted(os.listdir(html_root)):
-        if not fname.endswith(".html"):
+def _roots(html_root) -> list[Path]:
+    """Normalise a single root or a list of roots -- a figure may name a plain
+    chart (living with its Studio recipe) or another paper's built report (living
+    with that paper's document), so both roots are searched in order."""
+    return [Path(r) for r in ([html_root] if isinstance(html_root, (str, Path)) else html_root)]
+
+
+def _find_chart(html_root, name: str):
+    """Locate NAME.html anywhere under html_root -- charts live in real subfolders
+    now (Figures/, Extras/, ...), so a direct root/name join would miss them."""
+    for root in _roots(html_root):
+        if not root.is_dir():
             continue
-        try:
-            with open(os.path.join(html_root, fname), encoding="utf-8") as f:
-                text = f.read()
-        except OSError:
-            continue
-        m = _LIB_RE.search(text)
-        if m:
-            return m.group(1)
+        direct = root / f"{name}.html"
+        if direct.is_file():
+            return direct
+        for found in sorted(root.rglob(f"{name}.html")):
+            return found
     return None
 
 
-def _plotly_fragment(name: str, html_root: str, height: int):
+def _extract_lib(html_root):
+    """Pull the inline plotly.js <script> out of any chart file in html_root
+    (they all bundle the same version). Returns the script string, or None."""
+    for root in _roots(html_root):
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.html")):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            m = _LIB_RE.search(text)
+            if m:
+                return m.group(1)
+    return None
+
+
+def _plotly_fragment(name: str, html_root, height: int):
     """If NAME.html is a Plotly chart, return (holder_html, True): its graph div +
     the real newPlot script + a responsive resize IIFE. Otherwise return (None, False)."""
-    path = os.path.join(html_root, name + ".html")
-    if not os.path.isfile(path):
+    path = _find_chart(html_root, name)
+    if path is None:
         return None, False
     with open(path, encoding="utf-8") as f:
         h = f.read()
@@ -368,11 +387,11 @@ def _plotly_fragment(name: str, html_root: str, height: int):
     return f'<div class="plot-holder">{graph_div}\n{script}\n{resize}</div>', True
 
 
-def _iframe_fragment(name: str, html_root: str, height: int):
+def _iframe_fragment(name: str, html_root, height: int):
     """Embed a non-chart HTML file (e.g. a built paper) via a self-contained
     <iframe srcdoc> so it still works offline. Returns None if the file is missing."""
-    path = os.path.join(html_root, name + ".html")
-    if not os.path.isfile(path):
+    path = _find_chart(html_root, name)
+    if path is None:
         return None
     with open(path, encoding="utf-8") as f:
         content = f.read()
@@ -386,7 +405,7 @@ def _missing_holder(name: str, height: int) -> str:
             f'justify-content:center;color:#b91c1c;background:#fef2f2">[missing chart: {_esc(name)}]</div>')
 
 
-def build_paper_html(doc: dict, html_root: str) -> str:
+def build_paper_html(doc: dict, html_root) -> str:
     """Render ``doc`` to a self-contained, interactive HTML string: the report
     fragment + stylesheet, with each figure placeholder replaced by a live chart
     (or an iframe fallback), and plotly.js inlined exactly once when needed."""

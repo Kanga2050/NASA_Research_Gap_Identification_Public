@@ -16,7 +16,7 @@ import re
 
 from .file_meta import DESCRIPTIONS_FILE, get_description, set_description
 from .output_preview import resolve_safe_path
-from App.Frontend.webapp.storage import user_html_root, user_paper_root
+from App.Frontend.webapp.storage import user_paper_root, user_template_root
 from App.Servers.Paper_Builder import assign_numbers, build_paper_html
 from App.Servers.storage_paths import resolve_html_path
 
@@ -298,21 +298,23 @@ def edit_paper(user, name: str, ops: list) -> dict:
 
 def build_paper(user, name: str, output_name: str = "", description: str = "") -> dict:
     """Render a saved paper into a self-contained interactive HTML report and write
-    it into the user's visualizations, where it can be viewed, published, downloaded
-    -- or used as a figure inside another paper."""
+    it right alongside the paper's own document, where it can be viewed, published,
+    downloaded -- or used as a figure inside another paper."""
     doc = read_paper(user, name)
-    html_root = user_html_root(user)
+    paper_root = user_paper_root(user)
     output = safe_name(output_name or name)
     if not output:
         raise PaperError(f"Invalid report name: {output_name!r}")
-    out_path = resolve_html_path(output, str(html_root))
+    out_path = resolve_html_path(output, str(paper_root))
     try:
-        html = build_paper_html(doc, str(html_root))
+        # A figure may name a plain chart (lives with its Studio recipe) or another
+        # paper's own built report (lives with that paper's document) -- search both.
+        html = build_paper_html(doc, [str(user_template_root(user)), str(paper_root)])
     except Exception as exc:  # a bad doc shouldn't 500 the caller
         raise PaperError(f"Build failed: {exc}") from exc
     out_path.write_text(html, encoding="utf-8")
-    set_description(html_root, out_path.stem, description or f"Built from paper “{name}”.")
+    set_description(paper_root, out_path.stem, description or f"Built from paper “{name}”.")
     charts = [b.get("chart") for b in doc.get("blocks", [])
               if b.get("type") == "figure" and b.get("chart")]
     return {"ok": True, "name": out_path.stem, "figures": len(charts),
-            "note": f"“{out_path.stem}” is now in the user's visualizations (list_html_files)."}
+            "note": f"“{out_path.stem}” is now with the paper's document (list_html_files)."}
