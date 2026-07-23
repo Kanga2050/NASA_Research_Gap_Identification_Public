@@ -912,25 +912,31 @@
   // last @Name instance disappears (deleted directly, or itself living inside a region
   // that just got pruned), remove its now-unused region too -- runs to a fixed point so
   // a chain of dependencies (A calls B calls C) cleans up all the way down in one pass.
+  var pruneScheduled = false;
   function pruneUnusedDefinitions() {
-    var changed = true;
-    while (changed) {
-      changed = false;
-      // A connection can outlive the node it pointed to for a tick mid-removal (see
-      // nodeById), so a data[k] lookup here can transiently be undefined too -- guard it.
+    // refreshAll (which calls this) is itself one of Drawflow's own "nodeRemoved"
+    // listeners, so this can run re-entrantly from inside editor.removeNodeId's own call
+    // stack -- removing a node from there corrupts Drawflow's in-flight bookkeeping (see
+    // nodeById's note on the same hazard). Defer the actual removal past the current
+    // stack instead; refreshAll runs again once it lands, catching a dependency chain
+    // (A used B used C) a pass at a time.
+    if (pruneScheduled) return;
+    pruneScheduled = true;
+    setTimeout(function () {
+      pruneScheduled = false;
       var data = editor.drawflow.drawflow[editor.module].data;
       var used = {};
       Object.keys(data).forEach(function (k) {
         if (data[k] && isInstance(data[k].name)) used[blockNameOf(data[k].name)] = true;
       });
+      var removedAny = false;
       Object.keys(data).forEach(function (k) {
         var name = data[k] && data[k].data && data[k].data.def_of;
-        if (name && !used[name]) { editor.removeNodeId("node-" + k); changed = true; }
+        if (name && !used[name] && nodeById(k)) { editor.removeNodeId("node-" + k); removedAny = true; }
       });
-      if (changed) {
-        Object.keys(BLOCKS).forEach(function (name) { if (!used[name]) delete BLOCKS[name]; });
-      }
-    }
+      Object.keys(BLOCKS).forEach(function (name) { if (!used[name]) delete BLOCKS[name]; });
+      if (removedAny) refreshAll();
+    }, 0);
   }
 
   function refreshAll() {

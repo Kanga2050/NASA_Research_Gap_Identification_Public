@@ -243,7 +243,8 @@ def run_studio_pipeline(api_key: str, name: str = "", graph: str = "") -> dict:
         data = _json_arg(graph, "graph")
     else:
         raise ValueError("Pass either `name` (a saved pipeline) or an inline `graph`.")
-    tasks = studio_ops.queue_graph(user, data.get("nodes", []), data.get("edges", []))
+    tasks = studio_ops.queue_graph(user, data.get("nodes", []), data.get("edges", []),
+                                   blocks=data.get("blocks") or {})
     return {"queued": len(tasks), "tasks": tasks}
 
 
