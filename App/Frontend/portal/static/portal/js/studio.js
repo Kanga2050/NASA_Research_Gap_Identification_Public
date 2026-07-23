@@ -916,13 +916,15 @@
     var changed = true;
     while (changed) {
       changed = false;
+      // A connection can outlive the node it pointed to for a tick mid-removal (see
+      // nodeById), so a data[k] lookup here can transiently be undefined too -- guard it.
       var data = editor.drawflow.drawflow[editor.module].data;
       var used = {};
       Object.keys(data).forEach(function (k) {
-        if (isInstance(data[k].name)) used[blockNameOf(data[k].name)] = true;
+        if (data[k] && isInstance(data[k].name)) used[blockNameOf(data[k].name)] = true;
       });
       Object.keys(data).forEach(function (k) {
-        var name = data[k].data && data[k].data.def_of;
+        var name = data[k] && data[k].data && data[k].data.def_of;
         if (name && !used[name]) { editor.removeNodeId("node-" + k); changed = true; }
       });
       if (changed) {
@@ -1245,7 +1247,6 @@
       body: JSON.stringify({ name: name, is_block: true, graph: graph,
                              blocks: usedBlocks(defNodes), description: "Schema: " + name })
     }).then(function (r) { return r.json(); }).then(function (d) {
-      console.error("DEBUG_GROUP_RESPONSE", JSON.stringify(d));
       if (d.error || !d.block) { flash(d.error || "Could not save the schema."); return; }
       BLOCKS[d.name] = { header: d.block, body: { nodes: defNodes.filter(function (n) {
         return n.action !== "__block_in__" && n.action !== "__block_out__";
@@ -1279,7 +1280,7 @@
       refreshAll();
       layoutGraph();
       flash("Schema “" + d.name + "” saved and inserted.");
-    }).catch(function (e) { console.error("DEBUG_GROUP_ERROR", e && e.stack || e); flash("Network error saving the schema."); });
+    }).catch(function () { flash("Network error saving the schema."); });
   }
 
   // The canvas speaks Drawflow; the grouping code above speaks the simple graph, so
