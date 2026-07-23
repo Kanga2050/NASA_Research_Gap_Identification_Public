@@ -753,6 +753,7 @@ ul.errorlist {
   --cat-annotation: var(--nasa-blue);
   --cat-distillation: #7c3aed;
   --cat-visualization: var(--nasa-red);
+  --cat-block: #0d9488;   /* schema — a teal distinct from the distillation purple */
 }
 
 .studio-palette {
@@ -772,6 +773,9 @@ ul.errorlist {
   margin: 1rem 0 0.4rem;
 }
 .studio-palette h4:first-child { margin-top: 0; }
+/* the user's saved blocks get their own section head, in the block colour */
+.studio-palette h4[data-block-item] { color: var(--cat-block); }
+.palette-item[data-cat="block"] { background: color-mix(in srgb, var(--cat-block) 8%, var(--bg)); }
 
 .palette-item {
   display: block;
@@ -790,6 +794,7 @@ ul.errorlist {
 .palette-item[data-cat="annotation"] { --cat: var(--cat-annotation); }
 .palette-item[data-cat="distillation"] { --cat: var(--cat-distillation); }
 .palette-item[data-cat="visualization"] { --cat: var(--cat-visualization); }
+.palette-item[data-cat="block"] { --cat: var(--cat-block); }
 
 .studio-canvas {
   position: relative;
@@ -882,6 +887,7 @@ ul.errorlist {
 .studio-node[data-cat="annotation"] .node-head { background: var(--cat-annotation); }
 .studio-node[data-cat="distillation"] .node-head { background: var(--cat-distillation); }
 .studio-node[data-cat="visualization"] .node-head { background: var(--cat-visualization); }
+.studio-node[data-cat="block"] .node-head { background: var(--cat-block); }
 .studio-node .node-del {
   cursor: pointer;
   opacity: 0.75;
@@ -946,6 +952,76 @@ ul.errorlist {
   color: var(--text-muted);
 }
 .studio-node .port-in em { color: var(--text-muted); font-style: normal; font-size: 0.68rem; }
+
+/* A block definition drawn in place: a soft frame behind the nodes that make it up,
+   so a pipeline shows what its blocks ARE as well as where they are used. */
+.block-region {
+  position: absolute;
+  z-index: 0;
+  border: 2px dashed var(--cat-block);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--cat-block) 8%, transparent);
+  pointer-events: none;
+}
+.block-region-title {
+  position: absolute;
+  top: -0.85rem;
+  left: 1rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--cat-block);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.studio-node[data-cat="block"] { border-color: var(--cat-block); }
+.studio-node .block-tag {
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+/* shift-click selection, for grouping into a block */
+.drawflow-node.node-picked .studio-node {
+  outline: 2px solid var(--cat-block);
+  outline-offset: 2px;
+}
+.studio-checkline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0.35rem 0 0.15rem;
+}
+.studio-node .port-vary-out { justify-content: flex-end; }
+
+/* +/- for a node whose input ports are variadic (Combine CSVs) */
+.studio-node .port-vary {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.15rem 0 0.1rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.studio-node .port-vary button {
+  width: 1.15rem;
+  height: 1.15rem;
+  line-height: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.studio-node .port-vary button:hover:not(:disabled) { border-color: var(--cat-block); color: var(--cat-block); }
+.studio-node .port-vary button:disabled { opacity: 0.35; cursor: default; }
 .studio-node .wire-badge { margin-left: 0; }
 
 /* Drawflow port + wire cosmetics. The vendored default (.drawflow-node) hard-codes
@@ -1016,6 +1092,9 @@ ul.errorlist {
   color: var(--text);
   word-break: break-word;
 }
+/* A PDF collection is sized by how many PDFs it holds, where a file would show
+   its extension -- kept subordinate to the name it trails. */
+.file-count { color: var(--text-muted); font-size: 0.72rem; }
 .file-actions { display: inline-flex; gap: 0.3rem; flex: 0 0 auto; }
 .file-actions button,
 .public-pull {

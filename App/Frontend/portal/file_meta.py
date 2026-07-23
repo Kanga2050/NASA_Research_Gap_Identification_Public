@@ -64,3 +64,34 @@ def remove_description(folder: Path, name: str) -> None:
     if name in data:
         data.pop(name, None)
         _write_descriptions(folder, data)
+
+
+# --- Folder-aware helpers: a file's description lives in the sidecar of the folder that
+# actually contains it, so a bare (or foldered) file name resolves to the right sidecar.
+def locate_file(type_root: Path, name: str, suffix: str) -> Path | None:
+    """The on-disk path of ``name`` within a type's tree -- an explicit relative path if
+    ``name`` carries one, else the bare stem searched recursively (names are unique)."""
+    root = Path(type_root)
+    raw = str(name)
+    if "/" in raw or "\\" in raw:
+        parts = [p for p in raw.replace("\\", "/").split("/") if p not in ("", ".", "..")]
+        p = root.joinpath(*parts).with_name(f"{parts[-1]}{suffix}") if parts else None
+        return p if p and p.exists() else None
+    direct = root / f"{name}{suffix}"
+    if direct.exists():
+        return direct
+    if root.is_dir():
+        for found in sorted(root.rglob(f"{name}{suffix}")):
+            return found
+    return None
+
+
+def find_description(type_root: Path, name: str, suffix: str) -> str:
+    path = locate_file(type_root, name, suffix)
+    return get_description(path.parent, path.stem) if path else ""
+
+
+def store_description(type_root: Path, name: str, suffix: str, description: str) -> None:
+    path = locate_file(type_root, name, suffix)
+    if path:
+        set_description(path.parent, path.stem, description)

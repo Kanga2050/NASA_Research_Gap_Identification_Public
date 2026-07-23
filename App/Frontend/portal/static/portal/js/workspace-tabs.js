@@ -10,6 +10,12 @@
   function activate(name, push) {
     tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === name); });
     panels.forEach(function (p) { p.classList.toggle("active", p.getAttribute("data-tab") === name); });
+    // A hidden panel has no layout, so any wire the Studio drew while it was inactive
+    // was routed from a zero-sized box and lands off its node. Now that the panel is
+    // laid out, have the canvas recompute them.
+    if (name === "studio" && window.Studio && window.Studio.redrawWires) {
+      requestAnimationFrame(window.Studio.redrawWires);
+    }
     if (push) {
       var link = document.querySelector('.tabbar .tab[data-tab="' + name + '"]');
       if (link) history.pushState({ tab: name }, "", link.getAttribute("href"));

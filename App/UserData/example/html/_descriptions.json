@@ -12,5 +12,6 @@
   "Frontier_Retrieval": "AUC for retrieving passages containing an explicit hedge, by scoring method. SPECTER2 semantic scoring barely beats chance on abstracts (0.581) and hybrid RRF (0.661) lands BELOW keyword alone (0.742): embeddings encode topic, not epistemic stance.",
   "Frontier_Openness_4way": "Per-theme openness lift — open-question rate among each corpus's most theme-leaning quarter minus its own baseline — across all four windows. Omics is the most-flagged theme in three of four; plant/crops the least-flagged in the literature.",
   "Frontier_vs_Momentum": "Literature openness lift against 30-year emphasis momentum (r = −0.42): the field admits ignorance about the risks it is abandoning and stays quiet about the ones it is racing toward. SANS is the falling-and-unflagged outlier.",
-  "Frontier_vs_Funded": "Literature openness lift against funded emphasis (r = +0.54) — NASA's money is aimed at the themes the literature itself calls open, a third independent route to the finding that the funded portfolio is better-aimed than the published field."
+  "Frontier_vs_Funded": "Literature openness lift against funded emphasis (r = +0.54) — NASA's money is aimed at the themes the literature itself calls open, a third independent route to the finding that the funded portfolio is better-aimed than the published field.",
+  "Comprehensive_NLP_Analysis_of_Space_Biology_Research_Across_Internal_NASA_and_Pu": "Built from paper “Comprehensive_NLP_Analysis_of_Space_Biology_Research_Across_Internal_NASA_and_Pu”."
 }

@@ -18,7 +18,20 @@
        data-csrf="{{ csrf_token }}"
        data-publish-url="{% url 'publish_file' %}"
        data-describe-url="{% url 'describe_file' %}"
-       data-delete-url="{% url 'delete_file' %}">
+       data-delete-url="{% url 'delete_file' %}"
+       data-move-url="{% url 'move_entry' %}"
+       data-folder-create-url="{% url 'create_folder' %}"
+       data-folder-rename-url="{% url 'rename_folder' %}"
+       data-folder-delete-url="{% url 'delete_folder' %}"
+       {% comment %}
+         PDF collections are folders, not files, so they need their own endpoints --
+         but they render as one more kind in both libraries, so the JS just swaps in
+         this URL set when a row's data-kind is "pdf".
+       {% endcomment %}
+       data-pdf-publish-url="{% url 'publish_pdf_folder' %}"
+       data-pdf-describe-url="{% url 'describe_pdf_folder' %}"
+       data-pdf-delete-url="{% url 'delete_pdf_folder' %}"
+       data-pdf-import-url="{% url 'import_pdf_folder_from_public' %}">
     <div class="sidebar">
       <div class="card">
         <h2>Import {% info_tip "import" %}</h2>
@@ -28,11 +41,13 @@
           <input type="file" name="upload" id="id_upload" accept=".csv,.html,.json" required>
           <label for="id_upload_desc">Description (optional)</label>
           <input type="text" name="description" id="id_upload_desc" placeholder="What is this file?">
+          <label for="id_upload_folder">Folder (optional)</label>
+          <input type="text" name="folder" id="id_upload_folder" placeholder="e.g. Corpora or Figures/Temporal">
           <button type="submit">Upload</button>
         </form>
 
         <h3>Public library {% info_tip "public_library" %}</h3>
-        <p class="placeholder">Pull shared CSVs, visualizations, and templates into your account.</p>
+        <p class="placeholder">Pull shared CSVs, visualizations, templates, papers, and PDF collections into your account.</p>
         <div id="public-library" data-url="{% url 'public_list' %}" data-import-url="{% url 'import_from_public' %}">
           <p class="placeholder">Loading public files&hellip;</p>
         </div>
@@ -48,12 +63,26 @@
       {% endif %}
 
       <div class="card">
-        <h3>Data {% info_tip "data" %}</h3>
+        <h3>Data {% info_tip "data" %}
+          <button type="button" class="folder-new-btn" data-kind="csv" title="New folder">+ Folder</button></h3>
+        <div class="file-tree" data-kind="csv"></div>
+        <h3>Visualizations {% info_tip "visualizations" %}
+          <button type="button" class="folder-new-btn" data-kind="html" title="New folder">+ Folder</button></h3>
+        <div class="file-tree" data-kind="html"></div>
+        <h3>Templates {% info_tip "templates" %}
+          <button type="button" class="folder-new-btn" data-kind="template" title="New folder">+ Folder</button></h3>
+        <div class="file-tree" data-kind="template"></div>
+        <h3>Papers {% info_tip "papers" %}
+          <button type="button" class="folder-new-btn" data-kind="paper" title="New folder">+ Folder</button></h3>
+        <div class="file-tree" data-kind="paper"></div>
+        {{ file_trees|json_script:"file-trees-data" }}
+        {{ user_folder_choices|json_script:"user-folder-choices-data" }}
+        <h3>PDF collections {% info_tip "pdf_collections" %}</h3>
         <ul class="file-list">
-          {% for f in csv_files %}
-            <li class="file-row" data-kind="csv" data-name="{{ f.name }}">
+          {% for f in pdf_folders %}
+            <li class="file-row" data-kind="pdf" data-name="{{ f.name }}">
               <div class="file-main">
-                <span class="file-name">{{ f.name }}.csv</span>
+                <span class="file-name">{{ f.name }} <span class="file-count">({{ f.count }} PDFs)</span></span>
                 <span class="file-actions">
                   <button type="button" class="file-describe" title="Edit description">&#9998;</button>
                   <button type="button" class="file-publish" title="Publish to public library">Publish</button>
@@ -63,80 +92,24 @@
               <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
             </li>
           {% empty %}
-            <li class="placeholder">No data files yet.</li>
-          {% endfor %}
-        </ul>
-        <h3>Visualizations {% info_tip "visualizations" %}</h3>
-        <ul class="file-list">
-          {% for f in html_files %}
-            <li class="file-row" data-kind="html" data-name="{{ f.name }}">
-              <div class="file-main">
-                <span class="file-name">{{ f.name }}.html</span>
-                <span class="file-actions">
-                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
-                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
-                  <button type="button" class="file-delete" title="Delete">Delete</button>
-                </span>
-              </div>
-              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
-            </li>
-          {% empty %}
-            <li class="placeholder">No visualizations yet.</li>
-          {% endfor %}
-        </ul>
-        <h3>Templates {% info_tip "templates" %}</h3>
-        <ul class="file-list">
-          {% for f in template_files %}
-            <li class="file-row" data-kind="template" data-name="{{ f.name }}">
-              <div class="file-main">
-                <span class="file-name">{{ f.name }}.json</span>
-                <span class="file-actions">
-                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
-                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
-                  <button type="button" class="file-delete" title="Delete">Delete</button>
-                </span>
-              </div>
-              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
-            </li>
-          {% empty %}
-            <li class="placeholder">No templates yet. Save one in the Studio.</li>
-          {% endfor %}
-        </ul>
-        <h3>Papers {% info_tip "papers" %}</h3>
-        <ul class="file-list">
-          {% for f in paper_files %}
-            <li class="file-row" data-kind="paper" data-name="{{ f.name }}">
-              <div class="file-main">
-                <span class="file-name">{{ f.name }}.json</span>
-                <span class="file-actions">
-                  <button type="button" class="file-describe" title="Edit description">&#9998;</button>
-                  <button type="button" class="file-publish" title="Publish to public library">Publish</button>
-                  <button type="button" class="file-delete" title="Delete">Delete</button>
-                </span>
-              </div>
-              <div class="file-desc{% if not f.description %} empty{% endif %}">{{ f.description }}</div>
-            </li>
-          {% empty %}
-            <li class="placeholder">No papers yet. Write one in the Synthesize tab.</li>
+            <li class="placeholder">No PDF collections yet. Upload some below.</li>
           {% endfor %}
         </ul>
       </div>
 
       <div class="card">
-        <h2>PDF collections {% info_tip "pdf_collections" %}</h2>
+        <h2>Upload PDFs {% info_tip "pdf_collections" %}</h2>
         <form method="post" action="{% url 'upload_pdfs' %}" enctype="multipart/form-data">
           {% csrf_token %}
           <label for="id_pdf_collection">Collection name</label>
           <input type="text" name="collection" id="id_pdf_collection" placeholder="e.g. My_Papers" required>
           <label for="id_pdf_files">PDF files</label>
           <input type="file" name="pdfs" id="id_pdf_files" accept=".pdf" multiple required>
+          <label for="id_pdf_desc">Description (optional)</label>
+          <input type="text" name="description" id="id_pdf_desc" placeholder="What is in this collection?">
           <button type="submit">Upload PDFs</button>
         </form>
-        <div id="pdf-collections" data-url="{% url 'pdf_folders' %}"
-             data-delete-url="{% url 'delete_pdf_folder' %}"
-             data-import-url="{% url 'import_pdf_folder_from_public' %}">
-          <p class="placeholder">Loading PDF collections&hellip;</p>
-        </div>
+        <p class="placeholder" style="margin:0.5rem 0 0">Uploading into an existing collection name adds to it. Manage your collections in the library above.</p>
       </div>
 
       <div class="card">
@@ -340,7 +313,7 @@
        data-template-save-url="{% url 'save_template' %}"
        data-template-load-url="/studio/templates/__NAME__/">
     <aside class="studio-palette" id="studio-palette">
-      <div class="studio-palette-title">Blocks {% info_tip "studio_blocks" %}</div>
+      <div class="studio-palette-title">Nodes {% info_tip "studio_blocks" %}</div>
     </aside>
 
     <div class="studio-canvas">
@@ -373,12 +346,24 @@
           <button type="button" id="save-template-btn">Save as template</button>
           <button type="button" id="clear-canvas-btn" class="btn-secondary">Clear canvas</button>
         </div>
+        <div class="studio-template-actions">
+          <button type="button" id="tidy-btn" class="btn-secondary">Reorganize layout</button>
+        </div>
+        <label class="studio-checkline" for="save-as-block">
+          <input type="checkbox" id="save-as-block"> Save as a reusable schema
+        </label>
+        <div class="studio-template-actions">
+          <button type="button" id="group-block-btn" class="btn-secondary" disabled>
+            Group selection into schema
+          </button>
+        </div>
+        <p class="placeholder" id="selection-hint">Shift-click nodes to select them.</p>
         <p class="placeholder" style="margin:0.4rem 0 0">Saved templates become files on your account — export or publish them from the Dashboard.</p>
       </div>
 
       <p class="placeholder" id="run-empty" style="margin-top:0.75rem">
         Build a pipeline: <strong>CSV Input → Annotation/Distillation → Visualization</strong>.
-        Wire nodes through their table ports; pick columns inside each block. Run queues every
+        Wire nodes through their table ports; pick columns inside each node. Run queues every
         task to the server in dependency order.
       </p>
       <div class="run-status" id="run-status"></div>

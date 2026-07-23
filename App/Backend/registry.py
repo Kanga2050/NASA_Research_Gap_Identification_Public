@@ -110,6 +110,10 @@ class Function:
     description: str                # the prose the API docs AND the MCP tool show
     params: tuple[Param, ...]       # IN BACKEND POSITIONAL ORDER
     roots: tuple[str, ...] = ("csv",)   # storage roots passed as <name>_root kwargs
+    # Per-user third-party credentials this function needs, resolved by the queueing
+    # surface and attached as keyword arguments (see portal/user_secrets.py). Each is
+    # optional -- an unset key just leaves the backend on its own default.
+    secrets: tuple[str, ...] = ()
     # The REST path segment, when it is not just the kebab-cased name. Two endpoints
     # were published under other names before this registry existed and are public, so
     # they keep them rather than breaking existing callers.
@@ -225,6 +229,7 @@ IMPORT_FUNCTIONS = [
             _p("csv_name", str, "scraped", "The new CSV to write (no .csv extension)."),
             _p("limit", int, 10000, "Maximum number of works to download."),
         ),
+        secrets=("openalex",),   # the caller's own OpenAlex key, if they set one
         api_path="fetch-data",   # published under this name before it was renamed
     ),
     Function(

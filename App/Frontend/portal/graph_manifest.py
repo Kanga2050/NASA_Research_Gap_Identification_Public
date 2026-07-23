@@ -55,10 +55,21 @@ def _out_html(param, default):
     return {"param": param, "kind": "html", "default": default}
 
 
-def _n(action, label, category, *, table_param, inputs, output, prefs=None, special=None, projects=None):
+def _cols(*pairs):
+    """The columns an importer writes, as typed {name, type} dicts -- so a Select Column
+    downstream of a source offers the real schema before the pipeline is ever Run."""
+    return [{"name": n, "type": t} for n, t in pairs]
+
+
+def _n(action, label, category, *, table_param, inputs, output, prefs=None, special=None,
+       projects=None, variadic=None, columns=None):
+    """One node. ``variadic`` marks a node whose input ports the user can add to and
+    remove from on the canvas ({"min": n, "max": n, "wire": ..., "label": ...}); ports
+    past the declared ``inputs`` all carry that spec, and the instance's port count
+    lives on the node itself. ``columns`` is a source node's fixed output schema."""
     return {"action": action, "label": label, "category": category, "table_param": table_param,
             "inputs": inputs, "prefs": prefs or [], "output": output, "special": special,
-            "projects": projects}
+            "projects": projects, "variadic": variadic, "columns": columns or []}
 
 
 # ---- Source / bridge nodes ----
@@ -71,14 +82,47 @@ SOURCE_NODES = [
     _n("openalex_scraper", "OpenAlex Import", "source", table_param=None, inputs=[],
        prefs=[_pref("topic", "Topic", "text", "space biology"),
               _pref("limit", "Max papers", "number", 10000)],
-       output=_out_csv("csv_name", "scraped")),
+       output=_out_csv("csv_name", "scraped"),
+       columns=_cols(("openalex_id", "text"), ("title", "text"), ("doi", "text"),
+                     ("text", "text"), ("publish_time", "date"), ("authors", "text"),
+                     ("journal", "text"), ("pmcid", "text"), ("pubmed_id", "text"))),
     _n("chunk_pdfs", "PDF Import", "source", table_param=None, inputs=[],
        prefs=[_pref("folders", "PDF folders (comma-separated)", "text", ""),
               _pref("source_label", "Source label", "text", ""),
               _pref("chunk_words", "Words/chunk", "number", 250),
               _pref("overlap_words", "Overlap words", "number", 40)],
-       output=_out_csv("csv_name", "pdf_chunks")),
+       output=_out_csv("csv_name", "pdf_chunks"),
+       columns=_cols(("text", "text"), ("source_file", "text"), ("source", "text"),
+                     ("doi", "text"), ("title", "text"), ("authors", "text"),
+                     ("journal", "text"), ("publish_time", "date"),
+                     ("chunk_index", "number"))),
+    _n("parse_taskbook_pdfs", "Task Book Import", "source", table_param=None, inputs=[],
+       prefs=[_pref("folders", "Task Book PDF folders (comma-separated)", "text", ""),
+              _pref("source_label", "Source label", "text", "")],
+       output=_out_csv("csv_name", "taskbook"),
+       columns=_cols(("text", "text"), ("title", "text"), ("authors", "text"),
+                     ("publish_time", "number"), ("fiscal_year", "text"),
+                     ("start_date", "text"), ("end_date", "text"), ("division", "text"),
+                     ("program", "text"), ("organization", "text"),
+                     ("project_type", "text"), ("funding_source", "text"),
+                     ("grant_number", "text"), ("co_investigators", "text"),
+                     ("bibliography", "text"), ("source", "text"),
+                     ("source_file", "text"), ("task_id", "text"))),
 ]
+
+# ---- Block boundary: the two pseudo-nodes that give a composite its interface ----
+# Neither runs anything. Wiring an inner port to one of these is how a block declares
+# what it takes and what it hands back (see block_ops).
+BOUNDARY_NODES = [
+    _n("__block_in__", "Schema Inputs", "source", table_param=None, inputs=[],
+       output=_out_col(None, "text", ""), special="block_in",
+       variadic={"min": 0, "max": 16, "wire": "any", "label": "In", "side": "output"}),
+    _n("__block_out__", "Schema Outputs", "source", table_param=None,
+       inputs=[_col_in("__out_1__", "Out 1", ANY, optional=True)],
+       output={"param": None, "kind": None, "default": ""}, special="block_out",
+       variadic={"min": 0, "max": 16, "wire": "any", "label": "Out", "side": "input"}),
+]
+
 
 # ---- Annotation nodes: column input(s) -> new column ----
 ANNOTATION_NODES = [
@@ -177,10 +221,13 @@ DISTILLATION_NODES = [
     _n("aggregate_dictionary", "Aggregate Dictionary", "distillation", table_param="source_csv",
        inputs=[_csv_in("source_csv"), _col_in("dict_column", "Dict column", ["text"])],
        output=_out_csv("output_csv", "Aggregated_Counts"), projects="replace"),
+    # The backend takes a comma-separated list of any length, so the node's ports are
+    # variadic: +/- on the canvas adds and removes them.
     _n("combine_csvs", "Combine CSVs", "distillation", table_param=None,
-       inputs=[_csv_in("__csv_a__", "CSV A"), _csv_in("__csv_b__", "CSV B")],
+       inputs=[_csv_in("__csv_1__", "CSV 1"), _csv_in("__csv_2__", "CSV 2")],
        prefs=[_pref("source_column", "Source tag column", "text", "source")],
-       output=_out_csv("output_csv", "Combined_Corpus"), projects="replace"),
+       output=_out_csv("output_csv", "Combined_Corpus"), projects="combine",
+       variadic={"min": 2, "max": 12, "wire": "csv", "label": "CSV"}),
 ]
 
 # ---- Visualization nodes: column input(s) -> HTML (terminal) ----
@@ -259,7 +306,8 @@ VISUALIZATION_NODES = [
        output=_out_html("output_name", "trajectory")),
 ]
 
-ALL_NODES = SOURCE_NODES + ANNOTATION_NODES + DISTILLATION_NODES + VISUALIZATION_NODES
+ALL_NODES = (SOURCE_NODES + BOUNDARY_NODES + ANNOTATION_NODES + DISTILLATION_NODES
+             + VISUALIZATION_NODES)
 MANIFEST = {node["action"]: node for node in ALL_NODES}
 
 PALETTE = [

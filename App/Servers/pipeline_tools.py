@@ -110,14 +110,18 @@ def queue_from_api(queue_user_task, root_builders):
     """Build the `queue(user, fn, api_kwargs)` both surfaces call.
 
     Maps the caller's API-named arguments back onto the backend's positional order and
-    attaches the storage roots the function needs -- the same translation the Django
-    view does for form data, driven by the same registry entry.
+    attaches the storage roots -- and any per-user third-party keys -- the function
+    needs: the same translation the Django view does for form data, driven by the same
+    registry entry.
     """
 
     def queue(user, fn: Function, api_kwargs: dict):
+        # Imported lazily so this module stays importable without Django set up.
+        from App.Frontend.portal.user_secrets import secret_kwargs
+
         args = [api_kwargs.get(param.api_name, param.api_default()) for param in fn.params]
         roots = {f"{root}_root": str(root_builders[root](user)) for root in fn.roots}
-        return queue_user_task(user, fn.name, *args, **roots)
+        return queue_user_task(user, fn.name, *args, **roots, **secret_kwargs(user, fn))
 
     return queue
 

@@ -79,7 +79,13 @@ def _openalex_row(paper: dict) -> dict | None:
     }
 
 
-def openalex_scraper(topic, csv_name: str = "scraped", limit: int = 10000, csv_root: str | Path | None = None):
+def openalex_scraper(
+    topic,
+    csv_name: str = "scraped",
+    limit: int = 10000,
+    csv_root: str | Path | None = None,
+    api_key: str | None = None,
+):
     """Fetch up to `limit` works matching `topic` (that have an abstract) from the
     OpenAlex API into a brand-new CSV. Rows are streamed to disk in pages of 200 as
     they arrive, so partial progress survives an interruption."""
@@ -94,8 +100,10 @@ def openalex_scraper(topic, csv_name: str = "scraped", limit: int = 10000, csv_r
         "mailto": CONTACT_EMAIL,
     }
     # Premium OpenAlex accounts get a higher rate limit via an API key; anonymous
-    # (polite-pool) requests work fine without one.
-    api_key = os.environ.get("OPENALEX_API_KEY")
+    # (polite-pool) requests work fine without one. The queueing surface passes the
+    # calling user's own key (Settings -> Data sources); the environment variable is
+    # the fallback for direct/script use.
+    api_key = api_key or os.environ.get("OPENALEX_API_KEY")
     if api_key:
         params["api_key"] = api_key
 

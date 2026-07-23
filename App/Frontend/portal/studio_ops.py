@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from collections import deque
 
+from . import block_ops
 from .file_meta import get_description, set_description
 from .graph_manifest import MANIFEST, PALETTE
 from .output_preview import resolve_safe_path
@@ -59,8 +60,84 @@ to anything but __csv__. Example: chart the topic sizes of Space_Biology:
 """
 
 
+ANY_WIRE = ("text", "number", "date", "embedding")
+
+
 class StudioError(ValueError):
     """A graph could not be compiled, saved or run."""
+
+
+def entry_for(node: dict, blocks: dict | None = None) -> dict:
+    """The manifest entry for a node -- or, for a block instance, one synthesised from
+    the block's own interface, so the rest of the compiler treats a composite exactly
+    like any other node."""
+    action = node.get("action", "")
+    if not block_ops.is_instance(action):
+        entry = MANIFEST.get(action)
+        if entry is None:
+            raise StudioError(
+                f"Unknown action {action!r}. Call get_studio_manifest for the list of actions.")
+        return entry
+    name = block_ops.instance_block(action)
+    block = (blocks or {}).get(name)
+    if not block:
+        raise StudioError(f"This pipeline uses block {name!r} but carries no definition for it.")
+    header = block["header"]
+    return {
+        "action": action, "label": name, "category": "block", "table_param": None,
+        "inputs": [{"param": f"__in_{p['port']}__", "label": p["name"],
+                    "wire": p.get("wire", "any"), "accepts": list(p.get("accepts") or []),
+                    "optional": False} for p in header["inputs"]],
+        # One promoted name may drive several inner parameters (a query used by both a
+        # keyword and a semantic score); the instance shows one field for it.
+        "prefs": list({p["name"]: {"param": p["name"], "label": p["name"], "widget": "text",
+                                   "default": p.get("default", ""), "options": []}
+                       for p in header["params"]}.values()),
+        "output": {"param": None, "kind": "block", "default": ""},
+        "outputs": header["outputs"],
+        "special": "block_instance", "projects": None, "variadic": None,
+    }
+
+
+def output_port_count(entry: dict, node: dict) -> int:
+    """How many output ports this node instance has. One for most nodes; none for a
+    chart or a Block Outputs boundary; one per declared output for a block instance;
+    and a Block Inputs boundary has one per block input."""
+    if entry.get("special") == "block_instance":
+        return max(1, len(entry.get("outputs") or []))
+    if entry.get("special") == "block_in":
+        try:
+            return max(1, int(node.get("ports_out") or 1))
+        except (TypeError, ValueError):
+            return 1
+    if entry["output"].get("kind") in (None, "html"):
+        return 0
+    return 1
+
+
+def input_specs(entry: dict, node: dict) -> list[dict]:
+    """The input ports of one node *instance*, in port order.
+
+    Most nodes have exactly the ports the manifest declares. A variadic node (today,
+    Combine CSVs) lets the canvas add and remove ports, so the instance carries its own
+    count in ``ports`` and everything past the declared list repeats the variadic spec.
+    """
+    specs = list(entry["inputs"])
+    var = entry.get("variadic")
+    if var and var.get("side") == "output":
+        return []                          # its ports are outputs, not inputs
+    if not var:
+        return specs
+    try:
+        count = int(node.get("ports") or len(specs))
+    except (TypeError, ValueError):
+        count = len(specs)
+    count = max(int(var.get("min", len(specs))), min(count, int(var.get("max", 12))))
+    while len(specs) < count:
+        specs.append({"param": f"__{var['wire']}_{len(specs) + 1}__",
+                      "label": f"{var['label']} {len(specs) + 1}", "wire": var["wire"],
+                      "accepts": list(var.get("accepts") or ANY_WIRE), "optional": True})
+    return specs[:count]
 
 
 # --------------------------------------------------------------------------- #
@@ -88,6 +165,7 @@ def manifest_summary() -> dict:
             "output": {"param": entry["output"].get("param"),
                        "kind": entry["output"].get("kind"),
                        "default": entry["output"].get("default")},
+            "variadic": entry.get("variadic"),
         })
     return {"how_it_works": STUDIO_GRAPH_DOC,
             "palette": PALETTE,
@@ -142,7 +220,7 @@ def _queue_action(user, action: str, cleaned: dict):
     return _queue_task_for_user(user, action, cleaned)
 
 
-def queue_graph(user, nodes: list, edges: list, queue_fn=None) -> list[dict]:
+def queue_graph(user, nodes: list, edges: list, queue_fn=None, blocks: dict | None = None) -> list[dict]:
     """Compile a simple graph into queued tasks, in dependency (topological) order.
 
     Wires carry "carriage": a csv wire carries a table name, a column wire carries
@@ -156,6 +234,10 @@ def queue_graph(user, nodes: list, edges: list, queue_fn=None) -> list[dict]:
     Django view can keep using its own form-validating queue path.
     """
     queue_fn = queue_fn or _queue_action
+    # Blocks are notation: inline every instance (and drop the definition regions, which
+    # are a picture of a block rather than a step of this pipeline) before anything is
+    # queued, so what runs is always plain nodes.
+    nodes, edges = block_ops.expand(nodes, edges, blocks or {})
     by_id = {str(n.get("id")): n for n in nodes}
 
     order = _topo_sort(list(by_id), edges)
@@ -176,6 +258,11 @@ def queue_graph(user, nodes: list, edges: list, queue_fn=None) -> list[dict]:
         entry = MANIFEST.get(node.get("action"))
         if entry is None:
             continue
+        # A schema definition opened flat carries its boundary markers; they run nothing
+        # (a bare definition is normally inlined by expand, but a user can also open one to
+        # edit it and hit Run). Skip them rather than trying to queue a non-existent task.
+        if entry["special"] in ("block_in", "block_out"):
+            continue
         in_by_port = {port: carry.get(src) for src, port in incoming.get(nid, [])}
 
         if entry["special"] == "csv_input":
@@ -193,7 +280,7 @@ def queue_graph(user, nodes: list, edges: list, queue_fn=None) -> list[dict]:
                 cleaned[pref["param"]] = _coerce_number(cleaned[pref["param"]])
 
         source_csv, csv_inputs = "", []
-        for i, inp in enumerate(entry["inputs"]):
+        for i, inp in enumerate(input_specs(entry, node)):
             wire = in_by_port.get(i)
             if not wire:
                 continue
@@ -215,7 +302,10 @@ def queue_graph(user, nodes: list, edges: list, queue_fn=None) -> list[dict]:
         out_name = cleaned.get(out["param"]) or out.get("default", "")
         if entry["category"] == "annotation":
             carry[nid] = {"wire": "column", "csv": source_csv, "column": out_name}
-        elif entry["category"] == "distillation":
+        elif out["kind"] == "csv":
+            # a distillation's new table, or an importer's freshly written one -- an
+            # importer is a source node, but it still emits the CSV it just wrote, so
+            # a pipeline can start from the harvest rather than from an existing table
             carry[nid] = {"wire": "csv", "csv": out_name}
         else:
             carry[nid] = {"wire": "none"}
@@ -242,6 +332,9 @@ def from_drawflow(graph: dict) -> dict:
         data = node.get("data") or {}
         nodes.append({"id": str(nid), "action": node.get("name", ""),
                       "csv": data.get("csv", ""), "column": data.get("column", ""),
+                      "ports": len(node.get("inputs") or {}),
+                      "ports_out": len(node.get("outputs") or {}),
+                      "def_of": data.get("def_of") or None,
                       "fields": data.get("fields") or {}})
         for port, spec in (node.get("inputs") or {}).items():
             try:
@@ -249,11 +342,16 @@ def from_drawflow(graph: dict) -> dict:
             except (IndexError, ValueError):
                 continue
             for conn in spec.get("connections") or []:
-                edges.append({"from": str(conn.get("node")), "to": str(nid), "toPort": to_port})
+                try:
+                    from_port = int(str(conn.get("input", "output_1")).split("_")[1]) - 1
+                except (IndexError, ValueError):
+                    from_port = 0
+                edges.append({"from": str(conn.get("node")), "to": str(nid),
+                              "toPort": to_port, "fromPort": from_port})
     return {"nodes": nodes, "edges": edges}
 
 
-def to_drawflow(nodes: list, edges: list) -> dict:
+def to_drawflow(nodes: list, edges: list, blocks: dict | None = None) -> dict:
     """The simple {nodes, edges} graph -> a Drawflow export the canvas can import.
 
     Node HTML/positions are regenerated: studio.js re-renders every node's widgets
@@ -262,24 +360,26 @@ def to_drawflow(nodes: list, edges: list) -> dict:
     in topological order so the imported graph is readable.
     """
     by_id = {str(n.get("id")): n for n in nodes}
-    for nid, node in by_id.items():
-        if node.get("action") not in MANIFEST:
-            raise StudioError(
-                f"Node {nid}: unknown action {node.get('action')!r}. "
-                "Call get_studio_manifest for the list of actions."
-            )
+    entries = {nid: entry_for(node, blocks) for nid, node in by_id.items()}
 
     order = _topo_sort(list(by_id), edges) or list(by_id)
     depth = {}
     for nid in order:
         parents = [str(e["from"]) for e in edges if str(e.get("to")) == nid and str(e.get("from")) in by_id]
         depth[nid] = max((depth.get(p, 0) + 1 for p in parents), default=0)
+    # A chart is where a pipeline ends, so it belongs in the last column whatever its
+    # own depth -- otherwise a chart fed by a short branch lands mid-canvas, reading as
+    # if the longer branches beside it flowed past the end of the pipeline.
+    last = max(depth.values(), default=0)
+    for nid in order:
+        if entries[nid]["category"] == "visualization":
+            depth[nid] = last
     row = {}
 
     data = {}
     for nid in order:
         node = by_id[nid]
-        entry = MANIFEST[node["action"]]
+        entry = entries[nid]
         col = depth[nid]
         row[col] = row.get(col, -1) + 1
         fields = dict(node.get("fields") or {})
@@ -288,13 +388,18 @@ def to_drawflow(nodes: list, edges: list) -> dict:
         if entry["output"].get("param"):
             fields.setdefault(entry["output"]["param"], entry["output"]["default"])
 
-        inputs = {f"input_{i + 1}": {"connections": []} for i in range(len(entry["inputs"]))}
-        outputs = {} if entry["category"] == "visualization" else {"output_1": {"connections": []}}
+        inputs = {f"input_{i + 1}": {"connections": []}
+                  for i in range(len(input_specs(entry, node)))}
+        outputs = {f"output_{i + 1}": {"connections": []}
+                   for i in range(output_port_count(entry, node))}
+        node_data = {"action": node["action"], "csv": node.get("csv", ""),
+                     "column": node.get("column", ""), "fields": fields}
+        if node.get("def_of"):
+            node_data["def_of"] = node["def_of"]      # part of a definition region
         data[str(nid)] = {
             "id": int(nid) if str(nid).isdigit() else nid,
             "name": node["action"],
-            "data": {"action": node["action"], "csv": node.get("csv", ""),
-                     "column": node.get("column", ""), "fields": fields},
+            "data": node_data,
             "class": "studio-node-wrap",
             "html": f'<div class="studio-node" data-cat="{entry["category"]}"></div>',
             "typenode": False,
@@ -304,19 +409,38 @@ def to_drawflow(nodes: list, edges: list) -> dict:
             "pos_y": 60 + row[col] * 190,
         }
 
+    # Definition regions are a picture of a block, not a step of the pipeline, so they
+    # get their own band underneath it -- one band per block, in a stable order.
+    pipeline_bottom = max((n["pos_y"] for nid, n in data.items()
+                           if not by_id[nid].get("def_of")), default=0)
+    band_top = pipeline_bottom + 300
+    for block_name in dict.fromkeys(n.get("def_of") for n in by_id.values() if n.get("def_of")):
+        members = [nid for nid in order if by_id[nid].get("def_of") == block_name]
+        if not members:
+            continue
+        top = min(data[nid]["pos_y"] for nid in members)
+        left = min(data[nid]["pos_x"] for nid in members)
+        for nid in members:
+            data[nid]["pos_y"] += band_top - top
+            data[nid]["pos_x"] += 60 - left
+        band_top = max(data[nid]["pos_y"] for nid in members) + 300
+
     for edge in edges:
         src, dst = str(edge.get("from")), str(edge.get("to"))
         if src not in data or dst not in data:
             raise StudioError(f"Edge {src}->{dst} refers to a node that does not exist.")
-        port = int(edge.get("toPort", 0))
-        in_key, out_key = f"input_{port + 1}", "output_1"
+        port, out_port = int(edge.get("toPort", 0)), int(edge.get("fromPort", 0))
+        in_key, out_key = f"input_{port + 1}", f"output_{out_port + 1}"
         if in_key not in data[dst]["inputs"]:
             raise StudioError(
                 f"Node {dst} ({data[dst]['name']}) has no input port {port}. "
                 "Ports are 0-based; see the node's `inputs` in get_studio_manifest."
             )
         if out_key not in data[src]["outputs"]:
-            raise StudioError(f"Node {src} ({data[src]['name']}) is terminal and emits no wire.")
+            raise StudioError(
+                f"Node {src} ({data[src]['name']}) has no output port {out_port}."
+                if out_port else
+                f"Node {src} ({data[src]['name']}) is terminal and emits no wire.")
         data[dst]["inputs"][in_key]["connections"].append({"node": src, "input": out_key})
         data[src]["outputs"][out_key]["connections"].append({"node": dst, "output": in_key})
 
@@ -335,20 +459,46 @@ def graph_path(user, name: str):
 
 
 def list_graphs(user) -> list[dict]:
-    """The user's saved Studio pipelines (what the canvas's Templates dropdown lists)."""
+    """The user's saved Studio graphs -- pipelines and blocks, tagged by kind so the
+    canvas can list them in separate sections (a block is inserted into a pipeline;
+    a pipeline is opened)."""
     root = user_template_root(user)
     out = []
-    for path in sorted(root.glob("*.json")):
+    for path in sorted(root.rglob("*.json")):        # templates may live in nested folders
         if path.stem.startswith("_descriptions"):
             continue
+        folder = path.parent.relative_to(root).as_posix()
         try:
-            simple = from_drawflow(json.loads(path.read_text(encoding="utf-8")))
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            simple = from_drawflow(raw)
         except (ValueError, OSError):
             continue
-        out.append({"name": path.stem, "description": get_description(root, path.stem),
+        header = raw.get("block") if isinstance(raw, dict) else None
+        out.append({"name": path.stem, "description": get_description(path.parent, path.stem),
+                    "folder": "" if folder == "." else folder,
+                    "kind": "block" if header else "pipeline",
+                    "version": (header or {}).get("version", 1),
+                    "ports": {"inputs": [p["name"] for p in (header or {}).get("inputs", [])],
+                              "outputs": [p["name"] for p in (header or {}).get("outputs", [])],
+                              "params": [p["name"] for p in (header or {}).get("params", [])]}
+                    if header else None,
+                    "uses": sorted((raw.get("blocks") or {}).keys()) if isinstance(raw, dict) else [],
                     "nodes": len(simple["nodes"]),
                     "actions": [n["action"] for n in simple["nodes"]]})
     return out
+
+
+def block_library(user) -> dict:
+    """Every block template the user has, by name -> current version."""
+    return {g["name"]: g["version"] for g in list_graphs(user) if g["kind"] == "block"}
+
+
+def _embedded_blocks(raw: dict) -> dict:
+    """The frozen block definitions a saved pipeline carries."""
+    blocks = {}
+    for name, entry in (raw.get("blocks") or {}).items():
+        blocks[name] = {"header": entry["header"], "body": entry["body"]}
+    return blocks
 
 
 def read_graph(user, name: str) -> dict:
@@ -361,16 +511,42 @@ def read_graph(user, name: str) -> dict:
     except (ValueError, OSError) as exc:
         raise StudioError(f"Pipeline {name!r} is corrupt: {exc}") from exc
     simple = from_drawflow(graph)
+    blocks = _embedded_blocks(graph)
     return {"name": path.stem, "description": get_description(user_template_root(user), path.stem),
+            "block": graph.get("block"), "blocks": blocks,
+            "stale": block_ops.stale_blocks(blocks, block_library(user)),
             **simple}
 
 
-def write_graph(user, name: str, nodes: list, edges: list, description: str = "") -> dict:
-    """Save a simple graph as a Studio pipeline the user can open on the canvas."""
+def write_graph(user, name: str, nodes: list, edges: list, description: str = "",
+                blocks: dict | None = None, is_block: bool = False) -> dict:
+    """Save a simple graph as a Studio graph the user can open on the canvas.
+
+    ``blocks`` are the frozen definitions this pipeline uses, keyed by name; they are
+    written into the file so the pipeline stays runnable and portable on its own.
+    ``is_block`` marks the file as a block definition, which derives its own interface
+    from its boundary wiring and lists under Blocks instead of Pipelines.
+    """
     path = graph_path(user, name)
-    graph = to_drawflow(nodes, edges)
+    graph = to_drawflow(nodes, edges, blocks)
+    if blocks:
+        graph["blocks"] = {n: {"header": b["header"], "body": b["body"]}
+                           for n, b in blocks.items()}
+    if is_block:
+        header = block_ops.derive_interface(nodes, edges, name=path.stem)
+        previous = 0
+        if path.exists():
+            try:
+                previous = int((json.loads(path.read_text(encoding="utf-8"))
+                                .get("block") or {}).get("version", 0))
+            except (ValueError, OSError):
+                previous = 0
+        header["version"] = previous + 1     # every save is a version a pipeline can pin
+        graph["block"] = header
     path.write_text(json.dumps(graph), encoding="utf-8")
     if description:
         set_description(user_template_root(user), path.stem, description)
     return {"ok": True, "name": path.stem, "nodes": len(nodes),
+            "kind": "block" if is_block else "pipeline",
+            "version": graph.get("block", {}).get("version") if is_block else None,
             "note": f"“{path.stem}” now appears in the Studio's Templates dropdown."}

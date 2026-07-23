@@ -5,7 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from App.Backend import registry
 
-from .models import AgentSettings
+from .models import AgentSettings, ExternalApiSettings
 
 
 class SignupForm(UserCreationForm):
@@ -28,6 +28,20 @@ class AgentSettingsForm(forms.ModelForm):
         widgets = {
             "gemini_api_key": forms.PasswordInput(
                 render_value=True, attrs={"placeholder": "AIza…", "autocomplete": "off"}
+            ),
+        }
+
+
+class ExternalApiSettingsForm(forms.ModelForm):
+    """The user's own keys for the third-party sources the pipeline scrapes."""
+
+    class Meta:
+        model = ExternalApiSettings
+        fields = ("openalex_api_key",)
+        labels = {"openalex_api_key": "OpenAlex API key"}
+        widgets = {
+            "openalex_api_key": forms.PasswordInput(
+                render_value=True, attrs={"placeholder": "Optional", "autocomplete": "off"}
             ),
         }
 

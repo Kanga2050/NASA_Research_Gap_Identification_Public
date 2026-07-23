@@ -35,11 +35,31 @@ def get_latest_completed_task(user) -> TaskRecord | None:
 
 
 def resolve_safe_path(root: Path, name: str, suffix: str) -> Path | None:
-    """Resolve `root/name+suffix`, rejecting anything that escapes `root`."""
+    """Resolve a file named ``name`` (with ``suffix``) inside ``root``, anywhere in its
+    folder tree, rejecting anything that escapes ``root``.
+
+    Files live in real subfolders now (``root/Corpora/Space_Biology.csv``) but a pipeline,
+    a template load, or an export still refers to a file by its bare stem. So:
+
+    * a ``name`` that carries a path (``Corpora/Space_Biology``) resolves exactly there;
+    * a bare ``name`` that already exists at the root resolves there (fast path);
+    * otherwise the tree is searched for ``<stem><suffix>`` and the first match wins --
+      names are unique within a type, so this is unambiguous;
+    * a bare ``name`` that exists nowhere resolves to ``root/name+suffix`` (the default
+      home for a brand-new file), so writes still land somewhere sensible.
+
+    Returns ``None`` only when the path would escape ``root``.
+    """
     root_resolved = root.resolve()
     candidate = (root_resolved / f"{name}{suffix}").resolve()
     if candidate != root_resolved and root_resolved not in candidate.parents:
         return None
+    has_sep = "/" in str(name) or "\\" in str(name)
+    if candidate.exists() or has_sep:
+        return candidate
+    target = f"{Path(name).name}{suffix}"
+    for found in sorted(root_resolved.rglob(target)):
+        return found
     return candidate
 
 

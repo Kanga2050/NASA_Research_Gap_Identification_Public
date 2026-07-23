@@ -27,6 +27,17 @@
     </div>
 
     <div class="card">
+      <h2>Data sources (OpenAlex)</h2>
+      <p class="placeholder">Optional. The OpenAlex scraper works without a key; adding your own raises the rate limit it downloads at, and is used only for scrapes you queue.</p>
+      <form method="post" action="{% url 'update_external_api_settings' %}">
+        {% csrf_token %}
+        {{ external_api_form.as_p }}
+        <button type="submit">Save data-source settings</button>
+      </form>
+      <p class="hint">Request a key at <code>openalex.org/pricing</code>.</p>
+    </div>
+
+    <div class="card">
       <h2>Username</h2>
       <form method="post" action="{% url 'update_username' %}">
         {% csrf_token %}

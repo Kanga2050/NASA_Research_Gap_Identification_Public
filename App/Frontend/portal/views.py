@@ -21,23 +21,38 @@ from .data_lookups import (
     list_csv_columns_typed,
     list_public,
     list_public_pdf_folders,
+    list_public_tree,
     list_user_csv_names,
     list_user_files,
     list_user_html_names,
     list_user_paper_names,
     list_user_pdf_folders,
     list_user_template_names,
+    list_user_tree,
     pdf_folder_choices,
+    public_folder_paths,
+    user_folder_paths,
 )
-from .file_meta import DESCRIPTIONS_FILE, get_description, remove_description, set_description
-from .forms import AgentSettingsForm, ApiKeyCreateForm, SignupForm, TaskSubmitForm, UsernameForm
+from . import folders
+from .file_meta import (DESCRIPTIONS_FILE, find_description, get_description,
+                        remove_description, set_description, store_description)
+from .forms import (
+    AgentSettingsForm,
+    ApiKeyCreateForm,
+    ExternalApiSettingsForm,
+    SignupForm,
+    TaskSubmitForm,
+    UsernameForm,
+)
 from .graph_manifest import MANIFEST, PALETTE
-from .models import AgentSettings, ApiKey, TaskRecord
+from .models import AgentSettings, ApiKey, ExternalApiSettings, TaskRecord
 from .output_preview import build_named_preview, build_output_preview, get_latest_task, resolve_safe_path
 from .paper_ops import safe_name
 from .services import create_api_key, resolve_api_key
+from . import block_ops, studio_ops
 from .studio_ops import StudioError, queue_graph
 from .task_engine import get_task_history, get_task_status, queue_user_task
+from .user_secrets import secret_kwargs
 from App.Backend import registry
 from App.Frontend.webapp.storage import (
     public_pdf_root,
@@ -150,6 +165,10 @@ def _dashboard_context(request):
         "html_files": list_user_files(request.user, "html"),
         "template_files": list_user_files(request.user, "template"),
         "template_names": list_user_template_names(request.user),
+        # Files organised into nested folders: the Dashboard renders these trees, and
+        # the folder pickers (move / publish-into / pull-into) read the path lists.
+        "file_trees": {kind: list_user_tree(request.user, kind) for kind in KIND_SUFFIX},
+        "user_folder_choices": {kind: user_folder_paths(request.user, kind) for kind in KIND_SUFFIX},
         "pdf_folders": list_user_pdf_folders(request.user),
         "pdf_folder_choices": pdf_folder_choices(request.user),
         "column_field_names": COLUMN_FIELD_NAMES,
@@ -250,7 +269,13 @@ def import_file(request):
         kind = _json_kind(payload)
 
     root = USER_ROOTS[kind](request.user)
-    destination = root / filename
+    try:
+        dest_dir = folders.safe_dir(root, request.POST.get("folder", ""))
+    except folders.FolderError:
+        messages.error(request, "Invalid destination folder.")
+        return redirect("dashboard")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    destination = dest_dir / filename
     if payload is not None:
         destination.write_bytes(payload)
     else:
@@ -260,7 +285,7 @@ def import_file(request):
 
     description = request.POST.get("description", "")
     if description.strip():
-        set_description(root, Path(filename).stem, description)
+        set_description(dest_dir, Path(filename).stem, description)
 
     messages.success(request, f"Imported {filename}.")
     return redirect("dashboard")
@@ -294,50 +319,165 @@ def _unique_destination(folder: Path, name: str, suffix: str):
         index += 1
 
 
-def _copy_between_libraries(src_root: Path, dst_root: Path, kind: str, name: str):
-    """Copy `name` of `kind` from one library folder to another, carrying its
-    description along. Returns the destination stem, or None if the source is
-    missing / unsafe."""
+def _copy_file_between(src_root: Path, dst_root: Path, kind: str, name: str, dest_folder: str):
+    """Copy file ``name`` of ``kind`` from one library into ``dest_folder`` of another,
+    carrying its description into the destination folder's sidecar. Returns the
+    destination stem, or None if the source is missing / unsafe."""
     suffix = KIND_SUFFIX[kind]
     src = resolve_safe_path(src_root, name, suffix)
     if src is None or not src.exists():
         return None
-    dst, final_stem = _unique_destination(dst_root, name, suffix)
+    dst_dir = folders.safe_dir(dst_root, dest_folder)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst, final_stem = _unique_destination(dst_dir, Path(name).name, suffix)
     shutil.copy2(src, dst)
-    description = get_description(src_root, name)
+    description = get_description(src.parent, src.stem)
     if description:
-        set_description(dst_root, final_stem, description)
+        set_description(dst_dir, final_stem, description)
     return final_stem
 
 
-def _transfer_file(request, *, to_public: bool):
-    """Copy a file between the user's storage and the shared public library.
+def _copy_folder_between(src_root: Path, dst_root: Path, path: str, dest_folder: str):
+    """Copy a whole folder subtree (with its per-folder sidecars) from one library into
+    ``dest_folder`` of another. Returns the destination folder name, or None if missing."""
+    src_dir = folders.safe_dir(src_root, path)
+    if src_dir == Path(src_root).resolve() or not src_dir.is_dir():
+        return None
+    dst_parent = folders.safe_dir(dst_root, dest_folder)
+    dst_parent.mkdir(parents=True, exist_ok=True)
+    dst = dst_parent / src_dir.name
+    index = 2
+    while dst.exists():
+        dst = dst_parent / f"{src_dir.name}_{index}"
+        index += 1
+    shutil.copytree(src_dir, dst)
+    return dst.name
+
+
+def _transfer(request, *, to_public: bool):
+    """Copy a file OR a whole folder between the user's storage and the public commons.
 
     Publishing and pulling are the same operation with the two roots swapped, so they
-    share one path; only the direction and the wording of the messages differ.
+    share one path; only the direction and the wording differ. ``folder`` names the
+    destination folder on the receiving side (the "place it where?" prompt); ``path``
+    (with ``is_folder``) transfers a whole folder instead of a single file.
     """
     kind = request.POST.get("kind")
-    name = request.POST.get("name", "")
     if kind not in KIND_SUFFIX:
         messages.error(request, "Unknown file kind.")
         return redirect("dashboard")
 
     user_root, public_root = USER_ROOTS[kind](request.user), PUBLIC_ROOTS[kind]()
     source, destination = (user_root, public_root) if to_public else (public_root, user_root)
-    verb = "publish" if to_public else "import"
+    verb, where = ("publish", "the public library") if to_public else ("import", "your library")
+    dest_folder = request.POST.get("folder", "")
+    is_folder = request.POST.get("is_folder") in ("1", "true", "on")
 
     try:
-        final_stem = _copy_between_libraries(source, destination, kind, name)
-    except OSError as exc:
+        if is_folder:
+            result = _copy_folder_between(source, destination, request.POST.get("path", ""), dest_folder)
+            noun = f"folder “{result}”"
+        else:
+            result = _copy_file_between(source, destination, kind, request.POST.get("name", ""), dest_folder)
+            noun = f"{result}{KIND_SUFFIX[kind]}"
+    except (OSError, folders.FolderError) as exc:
         messages.error(request, f"Could not {verb}: {exc}")
         return redirect("dashboard")
 
-    if final_stem is None:
-        messages.error(request, "File not found." if to_public else "Public file not found.")
-    elif to_public:
-        messages.success(request, f"Published {final_stem}{KIND_SUFFIX[kind]} to the public library.")
+    if result is None:
+        messages.error(request, ("Folder" if is_folder else "File") +
+                        (" not found." if to_public else " not found in the public library."))
     else:
-        messages.success(request, f"Imported {final_stem}{KIND_SUFFIX[kind]} from the public library.")
+        into = f" into {dest_folder}" if dest_folder else ""
+        messages.success(request, f"{verb.title()}ed {noun} to {where}{into}.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def publish_file(request):
+    """Copy one of the user's files (or a whole folder) into the public commons."""
+    return _transfer(request, to_public=True)
+
+
+@login_required
+@require_POST
+def import_from_public(request):
+    """Copy a chosen file (or a whole folder) from the public commons into the user's storage."""
+    return _transfer(request, to_public=False)
+
+
+# --- Folder management (create / rename / move / delete) ----------------------
+def _kind_root(request, kind):
+    return USER_ROOTS[kind](request.user) if kind in KIND_SUFFIX else None
+
+
+@login_required
+@require_POST
+def create_folder(request):
+    kind = request.POST.get("kind")
+    root = _kind_root(request, kind)
+    if root is None:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+    try:
+        folders.create_folder(root, request.POST.get("parent", ""), request.POST.get("name", ""))
+        messages.success(request, f"Created folder “{request.POST.get('name', '')}”.")
+    except folders.FolderError as exc:
+        messages.error(request, str(exc))
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def rename_folder(request):
+    kind = request.POST.get("kind")
+    root = _kind_root(request, kind)
+    if root is None:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+    try:
+        folders.rename_folder(root, request.POST.get("path", ""), request.POST.get("name", ""))
+        messages.success(request, "Folder renamed.")
+    except folders.FolderError as exc:
+        messages.error(request, str(exc))
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def delete_folder(request):
+    kind = request.POST.get("kind")
+    root = _kind_root(request, kind)
+    if root is None:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+    try:
+        folders.delete_folder(root, request.POST.get("path", ""))
+        messages.success(request, "Folder deleted.")
+    except folders.FolderError as exc:
+        messages.error(request, str(exc))
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def move_entry(request):
+    """Move a file (by ``name``) or a folder (``path`` + ``is_folder``) into ``folder``."""
+    kind = request.POST.get("kind")
+    root = _kind_root(request, kind)
+    if root is None:
+        messages.error(request, "Unknown file kind.")
+        return redirect("dashboard")
+    dest = request.POST.get("folder", "")
+    try:
+        if request.POST.get("is_folder") in ("1", "true", "on"):
+            folders.move_folder(root, request.POST.get("path", ""), dest)
+        else:
+            folders.move_file(root, request.POST.get("name", ""), KIND_SUFFIX[kind], dest)
+        messages.success(request, "Moved.")
+    except folders.FolderError as exc:
+        messages.error(request, str(exc))
     return redirect("dashboard")
 
 
@@ -357,14 +497,24 @@ def import_from_public(request):
 
 @login_required
 def public_list(request):
-    """JSON contents of the shared public library, for the Dashboard pull UI."""
-    return JsonResponse({kind: list_public(kind) for kind in KIND_SUFFIX})
+    """JSON contents of the shared public library, for the Dashboard pull UI.
+
+    PDF collections are folders rather than files, so they are not a KIND_SUFFIX
+    kind -- but they ride in this same payload (and render as one more group in the
+    public library) rather than living in a library of their own.
+    """
+    return JsonResponse({
+        **{kind: list_public(kind) for kind in KIND_SUFFIX},
+        "trees": {kind: list_public_tree(kind) for kind in KIND_SUFFIX},
+        "folder_choices": {kind: public_folder_paths(kind) for kind in KIND_SUFFIX},
+        "pdf": list_public_pdf_folders(),
+    })
 
 
 @login_required
 @require_POST
 def describe_file(request):
-    """Set/update the description on one of the user's files."""
+    """Set/update the description on one of the user's files (found anywhere in its tree)."""
     kind = request.POST.get("kind")
     name = request.POST.get("name", "")
     if kind not in KIND_SUFFIX:
@@ -377,15 +527,15 @@ def describe_file(request):
         messages.error(request, "File not found.")
         return redirect("dashboard")
 
-    set_description(root, name, request.POST.get("description", ""))
-    messages.success(request, f"Updated description for {name}.")
+    store_description(root, name, KIND_SUFFIX[kind], request.POST.get("description", ""))
+    messages.success(request, f"Updated description for {Path(name).name}.")
     return redirect("dashboard")
 
 
 @login_required
 @require_POST
 def delete_file(request):
-    """Permanently delete one of the user's own files (CSV, HTML, or template)."""
+    """Permanently delete one of the user's own files (found anywhere in its tree)."""
     kind = request.POST.get("kind")
     name = request.POST.get("name", "")
     if kind not in KIND_SUFFIX:
@@ -399,8 +549,8 @@ def delete_file(request):
         return redirect("dashboard")
 
     path.unlink()
-    remove_description(root, name)
-    messages.success(request, f"Deleted {name}{KIND_SUFFIX[kind]}.")
+    remove_description(path.parent, path.stem)
+    messages.success(request, f"Deleted {Path(name).name}{KIND_SUFFIX[kind]}.")
     return redirect("dashboard")
 
 
@@ -414,12 +564,69 @@ def _safe_collection_name(raw: str) -> str:
 
 @login_required
 def pdf_folders(request):
-    """JSON list of the user's PDF collections and the shared public ones, for the
-    task-form picker and the library UI."""
+    """JSON list of the user's PDF collections and the shared public ones.
+
+    The dashboard renders both from page context now (its own collections in the file
+    library, the public ones in the public library), so this endpoint stands purely as
+    the JSON view of the same data for out-of-page callers."""
     return JsonResponse({
         "user": list_user_pdf_folders(request.user),
         "public": list_public_pdf_folders(),
     })
+
+
+def _copy_pdf_collection(src_root: Path, dst_root: Path, name: str) -> str | None:
+    """Copy a whole PDF collection between two PDF areas, carrying its description
+    and never clobbering an existing folder (appends `_2`, `_3`, ...). Returns the
+    destination folder name, or None if the source collection does not exist."""
+    source = src_root / name
+    if not name or not source.is_dir():
+        return None
+
+    destination = dst_root / name
+    index = 2
+    while destination.exists():
+        destination = dst_root / f"{name}_{index}"
+        index += 1
+
+    shutil.copytree(source, destination)
+    description = get_description(src_root, name)
+    if description:
+        set_description(dst_root, destination.name, description)
+    return destination.name
+
+
+@login_required
+@require_POST
+def describe_pdf_folder(request):
+    """Set/update the description on one of the user's PDF collections."""
+    collection = _safe_collection_name(request.POST.get("name", ""))
+    root = user_pdf_root(request.user)
+    if not collection or not (root / collection).is_dir():
+        messages.error(request, "Collection not found.")
+        return redirect("dashboard")
+
+    set_description(root, collection, request.POST.get("description", ""))
+    messages.success(request, f"Updated description for {collection}.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def publish_pdf_folder(request):
+    """Copy one of the user's PDF collections into the shared public library."""
+    collection = _safe_collection_name(request.POST.get("name", ""))
+    try:
+        published = _copy_pdf_collection(user_pdf_root(request.user), public_pdf_root(), collection)
+    except OSError as exc:
+        messages.error(request, f"Could not publish: {exc}")
+        return redirect("dashboard")
+
+    if published is None:
+        messages.error(request, "Collection not found.")
+    else:
+        messages.success(request, f"Published PDF collection '{published}' to the public library.")
+    return redirect("dashboard")
 
 
 @login_required
@@ -436,7 +643,8 @@ def upload_pdfs(request):
         messages.error(request, "Choose at least one PDF to upload.")
         return redirect("dashboard")
 
-    destination = user_pdf_root(request.user) / collection
+    pdf_root = user_pdf_root(request.user)
+    destination = pdf_root / collection
     destination.mkdir(parents=True, exist_ok=True)
     saved = 0
     for upload in uploads:
@@ -448,10 +656,14 @@ def upload_pdfs(request):
                 out.write(chunk)
         saved += 1
 
-    if saved:
-        messages.success(request, f"Uploaded {saved} PDF(s) into collection '{collection}'.")
-    else:
+    if not saved:
         messages.error(request, "No PDF files were uploaded (only .pdf is accepted).")
+        return redirect("dashboard")
+
+    description = request.POST.get("description", "")
+    if description.strip():
+        set_description(pdf_root, collection, description)
+    messages.success(request, f"Uploaded {saved} PDF(s) into collection '{collection}'.")
     return redirect("dashboard")
 
 
@@ -460,11 +672,13 @@ def upload_pdfs(request):
 def delete_pdf_folder(request):
     """Delete one of the user's own PDF collections."""
     collection = _safe_collection_name(request.POST.get("name", ""))
-    target = user_pdf_root(request.user) / collection
+    root = user_pdf_root(request.user)
+    target = root / collection
     if not collection or not target.is_dir():
         messages.error(request, "Collection not found.")
         return redirect("dashboard")
     shutil.rmtree(target)
+    remove_description(root, collection)
     messages.success(request, f"Deleted PDF collection '{collection}'.")
     return redirect("dashboard")
 
@@ -474,19 +688,16 @@ def delete_pdf_folder(request):
 def import_pdf_folder_from_public(request):
     """Copy a public PDF collection into the user's own PDF area (non-clobbering)."""
     collection = _safe_collection_name(request.POST.get("name", ""))
-    source = public_pdf_root() / collection
-    if not collection or not source.is_dir():
-        messages.error(request, "Public collection not found.")
+    try:
+        imported = _copy_pdf_collection(public_pdf_root(), user_pdf_root(request.user), collection)
+    except OSError as exc:
+        messages.error(request, f"Could not import: {exc}")
         return redirect("dashboard")
 
-    dest_root = user_pdf_root(request.user)
-    dest = dest_root / collection
-    index = 2
-    while dest.exists():
-        dest = dest_root / f"{collection}_{index}"
-        index += 1
-    shutil.copytree(source, dest)
-    messages.success(request, f"Imported PDF collection '{dest.name}' from the public library.")
+    if imported is None:
+        messages.error(request, "Public collection not found.")
+    else:
+        messages.success(request, f"Imported PDF collection '{imported}' from the public library.")
     return redirect("dashboard")
 
 
@@ -524,14 +735,15 @@ def _resolve_arg(cleaned: dict, param: registry.Param):
 def _queue_task_for_user(user, action: str, cleaned: dict):
     """Queue any pipeline function from cleaned form data.
 
-    The positional argument order and the storage roots come straight from the
-    registry, so this one path serves the dashboard form, the Studio's Run button and
-    the agent -- and none of them can drift out of step with the backend signature.
+    The positional argument order, the storage roots and any per-user third-party keys
+    come straight from the registry, so this one path serves the dashboard form, the
+    Studio's Run button and the agent -- and none of them can drift out of step with
+    the backend signature.
     """
     fn = registry.get(action)
     args = [_resolve_arg(cleaned, param) for param in fn.params]
     root_kwargs = {f"{name}_root": str(ROOT_BUILDERS[name](user)) for name in fn.roots}
-    return queue_user_task(user, action, *args, **root_kwargs)
+    return queue_user_task(user, action, *args, **root_kwargs, **secret_kwargs(user, fn))
 
 
 @login_required
@@ -598,7 +810,8 @@ def studio_run(request):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
     try:
-        queued = queue_graph(request.user, payload.get("nodes", []), payload.get("edges", []))
+        queued = queue_graph(request.user, payload.get("nodes", []), payload.get("edges", []),
+                             blocks=payload.get("blocks") or {})
     except StudioError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:  # surface a bad graph without 500-ing
@@ -609,8 +822,9 @@ def studio_run(request):
 
 @login_required
 def list_templates(request):
-    """The user's saved Studio templates (name + description) for the load dropdown."""
-    return JsonResponse({"templates": list_user_files(request.user, "template")})
+    """The user's saved Studio graphs for the load dropdown, tagged pipeline vs block so
+    the canvas can list them in separate sections."""
+    return JsonResponse({"templates": studio_ops.list_graphs(request.user)})
 
 
 @login_required
@@ -636,9 +850,28 @@ def save_template(request):
     if path is None:
         return JsonResponse({"error": "Invalid template name."}, status=400)
 
+    # Saving a block derives its interface from its boundary wiring and bumps its
+    # version, which is what pipelines pin when they embed a frozen copy.
+    if payload.get("is_block"):
+        simple = studio_ops.from_drawflow(graph)
+        try:
+            header = block_ops.derive_interface(simple["nodes"], simple["edges"], name=name)
+        except block_ops.BlockError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        previous = 0
+        if path.exists():
+            try:
+                previous = int((json.loads(path.read_text(encoding="utf-8")).get("block") or {})
+                               .get("version", 0))
+            except (ValueError, OSError):
+                previous = 0
+        header["version"] = previous + 1
+        graph["block"] = header
+        graph["body"] = block_ops.definition_body(simple["nodes"], simple["edges"])
+
     path.write_text(json.dumps(graph), encoding="utf-8")
     set_description(root, name, payload.get("description", ""))
-    return JsonResponse({"ok": True, "name": name})
+    return JsonResponse({"ok": True, "name": name, "block": graph.get("block")})
 
 
 @login_required
@@ -652,7 +885,11 @@ def load_template(request, name):
         graph = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return JsonResponse({"error": "Template is corrupt."}, status=400)
-    return JsonResponse({"name": name, "graph": graph, "description": get_description(root, name)})
+    stale = block_ops.stale_blocks(
+        {n: {"header": b["header"]} for n, b in (graph.get("blocks") or {}).items()},
+        studio_ops.block_library(request.user))
+    return JsonResponse({"name": name, "graph": graph, "stale": stale,
+                         "description": get_description(root, name)})
 
 
 # --- Synthesize: research-paper documents (block-model JSON) -------------------
@@ -849,13 +1086,18 @@ def _get_agent_settings(user) -> AgentSettings:
     return settings
 
 
+def _get_external_api_settings(user) -> ExternalApiSettings:
+    settings, _ = ExternalApiSettings.objects.get_or_create(user=user)
+    return settings
+
+
 @login_required
 def account_settings(request):
-    settings = _get_agent_settings(request.user)
     context = {
         "username_form": UsernameForm(instance=request.user),
         "password_form": PasswordChangeForm(request.user),
-        "agent_form": AgentSettingsForm(instance=settings),
+        "agent_form": AgentSettingsForm(instance=_get_agent_settings(request.user)),
+        "external_api_form": ExternalApiSettingsForm(instance=_get_external_api_settings(request.user)),
         "is_staff": request.user.is_staff,
         "is_superuser": request.user.is_superuser,
     }
@@ -907,4 +1149,17 @@ def update_agent_settings(request):
 
     form.save()
     messages.success(request, "Assistant settings saved.")
+    return redirect("account_settings")
+
+
+@login_required
+@require_POST
+def update_external_api_settings(request):
+    form = ExternalApiSettingsForm(request.POST, instance=_get_external_api_settings(request.user))
+    if not form.is_valid():
+        messages.error(request, "Could not save data-source settings.")
+        return redirect("account_settings")
+
+    form.save()
+    messages.success(request, "Data-source settings saved.")
     return redirect("account_settings")

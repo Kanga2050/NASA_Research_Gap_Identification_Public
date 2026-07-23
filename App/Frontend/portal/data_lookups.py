@@ -17,6 +17,7 @@ from App.Frontend.webapp.storage import (
     user_pdf_root,
     user_template_root,
 )
+from . import folders
 from .file_meta import DESCRIPTIONS_FILE, read_descriptions
 from .output_preview import resolve_safe_path
 
@@ -42,18 +43,44 @@ PUBLIC_ROOTS = {
 
 
 def _list_names(folder, suffix: str) -> list[str]:
-    """Stems of ``*suffix`` files in ``folder``, excluding the descriptions sidecar."""
+    """Stems of ``*suffix`` files anywhere in ``folder``'s tree (files live in nested
+    subfolders now), excluding the descriptions sidecar. Names are unique within a type,
+    so the bare stem is enough to resolve one -- which is what the Studio, the CSV
+    pickers and the preview dropdowns list."""
     return sorted(
-        p.stem for p in folder.glob(f"*{suffix}") if p.name != DESCRIPTIONS_FILE
+        p.stem for p in folder.rglob(f"*{suffix}") if p.name != DESCRIPTIONS_FILE
     )
 
 
 def _list_with_descriptions(folder, suffix: str) -> list[dict[str, str]]:
-    descriptions = read_descriptions(folder)
-    return [
-        {"name": name, "description": descriptions.get(name, "")}
-        for name in _list_names(folder, suffix)
-    ]
+    out = []
+    sidecars: dict = {}
+    for p in sorted(folder.rglob(f"*{suffix}")):
+        if p.name == DESCRIPTIONS_FILE:
+            continue
+        if p.parent not in sidecars:
+            sidecars[p.parent] = read_descriptions(p.parent)
+        out.append({"name": p.stem, "description": sidecars[p.parent].get(p.stem, "")})
+    out.sort(key=lambda d: d["name"].lower())
+    return out
+
+
+def list_user_tree(user, kind: str) -> dict:
+    """The signed-in user's files of a kind, as a nested folder tree (for the Dashboard)."""
+    return folders.list_tree(USER_ROOTS[kind](user), KIND_SUFFIX[kind])
+
+
+def list_public_tree(kind: str) -> dict:
+    """The shared public library of a kind, as a nested folder tree."""
+    return folders.list_tree(PUBLIC_ROOTS[kind](), KIND_SUFFIX[kind])
+
+
+def user_folder_paths(user, kind: str) -> list[str]:
+    return folders.folder_paths(USER_ROOTS[kind](user))
+
+
+def public_folder_paths(kind: str) -> list[str]:
+    return folders.folder_paths(PUBLIC_ROOTS[kind]())
 
 
 def list_user_csv_names(user) -> list[str]:
@@ -84,11 +111,21 @@ def list_public(kind: str) -> list[dict[str, str]]:
 
 # --- PDF collections (folders of PDFs, unlike the flat-file kinds above) -------
 def _list_pdf_folders_in(base) -> list[dict]:
-    """[{"name","count"}] for each subfolder of `base`, with its PDF count."""
+    """[{"name","count","description"}] for each subfolder of `base`.
+
+    The description sidecar lives in `base` (keyed by folder name), the same shape
+    the flat-file kinds use -- so a PDF collection carries a description through the
+    library UI, publishing and pulling just like a CSV does.
+    """
     if not base.is_dir():
         return []
+    descriptions = read_descriptions(base)
     return [
-        {"name": child.name, "count": len(list(child.glob("*.pdf")))}
+        {
+            "name": child.name,
+            "count": len(list(child.glob("*.pdf"))),
+            "description": descriptions.get(child.name, ""),
+        }
         for child in sorted(base.iterdir())
         if child.is_dir()
     ]

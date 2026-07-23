@@ -77,3 +77,26 @@ class AgentSettings(models.Model):
 
     def __str__(self) -> str:
         return f"agent:{self.user.username}"
+
+
+class ExternalApiSettings(models.Model):
+    """Per-user credentials for the third-party data sources the *pipeline* calls.
+
+    Kept separate from AgentSettings because these keys belong to background
+    pipeline functions (the OpenAlex scraper), not to the dashboard assistant.
+    Every key here is optional: the scrapers all work anonymously, a key only
+    buys a higher rate limit.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="external_api_settings"
+    )
+    openalex_api_key = models.CharField(max_length=200, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_openalex_key(self) -> bool:
+        return bool(self.openalex_api_key)
+
+    def __str__(self) -> str:
+        return f"external-api:{self.user.username}"
