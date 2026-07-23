@@ -599,7 +599,22 @@
         (count >= e.variadic.max ? " disabled" : "") + ">+</button></div>";
     }
 
-    e.prefs.forEach(function (pref) { html += "<label>" + esc(pref.label) + "</label>" + widgetHtml(id, pref, f); });
+    // Promoting a field exposes it as an argument on the schema currently being edited
+    // (the checkbox only appears alongside that schema's own, untagged Schema Inputs
+    // node -- never on a dependency region, which is read-only display).
+    var blockInId = (n.data || {}).def_of ? null : ownBlockInNode();
+    var promoted = blockInId ? ((nodeById(blockInId).data.fields || {}).promoted || []) : [];
+    e.prefs.forEach(function (pref) {
+      var promoteHtml = "";
+      if (blockInId) {
+        var checked = promoted.some(function (p) { return String(p.node) === String(id) && p.param === pref.param; });
+        promoteHtml = '<label class="promote-toggle" title="Expose as an argument on this schema">' +
+          '<input type="checkbox" data-role="promote" data-param="' + esc(pref.param) + '"' +
+          (checked ? " checked" : "") + "><span>promote</span></label>";
+      }
+      html += '<div class="pref-row"><label>' + esc(pref.label) + "</label>" + promoteHtml + "</div>"
+        + widgetHtml(id, pref, f);
+    });
 
     // Output-name field (annotation new column / distillation csv / viz html)
     if (e.output && e.output.param && e.special !== "csv_input" && e.special !== "select_column") {
@@ -721,6 +736,23 @@
       var evt = (c.tagName === "SELECT" || c.type === "checkbox") ? "change" : "input";
       c.addEventListener(evt, function () { syncNode(id); refreshAll(); });
     });
+
+    el.querySelectorAll('[data-role="promote"]').forEach(function (c) {
+      c.addEventListener("change", function () {
+        var blockInId = ownBlockInNode();
+        var biNode = blockInId && nodeById(blockInId);
+        if (!biNode) return;
+        var fields = biNode.data.fields || (biNode.data.fields = {});
+        var param = c.getAttribute("data-param");
+        var list = (fields.promoted || []).filter(function (p) {
+          return !(String(p.node) === String(id) && p.param === param);
+        });
+        if (c.checked) list.push({ node: String(id), param: param, name: param });
+        fields.promoted = list;
+        editor.updateNodeDataFromId(blockInId, biNode.data);
+        autosave();
+      });
+    });
   }
 
   // --------------------------------------------------------------- refresh
@@ -815,10 +847,10 @@
 
     var bands = {};
     ids.forEach(function (id) {
-      var band = (data[id].data && data[id].data.def_of) || " pipeline";
+      var band = (data[id].data && data[id].data.def_of) || " pipeline";
       (bands[band] = bands[band] || []).push(id);
     });
-    var order = Object.keys(bands).sort();   // " pipeline" sorts first
+    var order = Object.keys(bands).sort();   // " pipeline" sorts first
 
     var cursorY = PAD_Y;
     order.forEach(function (band) {
@@ -876,7 +908,31 @@
     autosave();
   }
 
+  // A definition region only earns its place on the canvas by being called: once the
+  // last @Name instance disappears (deleted directly, or itself living inside a region
+  // that just got pruned), remove its now-unused region too -- runs to a fixed point so
+  // a chain of dependencies (A calls B calls C) cleans up all the way down in one pass.
+  function pruneUnusedDefinitions() {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      var data = editor.drawflow.drawflow[editor.module].data;
+      var used = {};
+      Object.keys(data).forEach(function (k) {
+        if (isInstance(data[k].name)) used[blockNameOf(data[k].name)] = true;
+      });
+      Object.keys(data).forEach(function (k) {
+        var name = data[k].data && data[k].data.def_of;
+        if (name && !used[name]) { editor.removeNodeId("node-" + k); changed = true; }
+      });
+      if (changed) {
+        Object.keys(BLOCKS).forEach(function (name) { if (!used[name]) delete BLOCKS[name]; });
+      }
+    }
+  }
+
   function refreshAll() {
+    pruneUnusedDefinitions();
     var ids = allNodeIds();
     // Every table the graph reads OR writes: a CSV Input's table, and the table each
     // importer/distillation node names as its output (which may already exist on disk,
@@ -1060,6 +1116,25 @@
     paintSelection();
   }, true);
 
+  // Every block a set of nodes (transitively) instantiates, from the canvas' BLOCKS
+  // cache -- what a saved schema must carry along so a nested instance's ports resolve
+  // and the file stays runnable and portable on its own.
+  function usedBlocks(nodes) {
+    var out = {}, seen = {};
+    function walk(list) {
+      (list || []).forEach(function (n) {
+        if (!isInstance(n.action) || seen[n.action]) return;
+        seen[n.action] = 1;
+        var block = BLOCKS[blockNameOf(n.action)];
+        if (!block) return;
+        out[blockNameOf(n.action)] = block;
+        walk(block.body.nodes);
+      });
+    }
+    walk(nodes);
+    return out;
+  }
+
   // Turn the selected nodes into a block: whatever crosses the selection boundary
   // becomes a port, so the block takes exactly what its insides could not supply and
   // hands back exactly what the rest of the pipeline was already using.
@@ -1070,8 +1145,11 @@
     ids.forEach(function (id) { picked[id] = true; });
     var data = editor.export().drawflow.Home.data;
 
-    if (ids.some(function (id) { return isInstance(data[id].name) || (data[id].data || {}).def_of; })) {
-      flash("Ungroup a schema before grouping it into another one.");
+    // A schema INSTANCE may be nested into a new outer schema (its own definition
+    // travels along, gathered below); a definition REGION's internals may not -- group
+    // the instance instead, not the expanded picture of what it does.
+    if (ids.some(function (id) { return (data[id].data || {}).def_of; })) {
+      flash("Ungroup a schema before grouping its insides into another one.");
       return;
     }
 
@@ -1156,14 +1234,18 @@
     });
 
     // ---- save the block as its own template, then rebuild the canvas around it
+    // A nested @Name instance among defNodes brings its own definition along, so the
+    // saved schema stays portable and its boundary types resolve rather than falling
+    // back to "any" (see block_ops._port_type).
     var graph = studioToDrawflow(defNodes, defEdges);
     fetch(TEMPLATE_SAVE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
       credentials: "same-origin",
       body: JSON.stringify({ name: name, is_block: true, graph: graph,
-                             description: "Schema: " + name })
+                             blocks: usedBlocks(defNodes), description: "Schema: " + name })
     }).then(function (r) { return r.json(); }).then(function (d) {
+      console.error("DEBUG_GROUP_RESPONSE", JSON.stringify(d));
       if (d.error || !d.block) { flash(d.error || "Could not save the schema."); return; }
       BLOCKS[d.name] = { header: d.block, body: { nodes: defNodes.filter(function (n) {
         return n.action !== "__block_in__" && n.action !== "__block_out__";
@@ -1197,7 +1279,7 @@
       refreshAll();
       layoutGraph();
       flash("Schema “" + d.name + "” saved and inserted.");
-    }).catch(function () { flash("Network error saving the schema."); });
+    }).catch(function (e) { console.error("DEBUG_GROUP_ERROR", e && e.stack || e); flash("Network error saving the schema."); });
   }
 
   // The canvas speaks Drawflow; the grouping code above speaks the simple graph, so
@@ -1262,31 +1344,79 @@
     });
   }
 
+  // The canvas' own (top-level, not def_of-tagged) Schema Inputs node, when the graph
+  // open right now IS a schema's own definition -- opening a schema loads its boundary
+  // nodes untagged (see the template-load handler), while a dependency it depends on is
+  // drawn as a def_of-tagged region. So a node's fields are promote-able exactly when it
+  // sits alongside this node: editing the schema itself, not looking at one it calls or
+  // one it depends on.
+  function ownBlockInNode() {
+    var data = editor.drawflow.drawflow[editor.module].data;
+    var id = Object.keys(data).find(function (k) {
+      return data[k].name === "__block_in__" && !(data[k].data || {}).def_of;
+    });
+    return id || null;
+  }
+
+  // Draw a definition's nodes as a region tagged def_of=name. A no-op if already present.
+  function placeDefinitionRegion(name, bodyNodes, bodyEdges) {
+    if (regionPresent(name)) return;
+    var idMap = {};
+    bodyNodes.forEach(function (n) {
+      var e = entryFor(n.action) || { category: "source", inputs: [] };
+      // A body node coming straight from an embedded definition (rather than through
+      // drawflowToSimple) carries `ports`/`ports_out` only when its author set them
+      // explicitly (a variadic node) -- fall back to the manifest's declared count the
+      // same way studioToDrawflow does, so a plain node is never given zero ports.
+      var inN = n.ports != null ? n.ports : (e.inputs || []).length;
+      var outN = n.ports_out != null ? n.ports_out : 1;
+      var d = { action: n.action, csv: n.csv, column: n.column, fields: n.fields, def_of: name };
+      idMap[n.id] = editor.addNode(n.action, inN, outN, 0, 0, "studio-node-wrap", d,
+        '<div class="studio-node" data-cat="' + esc(e.category || "source") + '"></div>');
+      renderNode(idMap[n.id]);
+    });
+    bodyEdges.forEach(function (e) {
+      editor.addConnection(idMap[e.from], idMap[e.to],
+        "output_" + ((e.fromPort || 0) + 1), "input_" + ((e.toPort || 0) + 1));
+    });
+  }
+
+  // A definition's own body may itself instantiate further blocks; bring those in too,
+  // depth first, so every BLOCKS entry a region's nodes need is known before that region
+  // is drawn (entryFor resolves a @Name node from BLOCKS, not from the file it came from).
+  // `pool` is the {name: {header, body}} this graph already embeds (graph.blocks) --
+  // preferred over a network round trip, since a saved schema travels with everything
+  // it is itself built from (see block_ops / usedBlocks).
+  function addNestedDefinitions(bodyNodes, pool) {
+    bodyNodes.forEach(function (n) {
+      if (!isInstance(n.action)) return;
+      var nested = blockNameOf(n.action);
+      if (BLOCKS[nested] && regionPresent(nested)) return;
+      var known = (pool || {})[nested];
+      if (known) {
+        BLOCKS[nested] = known;
+        addNestedDefinitions(known.body.nodes, pool);
+        placeDefinitionRegion(nested, known.body.nodes, known.body.edges);
+      } else {
+        ensureBlock(nested, function () { refreshAll(); });
+      }
+    });
+  }
+
   // Bring a block's definition onto the canvas (its nodes tagged as a region) and record
-  // the frozen copy this pipeline carries. A no-op if the block is already here.
+  // the frozen copy this pipeline carries -- recursing into every schema it is itself
+  // built from, so opening or inserting one shows its whole dependency chain.
   function addBlockDefinition(name, graph) {
     var simple = drawflowToSimple(graph);
     var boundary = {};
     simple.nodes.forEach(function (n) {
       if (n.action === "__block_in__" || n.action === "__block_out__") boundary[n.id] = true;
     });
-    BLOCKS[name] = { header: graph.block, body: {
-      nodes: simple.nodes.filter(function (n) { return !boundary[n.id]; }),
-      edges: simple.edges.filter(function (e) { return !boundary[e.from] && !boundary[e.to]; })
-    } };
-    if (regionPresent(name)) return;
-    var idMap = {};
-    simple.nodes.forEach(function (n) {
-      var e = entryFor(n.action) || { category: "source" };
-      var d = { action: n.action, csv: n.csv, column: n.column, fields: n.fields, def_of: name };
-      idMap[n.id] = editor.addNode(n.action, n.ports, n.ports_out, 0, 0, "studio-node-wrap", d,
-        '<div class="studio-node" data-cat="' + esc(e.category || "source") + '"></div>');
-      renderNode(idMap[n.id]);
-    });
-    simple.edges.forEach(function (e) {
-      editor.addConnection(idMap[e.from], idMap[e.to],
-        "output_" + ((e.fromPort || 0) + 1), "input_" + ((e.toPort || 0) + 1));
-    });
+    var bodyNodes = simple.nodes.filter(function (n) { return !boundary[n.id]; });
+    var bodyEdges = simple.edges.filter(function (e) { return !boundary[e.from] && !boundary[e.to]; });
+    BLOCKS[name] = { header: graph.block, body: { nodes: bodyNodes, edges: bodyEdges } };
+    addNestedDefinitions(bodyNodes, graph.blocks || {});
+    placeDefinitionRegion(name, bodyNodes, bodyEdges);
   }
 
   function addBlockInstance(name, x, y) {
@@ -1509,6 +1639,14 @@
         if (TEMPLATE_KIND[name] === "block" && d.graph.block) {
           var box = document.getElementById("save-as-block");
           if (box) box.checked = true;                 // so re-saving keeps it a schema
+          // A schema's own file has no self-region (you are editing it, not calling it),
+          // but it may itself be built from other schemas -- bring those in as regions
+          // too, so the outline shows the whole dependency chain it depends on.
+          var ownBody = drawflowToSimple(d.graph).nodes.filter(function (n) {
+            return n.action !== "__block_in__" && n.action !== "__block_out__";
+          });
+          addNestedDefinitions(ownBody, d.graph.blocks || {});
+          refreshAll();
           flash("Editing schema “" + d.name + "”. Re-save keeps it a schema; drag it from Schemas to use it.");
         } else if ((d.stale || []).length) {
           flash(d.stale.map(function (b) {

@@ -904,6 +904,25 @@ ul.errorlist {
   color: var(--text-muted);
   margin: 0.45rem 0 0.15rem;
 }
+.studio-node .pref-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.studio-node .pref-row label { margin: 0.45rem 0 0.15rem; }
+.studio-node .promote-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0.45rem 0 0.15rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.studio-node .promote-toggle input { width: auto; }
 .studio-node input,
 .studio-node select {
   width: 100%;
@@ -1115,6 +1134,111 @@ ul.errorlist {
   white-space: pre-wrap;
 }
 .file-desc.empty { display: none; }
+
+/* ---- Folder trees: nested .file-list, one .tree-folder per subfolder ---- */
+.file-tree { margin-bottom: 0.4rem; }
+.folder-new-btn {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.68rem;
+  background: transparent;
+  color: var(--nasa-blue);
+  border: 1px solid var(--nasa-blue);
+}
+.folder-new-btn:hover { background: var(--nasa-blue); color: #fff; }
+.tree-folder { list-style: none; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+.tree-folder:last-child { border-bottom: none; }
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: default;
+}
+.folder-toggle {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  width: 1rem;
+  text-align: center;
+  transition: transform 0.15s ease;
+}
+.tree-folder.collapsed > .folder-head .folder-toggle { transform: rotate(-90deg); }
+.folder-name {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text);
+  flex: 1 1 auto;
+}
+.folder-actions { display: inline-flex; gap: 0.25rem; flex: 0 0 auto; }
+.folder-actions button {
+  margin-top: 0;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.68rem;
+  background: var(--text-muted);
+}
+.folder-actions button:hover { background: var(--nasa-blue-dark); }
+.folder-actions .folder-delete { background: transparent; color: var(--nasa-red); border: 1px solid var(--nasa-red); }
+.folder-actions .folder-delete:hover { background: var(--nasa-red); color: #fff; }
+.folder-body {
+  margin: 0.3rem 0 0.2rem 1.2rem;
+  padding-left: 0.6rem;
+  border-left: 1px dashed var(--border);
+}
+.tree-folder.collapsed > .folder-body { display: none; }
+.placeholder { color: var(--text-muted); font-size: 0.78rem; font-style: italic; }
+
+/* ---- "Place this in which folder?" modal (publish/pull/move destination) ---- */
+.folder-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 27, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.folder-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.2rem 1.2rem;
+  width: min(90vw, 22rem);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+.folder-modal h4 {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  margin: 0 0 0.6rem;
+  color: var(--text);
+}
+.folder-modal label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0.5rem 0 0.15rem;
+}
+.folder-modal select,
+.folder-modal input {
+  width: 100%;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.fm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.9rem; }
+.fm-actions button { margin-top: 0; padding: 0.3rem 0.75rem; font-size: 0.78rem; }
+.fm-cancel { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.fm-cancel:hover { background: var(--border); }
+.fm-ok { background: var(--nasa-blue); }
+.fm-ok:hover { background: var(--nasa-blue-dark); }
+
 #public-library h4 {
   font-family: var(--font-display);
   font-size: 0.78rem;

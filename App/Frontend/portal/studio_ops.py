@@ -533,7 +533,7 @@ def write_graph(user, name: str, nodes: list, edges: list, description: str = ""
         graph["blocks"] = {n: {"header": b["header"], "body": b["body"]}
                            for n, b in blocks.items()}
     if is_block:
-        header = block_ops.derive_interface(nodes, edges, name=path.stem)
+        header = block_ops.derive_interface(nodes, edges, name=path.stem, blocks=blocks)
         previous = 0
         if path.exists():
             try:

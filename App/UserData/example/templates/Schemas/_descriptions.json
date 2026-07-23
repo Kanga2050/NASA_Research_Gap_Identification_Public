@@ -1,0 +1,12 @@
+{
+  "Coverage_Share": "Each group's share of its own total emphasis (Arithmetic: divide, grouped), mean-centred against the flat baseline a uniform profile would give (Arithmetic: subtract) -- so a theme exactly at the average reads as zero.",
+  "Embed_And_Project": "SPECTER2 embeddings plus the UMAP projections every later step reads: 5-D for clustering, 2-D for the maps.",
+  "Emphasis_Probe": "One risk theme's mean-centred emphasis: Semantic Score -> Group Aggregate -> Select Column -> Arithmetic (x1000). The repeated unit behind every cross-corpus and temporal emphasis figure; the query and the theme label are arguments, so one definition serves all ten themes.",
+  "Four_Corpora": "All four windows in one table, tagged by corpus: the OpenAlex harvest, the OSDR and Decadal PDF corpora, and the funded Task Book portfolio. One Combine CSVs node stacks them, so every row keeps its own corpus name.",
+  "Phrase_Counts": "Corpus-wide phrase counts: per-row n-gram frequencies summed into one key/sum table. Set the n-gram to 1 for terms, 2 for bigrams.",
+  "Relevance_Score": "Hybrid relevance: TF-IDF keyword scoring fused with SPECTER2 cosine similarity by reciprocal-rank fusion. Gives the fused score and the keyword-only score, so a caller can grade or filter on either.",
+  "Taskbook_Portfolio": "The NASA Task Book scrape: both collections parsed, stacked with a collection tag, and de-duplicated on task id into 6,353 unique awards.",
+  "Theme_Emphasis": "The ten spaceflight-risk themes as one long (group, theme, emphasis) table: the Emphasis_Probe unit instantiated once per theme (each with its own probe and score column) and stacked by Combine CSVs, whose source tag -- the theme label each instance wrote -- becomes the theme column.",
+  "Theme_Scores": "The same ten risk probes scored per passage, projected down to the per-paper profile table the co-occurrence analyses read.",
+  "Topic_Model": "HDBSCAN topic discovery over a coordinate column, with each topic named from its members' distinctive keywords."
+}

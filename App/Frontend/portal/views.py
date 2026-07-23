@@ -850,12 +850,20 @@ def save_template(request):
     if path is None:
         return JsonResponse({"error": "Invalid template name."}, status=400)
 
+    # Any nested block instances this graph uses travel with it, keyed by name, so a
+    # boundary wired straight into one types correctly and the graph stays portable.
+    nested_blocks = {n: {"header": b["header"], "body": b["body"]}
+                     for n, b in (payload.get("blocks") or {}).items()}
+    if nested_blocks:
+        graph["blocks"] = nested_blocks
+
     # Saving a block derives its interface from its boundary wiring and bumps its
     # version, which is what pipelines pin when they embed a frozen copy.
     if payload.get("is_block"):
         simple = studio_ops.from_drawflow(graph)
         try:
-            header = block_ops.derive_interface(simple["nodes"], simple["edges"], name=name)
+            header = block_ops.derive_interface(simple["nodes"], simple["edges"], name=name,
+                                                blocks=nested_blocks)
         except block_ops.BlockError as exc:
             return JsonResponse({"error": str(exc)}, status=400)
         previous = 0

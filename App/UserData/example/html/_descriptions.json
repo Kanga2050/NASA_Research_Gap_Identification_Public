@@ -1,17 +1,3 @@
 {
-  "E2E_Built_Report": "Built from paper “E2E_Built_Report”.",
-  "SB_Theme_CoOccurrence": "Within-paper co-emphasis correlation of the ten spaceflight-risk themes across the on-target literature (n=4,415) — which risks are studied together.",
-  "SB_Theme_Network": "Force-directed theme co-occurrence network; greedy-modularity communities with nodes coloured by 30-year momentum — the falling human-physiology risks form one connected community.",
-  "SB_Momentum_Acceleration": "Acceleration map: each theme's early (1995–99→2015–19) vs recent (2015–19→2020–24) emphasis momentum — is the drift speeding up or slowing?",
-  "SB_Trajectories_Annotated": "Five representative emphasis trajectories (1995–2024) annotated with the real-world programmes, facilities and landmark publications that drove them.",
-  "SB_Sequencing_Omics": "Omics & microbiome literature emphasis against NHGRI cost-per-genome (log, inverted) — the molecular turn as an exogenous, sequencing-cost-driven tide.",
-  "Space_Biology_Research_Gap_Report": "Built from paper “Space_Biology_Research_Gap_Report”.",
-  "Topics": "After filtering csvs with high semantic similarity to \"unknown/to be researched\", we developed a profile on what is considered important to research.",
-  "SB_Frontier_Map": "Intertopic distance map of the 10,499 literature papers that explicitly acknowledge an unknown (72 topics, HDBSCAN min_cluster_size 20 / min_samples 4 on the existing 5-D coords) — a documented rebuild of the Topics.html method, in the same projection as SB_Distance_Map.",
-  "Frontier_Density": "Share of each of the four corpora whose passages carry an explicit acknowledged-unknown cue. Funded proposals 22.9% > Decadal 9.9% ≈ Literature 9.2% > OSDR 5.3% — a finding about genre, not intellectual honesty.",
-  "Frontier_Retrieval": "AUC for retrieving passages containing an explicit hedge, by scoring method. SPECTER2 semantic scoring barely beats chance on abstracts (0.581) and hybrid RRF (0.661) lands BELOW keyword alone (0.742): embeddings encode topic, not epistemic stance.",
-  "Frontier_Openness_4way": "Per-theme openness lift — open-question rate among each corpus's most theme-leaning quarter minus its own baseline — across all four windows. Omics is the most-flagged theme in three of four; plant/crops the least-flagged in the literature.",
-  "Frontier_vs_Momentum": "Literature openness lift against 30-year emphasis momentum (r = −0.42): the field admits ignorance about the risks it is abandoning and stays quiet about the ones it is racing toward. SANS is the falling-and-unflagged outlier.",
-  "Frontier_vs_Funded": "Literature openness lift against funded emphasis (r = +0.54) — NASA's money is aimed at the themes the literature itself calls open, a third independent route to the finding that the funded portfolio is better-aimed than the published field.",
-  "Comprehensive_NLP_Analysis_of_Space_Biology_Research_Across_Internal_NASA_and_Pu": "Built from paper “Comprehensive_NLP_Analysis_of_Space_Biology_Research_Across_Internal_NASA_and_Pu”."
+  "E2E_Built_Report": "Built from paper “E2E_Built_Report”."
 }

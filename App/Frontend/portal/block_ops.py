@@ -30,10 +30,27 @@ from __future__ import annotations
 
 import json
 
-def _port_type(action: str, port: int, side: str) -> dict:
+def _port_type(action: str, port: int, side: str, blocks: dict | None = None) -> dict:
     """The wire kind (and accepted column types) of one inner port, read from the node
     manifest -- so a block's ports are typed by what they actually connect to and the
-    canvas type-checks a composite exactly as it checks any node."""
+    canvas type-checks a composite exactly as it checks any node.
+
+    ``action`` may itself be a block instance (``@Name``): a boundary wired straight into
+    a nested block (e.g. Theme_Emphasis's inputs feed ten ``@Emphasis_Probe`` instances)
+    is typed by recursing into that block's own already-derived header rather than
+    falling back to "any" -- the header carries the same {wire, accepts, kind, type}
+    shape ``_port_type`` itself produces, since it is how that block derived its ports.
+    """
+    if is_instance(action):
+        block = (blocks or {}).get(instance_block(action))
+        if block is None:
+            return {"wire": "any", "accepts": []}
+        specs = block["header"]["inputs"] if side == "in" else block["header"]["outputs"]
+        spec = specs[port] if port < len(specs) else None
+        if not spec:
+            return {"wire": "any", "accepts": []}
+        return {k: v for k, v in spec.items() if k in ("wire", "accepts", "kind", "type")}
+
     from .graph_manifest import MANIFEST
 
     entry = MANIFEST.get(action)
@@ -80,12 +97,14 @@ def instance_block(action: str) -> str:
 # --------------------------------------------------------------------------- #
 # Interface derivation
 # --------------------------------------------------------------------------- #
-def derive_interface(nodes: list, edges: list, name: str = "") -> dict:
+def derive_interface(nodes: list, edges: list, name: str = "", blocks: dict | None = None) -> dict:
     """Read a definition graph's boundary wiring into a block header.
 
     Ports come out in port order; a port's type is the type of the wire on it, which
     the canvas has already checked, so a block cannot claim a type its insides do not
-    produce. ``params`` are the inner parameters the author chose to expose.
+    produce. ``params`` are the inner parameters the author chose to expose. ``blocks``
+    are the already-known definitions of any nested ``@Name`` instances this one's
+    boundary wires into, so their types resolve instead of falling back to "any".
     """
     by_id = {str(n["id"]): n for n in nodes}
     entry_node = next((n for n in nodes if n["action"] == BLOCK_IN), None)
@@ -115,7 +134,7 @@ def derive_interface(nodes: list, edges: list, name: str = "") -> dict:
                 # the first target, kept flat for readers that only need one
                 "node": target["node"], "to_port": target["to_port"],
                 "action": target["action"],
-                **_port_type(target["action"], target["to_port"], "in")}
+                **_port_type(target["action"], target["to_port"], "in", blocks)}
         by_port[port] = spec
         inputs.append(spec)
 
@@ -129,7 +148,8 @@ def derive_interface(nodes: list, edges: list, name: str = "") -> dict:
                         "name": labels_out.get(port) or f"out{port + 1}",
                         "node": str(edge["from"]),
                         "from_port": int(edge.get("fromPort", 0)),
-                        **_port_type(producer.get("action", ""), 0, "out")})
+                        **_port_type(producer.get("action", ""), int(edge.get("fromPort", 0)),
+                                    "out", blocks)})
 
     promoted = meta.get("promoted") or []
     if isinstance(promoted, str):
@@ -148,26 +168,44 @@ def derive_interface(nodes: list, edges: list, name: str = "") -> dict:
     header = {"name": name or meta.get("block") or "Block",
               "version": int(meta.get("version") or 1),
               "inputs": inputs, "outputs": outputs, "params": params}
-    _check_types(header, nodes, edges)
+    _check_self_reference(header["name"], nodes, blocks)
+    _check_types(header, nodes, edges, blocks)
     return header
 
 
-def _check_types(header: dict, nodes: list, edges: list) -> None:
+def _check_self_reference(name: str, nodes: list, blocks: dict | None) -> None:
+    """A block cannot use an instance of itself, directly or through a nested block it
+    already carries the definition of -- ``expand``'s depth-8 bound catches a cycle at
+    run time, but failing here at save time gives a clear error before one is ever
+    written to disk."""
+    seen = set()
+
+    def contains(name_to_check, body_nodes):
+        for node in body_nodes:
+            action = node.get("action", "")
+            if not is_instance(action):
+                continue
+            used = instance_block(action)
+            if used == name_to_check:
+                return True
+            if used in seen:
+                continue
+            seen.add(used)
+            nested = (blocks or {}).get(used)
+            if nested and contains(name_to_check, nested["body"]["nodes"]):
+                return True
+        return False
+
+    if contains(name, nodes):
+        raise BlockError(f"{name!r} cannot contain an instance of itself.")
+
+
+def _check_types(header: dict, nodes: list, edges: list, blocks: dict | None = None) -> None:
     """Every wire inside the definition must be type-compatible, and every boundary port
     must carry the type of the inner port it stands for. The canvas checks this live as
     wires are drawn; this re-checks it when a block is saved, so a block cannot be stored
     with a port that lies about what it accepts or emits."""
-    from .graph_manifest import MANIFEST
-
     by_id = {str(n["id"]): n for n in nodes}
-
-    def out_type(node_id, port):
-        node = by_id.get(str(node_id))
-        if not node:
-            return None
-        if node["action"] in (BLOCK_IN,):
-            return None                       # a boundary input stands for the caller's wire
-        return _port_type(node["action"], int(port), "out")
 
     # Only the wire KIND (csv vs column) is statically known: a Select Column's or an
     # annotation's output column type is chosen at run time, so column subtypes are
@@ -177,8 +215,8 @@ def _check_types(header: dict, nodes: list, edges: list) -> None:
         dst = by_id.get(str(edge.get("to")))
         if not src or not dst or dst["action"] in (BLOCK_OUT,) or src["action"] in (BLOCK_IN,):
             continue
-        pw = _port_type(src["action"], int(edge.get("fromPort", 0)), "out").get("wire")
-        aw = _port_type(dst["action"], int(edge.get("toPort", 0)), "in").get("wire")
+        pw = _port_type(src["action"], int(edge.get("fromPort", 0)), "out", blocks).get("wire")
+        aw = _port_type(dst["action"], int(edge.get("toPort", 0)), "in", blocks).get("wire")
         if pw and aw and "any" not in (pw, aw) and pw != aw:
             raise BlockError(
                 f"{src['action']} emits a {pw} wire into {dst['action']}, which wants {aw}.")
