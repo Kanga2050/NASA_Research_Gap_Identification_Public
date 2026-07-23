@@ -1318,7 +1318,19 @@ ul.errorlist {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 0.5rem 0 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+.pl-pull {
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.68rem;
+  text-transform: none;
+  letter-spacing: normal;
+  background: var(--nasa-blue);
+}
+.pl-pull:hover { background: var(--nasa-blue-dark); }
 
 /* ---- Studio template controls ---- */
 .studio-templates {

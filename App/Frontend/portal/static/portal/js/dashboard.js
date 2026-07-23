@@ -132,7 +132,7 @@
           '" data-group="' + esc(group.label) + '">Select</button>' : "";
         if (!inner && !pickBtn) return "";
         if (isRoot) return inner;
-        return '<li class="tree-folder" data-path="' + esc(node.path) + '"><div class="folder-head">' +
+        return '<li class="tree-folder collapsed" data-path="' + esc(node.path) + '"><div class="folder-head">' +
           '<span class="folder-toggle">▾</span><span class="folder-name">' + esc(node.name) + "</span>" +
           pickBtn + "</div>" + '<ul class="file-list folder-body">' + inner + "</ul></li>";
       }
@@ -243,7 +243,7 @@
       var inner = node.folders.map(function (sf) { return folderNode(kind, sf, false); }).join("") +
         node.files.map(function (f) { return fileRow(kind, f); }).join("");
       if (isRoot) return inner || '<li class="placeholder">Nothing here yet.</li>';
-      return '<li class="tree-folder" data-path="' + esc(node.path) + '">' +
+      return '<li class="tree-folder collapsed" data-path="' + esc(node.path) + '">' +
         '<div class="folder-head"><span class="folder-toggle">▾</span> ' +
         '<span class="folder-name">' + esc(node.name) + "</span></div>" +
         '<ul class="file-list folder-body">' + inner + "</ul></li>";
@@ -358,6 +358,10 @@
   }
 
   // ---- Public library: navigable trees + folder-aware pull -----------------
+  // Read-only rendering of the public library, same as the dashboard's own trees:
+  // one "Pull" button per kind at the top of its group (not per row/folder) opens
+  // the same tree picker to choose what to pull, then a second pass of it to
+  // choose which of the user's own folders to land it in.
   function initPublicLibrary() {
     var lib = document.getElementById("public-library");
     if (!lib) return;
@@ -373,8 +377,7 @@
         return label ? '<span class="kind-tag">' + esc(label) + "</span>" : "";
       }).join("");
       return '<li class="file-row" data-kind="' + kind + '" data-name="' + esc(f.path) + '">' +
-        '<div class="file-main"><span class="file-name">' + esc(f.name) + suffix + "</span>" + tags +
-        '<button type="button" class="public-pull">Pull</button></div>' + desc + "</li>";
+        '<div class="file-main"><span class="file-name">' + esc(f.name) + suffix + "</span>" + tags + "</div>" + desc + "</li>";
     }
     function folderNode(kind, node, isRoot) {
       var inner = node.folders.map(function (sf) { return folderNode(kind, sf, false); }).join("") +
@@ -382,14 +385,14 @@
       if (isRoot) return inner;
       return '<li class="tree-folder collapsed" data-path="' + esc(node.path) + '">' +
         '<div class="folder-head"><span class="folder-toggle">▾</span> ' +
-        '<span class="folder-name">' + esc(node.name) + "</span>" +
-        '<button type="button" class="public-pull-folder" title="Pull whole folder">Pull folder</button>' +
-        '</div><ul class="file-list folder-body">' + inner + "</ul></li>";
+        '<span class="folder-name">' + esc(node.name) + "</span></div>" +
+        '<ul class="file-list folder-body">' + inner + "</ul></li>";
     }
     function group(kind, tree) {
       if (!tree || (!tree.folders.length && !tree.files.length)) return "";
-      return "<h4>" + esc(LABELS[kind]) + "</h4><ul class=\"file-list\">" +
-        folderNode(kind, tree, true) + "</ul>";
+      return '<h4>' + esc(LABELS[kind]) +
+        '<button type="button" class="pl-pull" data-kind="' + kind + '" title="Pull a file or folder into your library">Pull</button></h4>' +
+        '<ul class="file-list">' + folderNode(kind, tree, true) + "</ul>";
     }
     function pdfGroup(items) {
       if (!items || !items.length) return "";
@@ -409,30 +412,32 @@
       lib.innerHTML = html || '<p class="placeholder">The public library is empty.</p>';
     }).catch(function () { lib.innerHTML = '<p class="placeholder">Could not load the public library.</p>'; });
 
+    function doPull(kind) {
+      publicTree(kind).then(function (tree) {
+        return pickItem(kind, tree, "Pull which file or folder?", { pickFiles: true, pickFolders: true });
+      }).then(function (picked) {
+        if (!picked) return;
+        var label = picked.isFolder ? picked.folder.path.split("/").pop() : picked.file.name;
+        return pickDestination(kind, TREES[kind], "Pull “" + label + "” into which of your folders?").then(function (dest) {
+          if (dest === null) return;
+          var params = { kind: kind, folder: dest };
+          if (picked.isFolder) { params.path = picked.folder.path; params.is_folder = 1; }
+          else { params.name = picked.file.path; }
+          post(IMPORT_URL, params).then(reload);
+        });
+      });
+    }
+
     lib.addEventListener("click", function (e) {
       var t = e.target, folderEl = t.closest(".tree-folder");
       if (t.classList.contains("folder-toggle") || t.classList.contains("folder-name")) {
         if (folderEl) folderEl.classList.toggle("collapsed"); return;
       }
-      if (t.classList.contains("public-pull-folder")) {
-        // the folder's kind = the data-kind of any file row inside it
-        var anyRow = folderEl.querySelector(".file-row");
-        var fkind = anyRow ? anyRow.getAttribute("data-kind") : null;
-        if (!fkind) return;
-        pickDestination(fkind, TREES[fkind], "Import folder into which of your folders?").then(function (dest) {
-          if (dest === null) return;
-          post(IMPORT_URL, { kind: fkind, path: folderEl.getAttribute("data-path"), is_folder: 1, folder: dest }).then(reload);
-        });
-        return;
-      }
+      if (t.classList.contains("pl-pull")) { doPull(t.getAttribute("data-kind")); return; }
       if (!t.classList.contains("public-pull")) return;
       var row = t.closest(".file-row");
-      var rkind = row.getAttribute("data-kind"), rname = row.getAttribute("data-name");
-      if (rkind === "pdf") { post(URLS.pdfImport, { name: rname }).then(reload); return; }
-      pickDestination(rkind, TREES[rkind], "Import into which of your folders?").then(function (dest) {
-        if (dest === null) return;
-        post(IMPORT_URL, { kind: rkind, name: rname, folder: dest }).then(reload);
-      });
+      var rname = row.getAttribute("data-name");
+      post(URLS.pdfImport, { name: rname }).then(reload);
     });
   }
 
