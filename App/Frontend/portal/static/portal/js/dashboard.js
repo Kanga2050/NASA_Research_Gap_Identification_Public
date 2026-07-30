@@ -23,10 +23,7 @@
     });
   }
 
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
+  var esc = window.esc; // shared helper, see text_escape.js
 
   function safe(fn) {
     try { fn(); } catch (e) { if (window.console) console.error(e); }
@@ -642,7 +639,10 @@
           }
           setTimeout(poll, 1200);
         })
-        .catch(function () { setTimeout(poll, 2000); });
+        .catch(function (err) {
+          if (window.console) console.warn("Task progress poll failed:", err);
+          setTimeout(poll, 2000);
+        });
     }
 
     poll();

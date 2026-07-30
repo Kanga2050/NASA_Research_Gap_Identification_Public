@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .crypto_fields import EncryptedCharField
+
 
 class ApiKey(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys")
@@ -67,7 +69,7 @@ class AgentSettings(models.Model):
         PRO = "gemini-2.5-pro", "Gemini 2.5 Pro"
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agent_settings")
-    gemini_api_key = models.CharField(max_length=200, blank=True)
+    gemini_api_key = EncryptedCharField(max_length=500, blank=True)
     model = models.CharField(max_length=64, choices=GeminiModel.choices, default=GeminiModel.FLASH)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -91,7 +93,7 @@ class ExternalApiSettings(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="external_api_settings"
     )
-    openalex_api_key = models.CharField(max_length=200, blank=True)
+    openalex_api_key = EncryptedCharField(max_length=500, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     @property

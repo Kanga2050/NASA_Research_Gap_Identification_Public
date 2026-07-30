@@ -3,3 +3,6 @@
 .venv/
 .tmp
 *.tmp
+.dev_secret_key
+.dev_field_encryption_key
+__pycache__/

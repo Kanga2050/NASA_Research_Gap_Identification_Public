@@ -27,7 +27,7 @@ from App.Servers.storage_paths import resolve_csv_path, resolve_pdf_folder
 
 # Identifies us to the OpenAlex and Crossref "polite pools", which grant a higher
 # rate limit to requests that carry a contact address.
-CONTACT_EMAIL = "shauryachauhan2050@gmail.com"
+CONTACT_EMAIL = os.environ.get("OPENALEX_CONTACT_EMAIL", "shauryachauhan2050@gmail.com")
 
 
 # --------------------------------------------------------------------------- #
@@ -38,6 +38,27 @@ OPENALEX_COLUMNS = [
     "openalex_id", "title", "doi", "text", "publish_time",
     "authors", "journal", "pmcid", "pubmed_id",
 ]
+
+
+def _get_with_retry(url: str, params: dict, *, timeout: int = 60, max_retries: int = 4):
+    """GET with exponential backoff on transient failures (timeouts, connection drops,
+    429 rate-limits, 5xx) so a single blip doesn't abort an otherwise-healthy scrape."""
+    import requests
+
+    last_exc: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = requests.get(url, params=params, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+            if attempt >= max_retries:
+                raise
+            wait = min(2**attempt, 30)
+            print(f"Request failed ({exc}); retrying in {wait}s (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(wait)
+    raise last_exc  # unreachable, satisfies type-checkers
 
 
 def _inverted_index_to_text(index: dict) -> str:
@@ -89,8 +110,6 @@ def openalex_scraper(
     """Fetch up to `limit` works matching `topic` (that have an abstract) from the
     OpenAlex API into a brand-new CSV. Rows are streamed to disk in pages of 200 as
     they arrive, so partial progress survives an interruption."""
-    import requests
-
     limit = int(limit)
     params = {
         "search": topic,
@@ -108,15 +127,18 @@ def openalex_scraper(
         params["api_key"] = api_key
 
     output_path = resolve_csv_path(csv_name, csv_root)
-    pd.DataFrame(columns=OPENALEX_COLUMNS).to_csv(output_path, index=False)
     print(f"Searching OpenAlex for '{topic}' (abstracts only); target up to {limit:,} papers → '{csv_name}.csv'.")
 
+    # The destination isn't touched until the first real batch arrives, so a request
+    # that fails immediately (rate limit, network outage) never clobbers whatever was
+    # already at `csv_name` -- only a successful fetch replaces it, as a scrape "into a
+    # brand-new CSV" implies.
     collected = 0
+    wrote_header = False
     while params["cursor"] and collected < limit:
         try:
             print(progress_line(f"Downloading '{topic}' papers", collected, limit))
-            response = requests.get(OPENALEX_URL, params=params, timeout=60)
-            response.raise_for_status()
+            response = _get_with_retry(OPENALEX_URL, params, timeout=60)
             data = response.json()
 
             results = data.get("results", [])
@@ -136,14 +158,26 @@ def openalex_scraper(
 
             if batch:
                 pd.DataFrame(batch, columns=OPENALEX_COLUMNS).to_csv(
-                    output_path, mode="a", header=False, index=False
+                    output_path, mode="w" if not wrote_header else "a",
+                    header=not wrote_header, index=False,
                 )
+                wrote_header = True
 
             params["cursor"] = data.get("meta", {}).get("next_cursor")
             time.sleep(0.1)
         except Exception as exc:
+            if collected == 0:
+                # Nothing was ever saved, so there is no partial progress worth keeping --
+                # surface the failure instead of reporting a silent, empty "success" that
+                # only shows up later as a confusing "no columns found" error downstream.
+                raise RuntimeError(f"OpenAlex request failed before any papers were collected: {exc}") from exc
             print(f"Stopped early after an error ({exc}); {collected:,} papers already saved.")
             break
+
+    if not wrote_header:
+        # A genuine zero-match search (not a caught error, handled above) still gets a
+        # valid, correctly-headed, empty CSV rather than leaving a stale prior file.
+        pd.DataFrame(columns=OPENALEX_COLUMNS).to_csv(output_path, index=False)
 
     print(progress_line(f"Downloading '{topic}' papers", collected, min(limit, max(collected, 1))))
     print(f"Success! Saved {collected:,} '{topic}' papers (with abstracts) to new file '{csv_name}.csv'.")

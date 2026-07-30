@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import os
-import queue
 import threading
 import sys
 from contextlib import redirect_stdout
@@ -27,12 +26,18 @@ from App.Backend import registry
 from .models import TaskRecord
 
 shared_task_registry: dict[str, dict[str, Any]] = {}
-pending_tasks: queue.Queue[str] = queue.Queue()
+# FIFO of (user_id, task_id) awaiting dispatch, guarded by task_condition. A plain
+# list (rather than queue.Queue) so the dispatcher can skip past a busy user's task
+# to reach a later, dispatchable one instead of head-of-line blocking every user
+# behind whichever task happens to be at the front.
+pending_tasks: list[tuple[int, str]] = []
 active_users: set[int] = set()
 active_count = 0
 task_condition = threading.Condition()
 dispatcher_started = False
 max_parallel_tasks = int(os.environ.get("DJANGO_MAX_PARALLEL_TASKS", "4"))
+# Backpressure on the pending queue itself, independent of MAX_REGISTRY_TASKS below.
+MAX_PENDING_TASKS = int(os.environ.get("DJANGO_MAX_PENDING_TASKS", "500"))
 # Hard ceiling on how many tasks the in-memory registry retains. Evicted entries
 # are transparently rebuilt from the database on the next status poll, so this
 # only bounds memory - it never loses data.
@@ -105,19 +110,22 @@ def _ensure_dispatcher_started() -> None:
 
 def _dispatcher_loop() -> None:
     global active_count
-    while True:
-        task_id = pending_tasks.get()
-        try:
-            task = TaskRecord.objects.select_related("user").get(task_id=task_id)
-            with task_condition:
-                while task.user_id in active_users or active_count >= max_parallel_tasks:
-                    task_condition.wait(timeout=1.0)
-                active_users.add(task.user_id)
-                active_count += 1
+    with task_condition:
+        while True:
+            dispatch_idx = None
+            if active_count < max_parallel_tasks:
+                for i, (user_id, _task_id) in enumerate(pending_tasks):
+                    if user_id not in active_users:
+                        dispatch_idx = i
+                        break
+            if dispatch_idx is None:
+                task_condition.wait(timeout=1.0)
+                continue
 
-            threading.Thread(target=_run_task, args=(task.task_id,), daemon=True, name=f"Task-{task.task_id}").start()
-        finally:
-            pending_tasks.task_done()
+            user_id, task_id = pending_tasks.pop(dispatch_idx)
+            active_users.add(user_id)
+            active_count += 1
+            threading.Thread(target=_run_task, args=(task_id, user_id), daemon=True, name=f"Task-{task_id}").start()
 
 
 def _deserialize_callable(function_name: str) -> Callable[..., Any]:
@@ -139,10 +147,13 @@ def _set_status(task_id: str, status: str, **update_fields: Any) -> None:
     shared_task_registry[task_id]["status"] = status
 
 
-def _run_task(task_id: str) -> None:
+def _run_task(task_id: str, user_id: int) -> None:
+    # user_id is passed in by the dispatcher (which already looked the task up)
+    # rather than re-fetched here, so a lookup failure below can't skip the
+    # `finally` release and leak this user's concurrency slot forever.
     global active_count
-    task = TaskRecord.objects.select_related("user").get(task_id=task_id)
     try:
+        task = TaskRecord.objects.select_related("user").get(task_id=task_id)
         _set_status(task_id, TaskRecord.Status.WORKING, started_at=django_timezone.now())
         print(f"[Task Engine] Running task {task_id} ({task.function_name}) for user {task.user_id}...")
 
@@ -162,13 +173,16 @@ def _run_task(task_id: str) -> None:
         shared_task_registry[task_id]["error"] = str(exc)
     finally:
         with task_condition:
-            active_users.discard(task.user_id)
+            active_users.discard(user_id)
             active_count = max(0, active_count - 1)
             task_condition.notify_all()
 
 
 def queue_user_task(user, function_name: str, *args, **kwargs) -> dict[str, Any]:
     _ensure_dispatcher_started()
+    with task_condition:
+        if len(pending_tasks) >= MAX_PENDING_TASKS:
+            raise RuntimeError("Task queue is full; try again shortly.")
     task = TaskRecord.objects.create(
         user=user,
         task_id=os.urandom(16).hex(),
@@ -178,7 +192,9 @@ def queue_user_task(user, function_name: str, *args, **kwargs) -> dict[str, Any]
         kwargs_json=kwargs,
     )
     _update_registry(task)
-    pending_tasks.put(task.task_id)
+    with task_condition:
+        pending_tasks.append((task.user_id, task.task_id))
+        task_condition.notify_all()
     return {"task_id": task.task_id, "status": task.status}
 
 

@@ -140,12 +140,24 @@ def as_bool(value) -> bool:
 
 def parse_vector(value) -> np.ndarray:
     """Parse one stored embedding/coordinate cell ("[0.1, 0.2, ...]") into a vector."""
-    return np.asarray(ast.literal_eval(value), dtype=float)
+    try:
+        parsed = ast.literal_eval(value)
+    except (ValueError, SyntaxError) as exc:
+        raise ValueError(f"Could not parse vector cell (not a valid Python literal): {value!r}") from exc
+    return np.asarray(parsed, dtype=float)
 
 
 def stacked_vectors(series: pd.Series) -> np.ndarray:
-    """Stack a column of stringified vectors into a single (n_rows × n_dims) matrix."""
-    return np.vstack(series.apply(parse_vector).values)
+    """Stack a column of stringified vectors into a single (n_rows × n_dims) matrix.
+    Reports the offending row's index if a cell fails to parse, rather than letting
+    one bad cell surface as an opaque error with no row-level diagnostics."""
+    vectors = []
+    for row_index, value in series.items():
+        try:
+            vectors.append(parse_vector(value))
+        except ValueError as exc:
+            raise ValueError(f"Row {row_index}: {exc}") from exc
+    return np.vstack(vectors)
 
 
 def drop_excluded(df: pd.DataFrame, column: str, exclude: str) -> pd.DataFrame:

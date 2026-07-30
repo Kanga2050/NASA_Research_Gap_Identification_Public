@@ -30,10 +30,16 @@ combined_app = FastAPI(
     ]
 )
 
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 combined_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    # allow_origins=["*"] combined with allow_credentials=True is not a legal CORS
+    # response (browsers reject it) so it silently degrades to reflecting whatever
+    # Origin the caller sends -- i.e. any site can make credentialed requests against
+    # the Django session cookie mounted below. Require an explicit allowlist instead.
+    allow_origins=_cors_origins,
+    allow_credentials=bool(_cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -41,4 +47,6 @@ combined_app.add_middleware(
 combined_app.mount("/", django_app)
 
 if __name__ == "__main__":
-    uvicorn.run(combined_app, host="127.0.0.1", port=8000)
+    host = os.environ.get("SERVER_HOST", "127.0.0.1")
+    port = int(os.environ.get("SERVER_PORT", "8000"))
+    uvicorn.run(combined_app, host=host, port=port)

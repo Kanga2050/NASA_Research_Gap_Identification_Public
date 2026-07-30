@@ -19,7 +19,7 @@ from App.Frontend.portal import paper_ops, studio_ops
 from App.Frontend.portal.services import resolve_api_key
 from App.Frontend.portal.task_engine import get_task_status, queue_user_task
 from App.Frontend.webapp.storage import user_csv_root, user_paper_root, user_pdf_root, user_template_root
-from App.Servers.pipeline_tools import queue_from_api, register_api_routes
+from App.Servers.pipeline_tools import ROOT_BUILDERS, queue_from_api, register_api_routes
 
 from Servers.Getter_Functions.Get_Csv_Catalog import get_csv_catalog as _get_csv_catalog
 from Servers.Getter_Functions.Get_Csv_Segment import get_csv_segment as _get_csv_segment
@@ -56,11 +56,6 @@ def _current_user(x_api_key: str | None = Header(default=None, alias="X-API-Key"
 
 
 CurrentUser = Depends(_current_user)
-
-# A chart's .html lives right alongside the Studio recipe that made it (the
-# "template" root); a paper's built report lives right alongside its own .json
-# document (the "paper" root) -- there is no longer a standalone "html" root.
-ROOT_BUILDERS = {"csv": user_csv_root, "html": user_template_root, "pdf": user_pdf_root}
 
 # --------------------------------------------------------------------------- #
 # The pipeline endpoints (Import / Annotation / Distillation / Visualization).

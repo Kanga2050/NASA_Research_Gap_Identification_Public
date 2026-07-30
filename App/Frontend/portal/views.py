@@ -364,11 +364,7 @@ def _copy_folder_between(src_root: Path, dst_root: Path, path: str, dest_folder:
         return None
     dst_parent = folders.safe_dir(dst_root, dest_folder)
     dst_parent.mkdir(parents=True, exist_ok=True)
-    dst = dst_parent / src_dir.name
-    index = 2
-    while dst.exists():
-        dst = dst_parent / f"{src_dir.name}_{index}"
-        index += 1
+    dst, _ = _unique_destination(dst_parent, src_dir.name, "")
     shutil.copytree(src_dir, dst)
     return dst.name
 
@@ -597,12 +593,7 @@ def _copy_pdf_collection(src_root: Path, dst_root: Path, name: str) -> str | Non
     if not name or not source.is_dir():
         return None
 
-    destination = dst_root / name
-    index = 2
-    while destination.exists():
-        destination = dst_root / f"{name}_{index}"
-        index += 1
-
+    destination, _ = _unique_destination(dst_root, name, "")
     shutil.copytree(source, destination)
     description = get_description(src_root, name)
     if description:

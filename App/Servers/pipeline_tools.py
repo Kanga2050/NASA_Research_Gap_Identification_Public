@@ -25,6 +25,14 @@ from pydantic import Field, create_model
 
 from App.Backend import registry
 from App.Backend.registry import Function, Param
+from App.Frontend.webapp.storage import user_csv_root, user_pdf_root, user_template_root
+
+# A chart's .html lives right alongside the Studio recipe that made it (the
+# "template" root); a paper's built report lives right alongside its own .json
+# document (the "paper" root) -- there is no longer a standalone "html" root.
+# Shared here (rather than duplicated in api_runtime.py and mcp_runtime.py) so the
+# two runtimes can't drift on which storage root each kind resolves to.
+ROOT_BUILDERS = {"csv": user_csv_root, "html": user_template_root, "pdf": user_pdf_root}
 
 # The REST tag / MCP grouping each family of function is published under.
 API_TAGS = {

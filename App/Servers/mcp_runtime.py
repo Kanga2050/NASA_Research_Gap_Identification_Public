@@ -21,7 +21,7 @@ from App.Frontend.portal import paper_ops, studio_ops
 from App.Frontend.portal.services import resolve_api_key
 from App.Frontend.portal.task_engine import get_task_history as _get_task_history, get_task_status as _get_task_status, queue_user_task
 from App.Frontend.webapp.storage import user_csv_root, user_paper_root, user_pdf_root, user_template_root
-from App.Servers.pipeline_tools import queue_from_api, register_mcp_tools
+from App.Servers.pipeline_tools import ROOT_BUILDERS, queue_from_api, register_mcp_tools
 
 from Servers.Getter_Functions.Get_Csv_Catalog import get_csv_catalog as _get_csv_catalog
 from Servers.Getter_Functions.Get_Csv_Segment import get_csv_segment as _get_csv_segment
@@ -29,11 +29,6 @@ from Servers.Getter_Functions.List_Html_Files import list_html_files as _list_ht
 from Servers.Getter_Functions.List_Pdf_Folders import list_pdf_folders as _list_pdf_folders
 
 mcp = FastMCP("NLP Analysis Platform")
-
-# A chart's .html lives right alongside the Studio recipe that made it (the
-# "template" root); a paper's built report lives right alongside its own .json
-# document (the "paper" root) -- there is no longer a standalone "html" root.
-ROOT_BUILDERS = {"csv": user_csv_root, "html": user_template_root, "pdf": user_pdf_root}
 
 
 def _html_roots(user):
@@ -120,6 +115,18 @@ def list_pdf_folders(api_key: str) -> str:
 # are the same code paths the browser editor uses, so anything you change here shows
 # up in the user's Synthesize tab (it reloads the open paper after your turn).
 # --------------------------------------------------------------------------- #
+def _clean(call):
+    """Run a paper/studio operation, turning PaperError/StudioError into a plain
+    ValueError carrying just their message -- the MCP-side counterpart to
+    api_runtime._paper()'s HTTPException(400, ...) wrapping, so a known, expected
+    failure reaches the calling agent as one clean line instead of this server's
+    internal exception type and traceback."""
+    try:
+        return call()
+    except (paper_ops.PaperError, studio_ops.StudioError) as exc:
+        raise ValueError(str(exc)) from None
+
+
 def _json_arg(value, what: str):
     """Structured tool arguments arrive as a JSON string from most model clients;
     accept either that or an already-decoded object."""
@@ -144,7 +151,7 @@ def get_paper_schema() -> str:
 def list_papers(api_key: str) -> list:
     """[Synthesize] List the user's saved research papers, each with its title,
     description and block/source counts. Start here to find the paper to work on."""
-    return paper_ops.list_papers(_get_user(api_key))
+    return _clean(lambda: paper_ops.list_papers(_get_user(api_key)))
 
 
 @mcp.tool(name="get_paper_outline")
@@ -153,7 +160,7 @@ def get_paper_outline(api_key: str, name: str) -> dict:
     type, heading number and a text preview, plus the numbered source list. Use this
     to see the paper's structure and to find the index a block sits at -- those are
     the indexes `edit_paper` addresses. Much cheaper than `get_paper`."""
-    return paper_ops.outline_paper(_get_user(api_key), name)
+    return _clean(lambda: paper_ops.outline_paper(_get_user(api_key), name))
 
 
 @mcp.tool(name="get_paper")
@@ -161,7 +168,7 @@ def get_paper(api_key: str, name: str) -> dict:
     """[Synthesize] The FULL block-model JSON of one paper -- every block's text.
     Use it when you need to read or rewrite actual prose; for structure alone, prefer
     the cheaper `get_paper_outline`."""
-    return paper_ops.read_paper(_get_user(api_key), name)
+    return _clean(lambda: paper_ops.read_paper(_get_user(api_key), name))
 
 
 @mcp.tool(name="edit_paper")
@@ -182,7 +189,7 @@ def edit_paper(api_key: str, name: str, ops: str) -> dict:
     Ops apply in order and indexes shift as they do, so when inserting several blocks
     work back-to-front. Call get_paper_schema for the block format. Heading numbers
     are recomputed automatically -- never write a `num`. Returns the new outline."""
-    return paper_ops.edit_paper(_get_user(api_key), name, _json_arg(ops, "ops"))
+    return _clean(lambda: paper_ops.edit_paper(_get_user(api_key), name, _json_arg(ops, "ops")))
 
 
 @mcp.tool(name="save_paper")
@@ -191,7 +198,7 @@ def save_paper(api_key: str, name: str, doc: str, description: str = "") -> dict
     complete block-model document. `doc` is the JSON {"title","blocks","sources"} --
     call get_paper_schema for the format. To change part of a paper that already
     exists, use `edit_paper` instead: this replaces the whole document."""
-    return paper_ops.write_paper(_get_user(api_key), name, _json_arg(doc, "doc"), description)
+    return _clean(lambda: paper_ops.write_paper(_get_user(api_key), name, _json_arg(doc, "doc"), description))
 
 
 @mcp.tool(name="build_paper")
@@ -201,7 +208,7 @@ def build_paper(api_key: str, name: str, output_name: str = "") -> dict:
     visualizations, where `list_html_files`/`display_html_file` can see it, and where
     it can even be used as a figure inside another paper. `output_name` defaults to the
     paper's name."""
-    return paper_ops.build_paper(_get_user(api_key), name, output_name)
+    return _clean(lambda: paper_ops.build_paper(_get_user(api_key), name, output_name))
 
 
 # --------------------------------------------------------------------------- #
@@ -220,14 +227,14 @@ def get_studio_manifest() -> dict:
 def list_studio_pipelines(api_key: str) -> list:
     """[Studio] List the user's saved Studio pipelines (the canvas's Templates
     dropdown), each with its description, node count and the actions it runs."""
-    return studio_ops.list_graphs(_get_user(api_key))
+    return _clean(lambda: studio_ops.list_graphs(_get_user(api_key)))
 
 
 @mcp.tool(name="get_studio_pipeline")
 def get_studio_pipeline(api_key: str, name: str) -> dict:
     """[Studio] Read one saved pipeline as a {nodes, edges} graph -- what it does, how
     it is wired, and which parameters each node uses."""
-    return studio_ops.read_graph(_get_user(api_key), name)
+    return _clean(lambda: studio_ops.read_graph(_get_user(api_key), name))
 
 
 @mcp.tool(name="save_studio_pipeline")
@@ -237,8 +244,8 @@ def save_studio_pipeline(api_key: str, name: str, graph: str, description: str =
     "toPort"}]} -- see get_studio_manifest for the actions, ports and wiring rules.
     This only saves it; call `run_studio_pipeline` to actually execute it."""
     data = _json_arg(graph, "graph")
-    return studio_ops.write_graph(_get_user(api_key), name, data.get("nodes", []),
-                                  data.get("edges", []), description)
+    return _clean(lambda: studio_ops.write_graph(_get_user(api_key), name, data.get("nodes", []),
+                                                  data.get("edges", []), description))
 
 
 @mcp.tool(name="run_studio_pipeline")
@@ -247,16 +254,19 @@ def run_studio_pipeline(api_key: str, name: str = "", graph: str = "") -> dict:
     order (exactly what the canvas's Run button does). Pass either `name` (a saved
     pipeline) or an inline `graph` (the same JSON as save_studio_pipeline). Returns one
     task_id per queued node -- poll them with get_task_status."""
-    user = _get_user(api_key)
-    if name:
-        data = studio_ops.read_graph(user, name)
-    elif graph:
-        data = _json_arg(graph, "graph")
-    else:
-        raise ValueError("Pass either `name` (a saved pipeline) or an inline `graph`.")
-    tasks = studio_ops.queue_graph(user, data.get("nodes", []), data.get("edges", []),
-                                   blocks=data.get("blocks") or {})
-    return {"queued": len(tasks), "tasks": tasks}
+    def run():
+        user = _get_user(api_key)
+        if name:
+            data = studio_ops.read_graph(user, name)
+        elif graph:
+            data = _json_arg(graph, "graph")
+        else:
+            raise studio_ops.StudioError("Pass either `name` (a saved pipeline) or an inline `graph`.")
+        tasks = studio_ops.queue_graph(user, data.get("nodes", []), data.get("edges", []),
+                                       blocks=data.get("blocks") or {})
+        return {"queued": len(tasks), "tasks": tasks}
+
+    return _clean(run)
 
 
 # --------------------------------------------------------------------------- #

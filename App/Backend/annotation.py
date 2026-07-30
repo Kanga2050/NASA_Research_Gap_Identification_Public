@@ -139,9 +139,16 @@ def cluster(
 
     valid_rows = df[embedding_column].dropna().index
     print(f"Parsing {len(valid_rows):,} coordinate vectors from '{embedding_column}'...")
+    if len(valid_rows) < 2:
+        raise ValueError(f"Column '{embedding_column}' has {len(valid_rows)} non-null row(s); need at least 2 to cluster.")
     matrix = stacked_vectors(df.loc[valid_rows, embedding_column])
 
     min_cluster_size, min_samples = int(min_cluster_size), int(min_samples)
+    if min_cluster_size > matrix.shape[0]:
+        raise ValueError(
+            f"min_cluster_size ({min_cluster_size}) exceeds the {matrix.shape[0]:,} available rows; "
+            "lower min_cluster_size or provide more data."
+        )
     print(f"Running HDBSCAN on {matrix.shape[0]:,} points (min_cluster_size={min_cluster_size}, min_samples={min_samples})...")
     print("Density clustering runs as one pass with no incremental progress; please wait...")
     clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, min_samples=min_samples, metric="euclidean")
@@ -178,7 +185,13 @@ def keyword_score(
     # matrices, so keep it rather than densifying for the hand-rolled numpy version.
     print(f"Building TF-IDF vocabulary over {len(corpus):,} documents...")
     vectorizer = TfidfVectorizer(stop_words="english")
-    tfidf_matrix = vectorizer.fit_transform(corpus)
+    try:
+        tfidf_matrix = vectorizer.fit_transform(corpus)
+    except ValueError as exc:
+        raise ValueError(
+            f"Could not build a TF-IDF vocabulary from column '{text_column}': every row is empty "
+            "or contains only English stopwords after filtering."
+        ) from exc
     query_vector = vectorizer.transform([query])
 
     print(f"Scoring {len(corpus):,} documents by keyword (TF-IDF cosine) similarity to '{query}'...")

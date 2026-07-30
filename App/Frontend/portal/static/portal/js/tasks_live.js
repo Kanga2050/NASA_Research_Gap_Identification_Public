@@ -15,11 +15,7 @@
   if (!recentList && !activeList) return;
   var POLL_MS = 1500;
   var lastJson = null;
-
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
+  var esc = window.esc; // shared helper, see text_escape.js
 
   function renderRecent(tasks) {
     if (!recentList) return;
@@ -55,6 +51,10 @@
   }
 
   function poll() {
+    if (document.visibilityState === "hidden") {
+      setTimeout(poll, POLL_MS);
+      return;
+    }
     fetch("/tasks/feed/", { headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : { tasks: [] }; })
       .then(function (d) {
@@ -66,7 +66,7 @@
           renderActive(tasks);
         }
       })
-      .catch(function () {})
+      .catch(function (err) { if (window.console) console.warn("Task feed poll failed:", err); })
       .then(function () { setTimeout(poll, POLL_MS); });
   }
 

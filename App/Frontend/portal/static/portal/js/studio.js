@@ -33,6 +33,12 @@
   var BLOCKS = {};
   var BLOCK_PREFIX = "@";
 
+  // The template this canvas was loaded from (or last saved as), so Run can silently
+  // autosave over it first -- a blank/unnamed canvas (currentTemplateName === null)
+  // never autosaves, it just runs.
+  var currentTemplateName = null;
+  var currentTemplateIsBlock = false;
+
   function isInstance(action) { return !!action && action.indexOf(BLOCK_PREFIX) === 0; }
   function blockNameOf(action) { return action.slice(BLOCK_PREFIX.length); }
 
@@ -120,10 +126,7 @@
   }
 
   // ---------------------------------------------------------------- helpers
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
+  var esc = window.esc; // shared helper, see text_escape.js
   function mergeCols(a, b) {
     var seen = {}, out = [];
     a.concat(b).forEach(function (c) { if (c && c.name && !seen[c.name]) { seen[c.name] = 1; out.push(c); } });
@@ -1555,7 +1558,21 @@
     runBtn.disabled = true;
     runBtn.textContent = "Queuing…";
     runResults.innerHTML = "";
-    fetch(RUN_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF }, body: JSON.stringify(payload) })
+
+    // Running a template autosaves it first, so the canvas you just ran is always what's
+    // on disk -- no separate "did you save?" step between editing and running. A canvas
+    // with no template identity (never loaded/saved) just runs, same as before.
+    var beforeRun = currentTemplateName
+      ? saveGraphAs(currentTemplateName, TEMPLATE_RAW_DESC[currentTemplateName] || "", currentTemplateIsBlock)
+          .then(function (res) {
+            if (!res.ok || res.data.error) flash("Autosave failed: " + (res.data.error || "could not save template."));
+          })
+          .catch(function () { flash("Autosave failed: network error."); })
+      : Promise.resolve();
+
+    beforeRun.then(function () {
+      return fetch(RUN_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF }, body: JSON.stringify(payload) });
+    })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
       .then(function (res) {
         if (!res.ok || res.data.error) {
@@ -1580,6 +1597,7 @@
 
   var TEMPLATE_KIND = {};
   var TEMPLATE_DESC = {};
+  var TEMPLATE_RAW_DESC = {}; // unadorned description, as stored -- what autosave writes back
 
   function refreshTemplateList() {
     if (!TEMPLATES_URL) return;
@@ -1590,8 +1608,10 @@
         refreshBlockPalette(items);
         TEMPLATE_KIND = {};
         TEMPLATE_DESC = {};
+        TEMPLATE_RAW_DESC = {};
         items.forEach(function (t) {
           TEMPLATE_KIND[t.name] = t.kind || "pipeline";
+          TEMPLATE_RAW_DESC[t.name] = t.description || "";
           TEMPLATE_DESC[t.name] = t.kind === "block" && t.ports
             ? "(" + t.ports.inputs.length + " in / " + t.ports.outputs.length + " out)" +
               (t.description ? " — " + t.description : "")
@@ -1601,25 +1621,31 @@
       .catch(function () {});
   }
 
+  // Shared by the manual Save button and Run's autosave, so both persist the canvas
+  // the exact same way.
+  function saveGraphAs(name, description, isBlock) {
+    var graph = editor.export();
+    graph.blocks = BLOCKS;
+    return fetch(TEMPLATE_SAVE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+      body: JSON.stringify({ name: name, description: description, graph: graph, is_block: !!isBlock })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); });
+  }
+
   if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
     var payload = compile();
     if (!payload.nodes.length) { flash("Add some nodes before saving a template."); return; }
-    var name = (prompt("Template name:") || "").trim();
+    var name = (prompt("Template name:", currentTemplateName || "") || "").trim();
     if (!name) return;
-    var description = (prompt("Description (optional):") || "").trim();
-    fetch(TEMPLATE_SAVE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
-      body: JSON.stringify(function () {
-        var graph = editor.export();
-        graph.blocks = BLOCKS;
-        return { name: name, description: description, graph: graph,
-                 is_block: !!document.getElementById("save-as-block").checked };
-      }())
-    })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    var description = (prompt("Description (optional):", TEMPLATE_RAW_DESC[name] || "") || "").trim();
+    var isBlock = !!document.getElementById("save-as-block").checked;
+    saveGraphAs(name, description, isBlock)
       .then(function (res) {
         if (!res.ok || res.data.error) { flash(res.data.error || "Could not save template."); return; }
+        currentTemplateName = res.data.name;
+        currentTemplateIsBlock = isBlock;
+        TEMPLATE_RAW_DESC[res.data.name] = description;
         flash("Saved template “" + res.data.name + "”.");
         refreshTemplateList();
       })
@@ -1636,6 +1662,8 @@
         // since here you are editing the schema itself, not calling it). To CALL a schema,
         // drag it from the Schemas palette; that drops an instance + its definition region.
         importGraph(d.graph);
+        currentTemplateName = name;
+        currentTemplateIsBlock = TEMPLATE_KIND[name] === "block";
         if (TEMPLATE_KIND[name] === "block" && d.graph.block) {
           var box = document.getElementById("save-as-block");
           if (box) box.checked = true;                 // so re-saving keeps it a schema
@@ -1698,6 +1726,8 @@
         .then(function (d) {
           if (d.error || !d.graph) throw new Error(d.error || "Could not load pipeline.");
           importGraph(d.graph);
+          currentTemplateName = name;
+          currentTemplateIsBlock = TEMPLATE_KIND[name] === "block";
           refreshTemplateList();
         });
     }
@@ -1709,6 +1739,10 @@
     try { editor.clear(); } finally { restoring = false; }
     if (CSV_NAMES.length) createNode("__csv__", 40, 60);
     saveLocal();
+    // A cleared canvas is no longer "that" template -- Run must not autosave blank
+    // nodes over whatever was loaded before.
+    currentTemplateName = null;
+    currentTemplateIsBlock = false;
   });
 
   // Restore the saved canvas if present; otherwise seed a starter CSV node so

@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import html as _html
 import re
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 DEFAULT_H = 500          # default figure height (px); width is always the column width
 PAPER_EMBED_H = 760      # default height for an embedded paper/non-chart HTML
@@ -114,21 +116,78 @@ PLOT_CSS = ("<style>"
 # --------------------------------------------------------------------------- #
 # Inline text: allow only a small, known-safe subset of markup through.
 # --------------------------------------------------------------------------- #
-_SCRIPT_RE = re.compile(r"<\s*/?\s*script[^>]*>", re.I)
-_ON_ATTR_RE = re.compile(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.I)
-_JS_URI_RE = re.compile(r"javascript:", re.I)
+_ALLOWED_INLINE_TAGS = {"b", "strong", "i", "em", "sup", "sub", "a", "span"}
+_ALLOWED_INLINE_ATTRS = {"a": {"href"}, "span": {"class"}}
+_ALLOWED_URL_SCHEMES = {"http", "https", "mailto"}
+
+
+def _safe_url(value: str) -> str:
+    try:
+        scheme = urlsplit(value).scheme.lower()
+    except ValueError:
+        return "#"
+    # No scheme at all (relative link / #fragment) is fine; anything with an
+    # explicit scheme must be on the allowlist (blocks javascript:, data:, vbscript:…).
+    if scheme and scheme not in _ALLOWED_URL_SCHEMES:
+        return "#"
+    return value
+
+
+class _InlineSanitizer(HTMLParser):
+    """Allowlist-based sanitizer for author-supplied inline HTML: only
+    _ALLOWED_INLINE_TAGS survive, only _ALLOWED_INLINE_ATTRS on those tags, and
+    only http(s)/mailto URLs. Everything else (script, iframe, object, svg, style,
+    event-handler attributes, javascript:/data: URIs, …) is dropped as a tag but
+    its inner text is kept (escaped), matching an editor's expectation that typing
+    an unsupported tag loses the markup, not the content."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in _ALLOWED_INLINE_TAGS:
+            return
+        allowed_attrs = _ALLOWED_INLINE_ATTRS.get(tag, set())
+        kept = []
+        for name, value in attrs:
+            if name not in allowed_attrs:
+                continue
+            value = value or ""
+            if name == "href":
+                value = _safe_url(value)
+            kept.append(f'{name}="{_html.escape(value, quote=True)}"')
+        attr_str = (" " + " ".join(kept)) if kept else ""
+        self.out.append(f"<{tag}{attr_str}>")
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag in _ALLOWED_INLINE_TAGS:
+            self.out.append(f"</{tag}>")
+
+    def handle_endtag(self, tag):
+        if tag in _ALLOWED_INLINE_TAGS:
+            self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self.out.append(_html.escape(data, quote=False))
+
+    def handle_entityref(self, name):
+        self.out.append(f"&{name};")
+
+    def handle_charref(self, name):
+        self.out.append(f"&#{name};")
 
 
 def _clean_inline(text) -> str:
-    """Strip scripts / event handlers / javascript: URIs from author inline HTML.
+    """Sanitize author inline HTML down to _ALLOWED_INLINE_TAGS/_ALLOWED_INLINE_ATTRS.
     Bold, italic, tag pills, citation sups and anchors pass through untouched."""
     if text is None:
         return ""
-    s = str(text)
-    s = _SCRIPT_RE.sub("", s)
-    s = _ON_ATTR_RE.sub("", s)
-    s = _JS_URI_RE.sub("#", s)
-    return s
+    parser = _InlineSanitizer()
+    parser.feed(str(text))
+    parser.close()
+    return "".join(parser.out)
 
 
 def _esc(text) -> str:

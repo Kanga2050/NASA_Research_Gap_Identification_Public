@@ -57,13 +57,8 @@
   }
 
   // ---- Small utils ---------------------------------------------------------
-  function escText(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function escAttr(s) {
-    return escText(s).replace(/"/g, "&quot;");
-  }
+  var escText = window.escText; // shared helper, see text_escape.js
+  var escAttr = window.escAttr;
   function setStatus(msg, kind) {
     statusEl.textContent = msg || "";
     statusEl.className = "synth-status" + (kind ? " " + kind : "");
