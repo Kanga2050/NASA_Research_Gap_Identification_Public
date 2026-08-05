@@ -1,0 +1,36 @@
+name: Django
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download spaCy English model
+        run: python -m spacy download en_core_web_sm
+
+      - name: Django system check
+        run: python App/Frontend/manage.py check
+
+      - name: Run tests
+        run: python App/Frontend/manage.py test App/Frontend/portal

@@ -1,4 +1,5 @@
 Django
+cryptography
 fastapi
 fastmcp
 uvicorn

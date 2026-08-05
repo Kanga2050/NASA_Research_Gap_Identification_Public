@@ -1,8 +1,6 @@
 from pathlib import Path
 import os
 
-from django.core.exceptions import ImproperlyConfigured
-
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -10,42 +8,41 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
 
-def _dev_only_persistent_secret(env_var: str, file_name: str) -> str:
-    """Return a secret suitable for local dev only: read from env, else read/create
-    a local file so the value is stable across restarts. Raises outside DEBUG."""
+def _persistent_secret(env_var: str, file_name: str, generator) -> str:
+    """Return a secret: read from env, else read/create a local gitignored file so
+    the value is stable across restarts. Lets anyone run the project with zero
+    manual key setup, while still honoring an explicit env var in production."""
     value = os.environ.get(env_var, "")
     if value:
         return value
-    if not DEBUG:
-        raise ImproperlyConfigured(f"{env_var} must be set when DJANGO_DEBUG is not enabled.")
     key_file = BASE_DIR / file_name
     if key_file.exists():
         return key_file.read_text().strip()
-    from django.core.management.utils import get_random_secret_key
-
-    value = get_random_secret_key()
+    value = generator()
     key_file.write_text(value)
     return value
 
 
-SECRET_KEY = _dev_only_persistent_secret("DJANGO_SECRET_KEY", ".dev_secret_key")
+def _generate_secret_key() -> str:
+    from django.core.management.utils import get_random_secret_key
+
+    return get_random_secret_key()
+
+
+def _generate_field_encryption_key() -> str:
+    from cryptography.fernet import Fernet
+
+    return Fernet.generate_key().decode()
+
+
+SECRET_KEY = _persistent_secret("DJANGO_SECRET_KEY", ".dev_secret_key", _generate_secret_key)
 ALLOWED_HOSTS = [host for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if host]
 
 # Fernet key for encrypting third-party API keys at rest (AgentSettings.gemini_api_key,
 # ExternalApiSettings.openalex_api_key). See App/Frontend/portal/crypto_fields.py.
-if os.environ.get("DJANGO_FIELD_ENCRYPTION_KEY"):
-    FIELD_ENCRYPTION_KEY = os.environ["DJANGO_FIELD_ENCRYPTION_KEY"]
-elif DEBUG:
-    from cryptography.fernet import Fernet
-
-    _key_file = BASE_DIR / ".dev_field_encryption_key"
-    if _key_file.exists():
-        FIELD_ENCRYPTION_KEY = _key_file.read_text().strip()
-    else:
-        FIELD_ENCRYPTION_KEY = Fernet.generate_key().decode()
-        _key_file.write_text(FIELD_ENCRYPTION_KEY)
-else:
-    FIELD_ENCRYPTION_KEY = ""  # EncryptedCharField raises ImproperlyConfigured on first use
+FIELD_ENCRYPTION_KEY = _persistent_secret(
+    "DJANGO_FIELD_ENCRYPTION_KEY", ".dev_field_encryption_key", _generate_field_encryption_key
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

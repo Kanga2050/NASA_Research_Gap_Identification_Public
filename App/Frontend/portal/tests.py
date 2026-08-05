@@ -12,7 +12,10 @@ one, the tasks queued for it would silently receive their arguments in the wrong
 -- a corrupted CSV rather than a crash. That used to be a real hazard: the argument
 order was restated by hand in five places. Now it is stated once, and asserted here.
 
-Run with:  python App/Frontend/manage.py test App.Frontend.portal
+Run with:  python App/Frontend/manage.py test App/Frontend/portal
+(the path form, not the dotted-module form: App has no __init__.py, so it's a
+namespace package and unittest's dotted-label discovery breaks on it -- the
+module object's __file__ is None, and dirname(None) raises TypeError.)
 """
 from __future__ import annotations
 
